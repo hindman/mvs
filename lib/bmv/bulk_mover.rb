@@ -21,6 +21,17 @@ module Bmv
       puts 'run()'
       puts "Options: #{opts}"
       puts "Args: #{args}"
+
+      # get_options
+      # exit if opts.help          # Do this here, not parse_options()
+      # get_orig_file_names
+      # set_new_file_names
+      # prune_renamings
+      # check_for_non_unique_new_names
+      # check_for_collisions
+      # check_dirs_of_new_names
+      # rename_files
+
     end
 
     def setup_parser
