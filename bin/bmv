@@ -3,14 +3,9 @@
 require 'bmv'
 
 def main(args)
-
-  mover = BulkMover.new
-  mover.setup_parser
-  mover.parse_options(args)
+  mover = Bmv::BulkMover.new(args: args)
   mover.run
-
 end
-
 
 main(ARGV) if __FILE__ == $PROGRAM_NAME
 

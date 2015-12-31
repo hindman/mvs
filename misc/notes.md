@@ -20,12 +20,6 @@
     Options and modes:
         --dryrun         # Also support: --dry and --dry-run
 
-    Notes:
-
-        - Code executes against a renaming object having various attributes.
-        - Some examples:
-            --rename 'nm.sub /foobar/, "blah"'
-            --rename '"#{base}.foobar.#{ext}"'
 
 ### Input options to take OLD and NEW names
 
@@ -39,6 +33,7 @@
         --file_only
         --dirs_only
 
+
 ### Important options
 
     Options and modes:
@@ -49,6 +44,7 @@
         --copy
         --link SOFT|HARD
 
+
 ### File naming patterns and sequences
 
     Tranformations:
@@ -57,6 +53,7 @@
             --n1 START
             --n1 START,STOP             # Cycle when hitting STOP.
             --n1 START,STOP,SKIP
+
 
 ### Tranformations via scriptlets
 
@@ -73,6 +70,7 @@
         --trim
         --whitespace X    # All whitespace to single X
 
+
 ### More input sources and structures
 
     Input sources:
@@ -88,10 +86,12 @@
     Input filters
         --filter CODE        # Retain input item if code returns true.
 
+
 ### Preferences
 
     Options and modes:
         ~/.bmv/options.yml
+
 
 ### Undo mode and log management
 
@@ -103,12 +103,14 @@
         --prune_logs N      # Keep N most recent renaming logs.
         --no_log
 
+
 ### Editor and mv modes
 
     Options and modes:
 
         --editor            # Open renamings in text file.
         --mv                # Behave like mv (with logging, etc).
+
 
 ### File attribute modes
 
@@ -117,6 +119,7 @@
         --access_time TIME
         --modfy_time TIME
         --create_time TIME
+
 
 ### Output options
 
