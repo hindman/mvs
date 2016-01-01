@@ -3,6 +3,10 @@ require 'pathname'
 module Bmv
   class Path
 
+    # A simple data class to hold a path to a file or directory
+    # and the various components of the path. User code does
+    # not interact directly with these intances.
+
     attr_accessor(
       :path,
       :directory,
@@ -18,16 +22,6 @@ module Bmv
       @extension = @path.extname()           #             .txt    ''
       @stem      = @path.basename(extension) #         fubb        blah
     end
-
-    # def p    ; path.to_s      ; end
-    # def d    ; directory.to_s ; end
-    # def f    ; file_name.to_s ; end
-    # def s    ; stem.to_s      ; end
-    # def e    ; extension.to_s ; end
-
-    # def dir  ; directory.to_s ; end
-    # def file ; file_name.to_s ; end
-    # def ext  ; extension.to_s ; end
 
   end
 end

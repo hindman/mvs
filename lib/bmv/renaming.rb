@@ -13,12 +13,16 @@ module Bmv
     )
 
     def initialize(kws = {})
-      self.old_path = kws.fetch(:old_path, nil)
-      self.new_path = kws.fetch(:new_path, nil)
-      @diagnostics = Set.new
+      self.old_path  = kws.fetch(:old_path, nil)
+      self.new_path  = kws.fetch(:new_path, nil)
+      @diagnostics   = Set.new
       @should_rename = nil
-      @was_renamed = false
+      @was_renamed   = nil
     end
+
+    ####
+    # Setters for the old and new paths.
+    ####
 
     def old_path=(path)
       @old_path = make_path(path)
@@ -31,6 +35,10 @@ module Bmv
     def make_path(path)
       path.nil? ? nil : Bmv::Path.new(path)
     end
+
+    ####
+    # The Renaming as either a string or hash.
+    ####
 
     def to_s
       "#<Renaming old_path=#{old_path.path}, new_path=#{new_path.path}"
@@ -51,6 +59,11 @@ module Bmv
       end
       return h
     end
+
+    ####
+    # Convenience methods to get file name components from the old_path.
+    # These are intended to be used in the user-supplied renaming code.
+    ####
 
     def p    ; old_path.path.to_s      ; end
     def d    ; old_path.directory.to_s ; end
