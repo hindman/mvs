@@ -93,9 +93,9 @@ module Bmv
       # Unpack input parameters.
       args = kws.fetch(:args, [])
       @streams = {
-        stdout: kws.fetch(:stdout, $stdout),
-        stderr: kws.fetch(:stderr, $stderr),
-        stdin:  kws.fetch(:stdin,  $stdin),
+        :stdout => kws.fetch(:stdout, $stdout),
+        :stderr => kws.fetch(:stderr, $stderr),
+        :stdin  => kws.fetch(:stdin,  $stdin),
       }
 
       # Parse CLI options and get old paths.
