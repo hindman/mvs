@@ -15,7 +15,7 @@ module Bmv
       :renamings,
       :should_rename,
       :run_time,
-      :streams,
+      :streams
     )
 
     ####

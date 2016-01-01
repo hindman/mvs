@@ -3,13 +3,13 @@ module Bmv
 
     attr_reader(
       :old_path,
-      :new_path,
+      :new_path
     )
 
     attr_accessor(
       :diagnostics,
       :should_rename,
-      :was_renamed,
+      :was_renamed
     )
 
     def initialize(kws = {})

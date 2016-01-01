@@ -12,7 +12,7 @@ module Bmv
       :directory,
       :file_name,
       :extension,
-      :stem,
+      :stem
     )
 
     def initialize(path)                     # Example 1           Example 2
