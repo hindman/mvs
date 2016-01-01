@@ -15,6 +15,7 @@ module Bmv
       :renamings,
       :should_rename,
       :run_time,
+      :streams,
     )
 
     ####
@@ -25,12 +26,13 @@ module Bmv
       setup_options_parser
       @should_rename = nil
       @run_time = Time.now
+      @streams = nil
     end
 
     def setup_options_parser
       # Defaults.
       @opts        = OpenStruct.new
-      opts.rename  = 'path'
+      opts.rename  = nil
       opts.dryrun  = false
       opts.confirm = false
       opts.help    = false
@@ -74,18 +76,22 @@ module Bmv
     end
 
     ####
-    # Run the renaming process.
+    # The renaming process: run()
     ####
 
     def run(kws = {})
       # Unpack input parameters.
-      args  = kws.fetch(:args, [])
-      stdin = kws.fetch(:stdin, $stdin)
+      args = kws.fetch(:args, [])
+      @streams = {
+        stdout: kws.fetch(:stdout, $stdout),
+        stderr: kws.fetch(:stderr, $stderr),
+        stdin:  kws.fetch(:stdin,  $stdin),
+      }
 
       # Parse CLI options and get old paths.
       parse_options(args)
       handle_options
-      process_stdin(stdin)
+      process_stdin
 
       # Create the Renaming instances, with both old_path and new_path.
       initialize_renamings
@@ -109,6 +115,10 @@ module Bmv
       print_summary
     end
 
+    ####
+    # The renaming process: options and old paths.
+    ####
+
     def parse_options(args)
       # Parse CLI options and get any positional arguments.
       @cli_args = Array.new(args)
@@ -119,30 +129,34 @@ module Bmv
     def handle_options
       # Help.
       if opts.help
-        puts @parser
-        exit 0
+        quit(0, parser.to_s)
       end
 
       # Create .bmv directory.
       if opts.init
         create_directory(log_dir)
-        exit 0
+        msg = "Created directory: #{bmv_dir}"
+        quit(0, msg)
       end
 
       # Quit if there is no .bmv directory.
       unless directory_exists(log_dir)
         msg = 'The .bmv directory does not exist. Run `bmv --init` to create it.'
-        abort(msg)
+        quit(1, msg)
       end
 
     end
 
-    def process_stdin(stdin)
+    def process_stdin
       # If the user did not supply positional arguments, get the old paths
       # from standard input.
       return unless pos_args.empty?
-      @pos_args = stdin.map(&:chomp)
+      @pos_args = streams[:stdin].map(&:chomp)
     end
+
+    ####
+    # The renaming process: renaming instances and their paths.
+    ####
 
     def initialize_renamings
       # Create the Renaming objects.
@@ -151,17 +165,23 @@ module Bmv
 
     def set_new_paths
       # Use the user-supplied code to add a method to the Renaming class.
-      renaming_code = %Q[
-        def compute_new_path
-          #{opts.rename}
-        end
-      ]
-      Bmv::Renaming.send(:class_eval, renaming_code)
+      unless opts.rename.nil?
+        renaming_code = %Q[
+          def compute_new_path
+            #{opts.rename}
+          end
+        ]
+        Bmv::Renaming.send(:class_eval, renaming_code)
+      end
       # Execute that method to create the new paths.
       renamings.each { |r|
         r.new_path = r.compute_new_path()
       }
     end
+
+    ####
+    # The renaming process: diagnostics.
+    ####
 
     def check_for_missing_old_paths
       # The old paths should exist.
@@ -207,6 +227,10 @@ module Bmv
       }
     end
 
+    ####
+    # The renaming process: decide what to rename.
+    ####
+
     def handle_diagnostics
       # Evaluate the diagnostics to determine whether to proceed at all and, if
       # so, which paths to rename. Those decisions are held in the
@@ -229,35 +253,42 @@ module Bmv
       # Get user confirmation, if needed.
       return unless opts.confirm
       return unless should_rename
-      puts to_yaml(brief = true)
-      print "\nProceed? [y/n] "
-      reply = $stdin.gets.chomp.downcase
+      say(to_yaml(brief = true))
+      say("\nProceed? [y/n] ", :write)
+      reply = streams[:stdin].gets.chomp.downcase
       @should_rename = false unless reply == 'y'
     end
+
+    ####
+    # The renaming process: rename and produce output.
+    ####
 
     def rename_files
       # Implement the renamings.
       return unless should_rename
       renamings.each { |r|
-        # TODO.
         flag = r.should_rename ? 'Y' : 'n'
-        puts "RENAME: #{flag}: #{r.old_path.path} -> #{r.new_path.path}"
+        r.was_renamed = r.should_rename
+        say("RENAME: #{flag}: #{r.old_path.path} -> #{r.new_path.path}")
       }
     end
 
     def write_log
       # Write the renaming data to a log file.
-      File.open(log_path, 'w') { |fh| fh.write(to_yaml) }
+      write_file(log_path, to_yaml)
     end
 
     def print_summary
       # Print summary information.
-      h = {
+      say(summary.to_yaml)
+    end
+
+    def summary
+      {
         'n_paths'   => renamings.size,
         'n_renamed' => renamings.select(&:was_renamed).size,
         'log_file'  => log_path,
       }
-      puts h.to_yaml
     end
 
     ####
@@ -284,7 +315,7 @@ module Bmv
     end
 
     ####
-    # Miscellaneous helpers.
+    # Helpers: paths to bmv directories and logs.
     ####
 
     def bmv_dir
@@ -298,6 +329,24 @@ module Bmv
     def log_path
       file_name = run_time.strftime('%Y_%m_%d_%H_%M_%S') + '.yaml'
       File.join(log_dir, file_name)
+    end
+
+    ####
+    # Side-effects: interaction with file system, printing, exiting, etc.
+    ####
+
+    def quit(code, msg)
+      stream = code == 0 ? streams[:stdout] : streams[:stderr]
+      stream.puts(msg) unless msg.nil?
+      Kernel.exit(code)
+    end
+
+    def say(msg, meth = :puts)
+      streams[:stdout].send(meth, msg)
+    end
+
+    def write_file(path, msg)
+      File.open(path, 'w') { |fh| fh.write(msg) }
     end
 
     def path_exists(path)

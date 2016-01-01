@@ -45,19 +45,30 @@ module Bmv
     end
 
     def to_h(brief = false)
-      h = {
-        'old_path'      => old_path.path.to_s,
-        'new_path'      => new_path.path.to_s,
-        'diagnostics'   => diagnostics.map(&:to_s).sort,
-        'should_rename' => should_rename,
-        'was_renamed'   => was_renamed,
-      }
+      op = old_path.path.to_s
+      np = new_path.path.to_s
       if brief
-        h.delete('diagnostics')
-        h.delete('should_rename')
-        h.delete('was_renamed')
+        {
+          'old_path' => op,
+          'new_path' => np,
+        }
+      else
+        {
+          'old_path'      => op,
+          'new_path'      => np,
+          'diagnostics'   => diagnostics.map(&:to_s).sort,
+          'should_rename' => should_rename,
+          'was_renamed'   => was_renamed,
+        }
       end
-      return h
+    end
+
+    ####
+    # The default renaming code: new path same as old path.
+    ####
+
+    def compute_new_path
+      old_path.path.to_s
     end
 
     ####
@@ -65,17 +76,17 @@ module Bmv
     # These are intended to be used in the user-supplied renaming code.
     ####
 
-    def p    ; old_path.path.to_s      ; end
-    def d    ; old_path.directory.to_s ; end
-    def f    ; old_path.file_name.to_s ; end
-    def s    ; old_path.stem.to_s      ; end
-    def e    ; old_path.extension.to_s ; end
-
     def path ; old_path.path.to_s      ; end
     def dir  ; old_path.directory.to_s ; end
     def file ; old_path.file_name.to_s ; end
     def stem ; old_path.stem.to_s      ; end
     def ext  ; old_path.extension.to_s ; end
+
+    def p    ; old_path.path.to_s      ; end
+    def d    ; old_path.directory.to_s ; end
+    def f    ; old_path.file_name.to_s ; end
+    def s    ; old_path.stem.to_s      ; end
+    def e    ; old_path.extension.to_s ; end
 
   end
 end
