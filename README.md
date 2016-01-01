@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/hindman/bmv.svg?branch=master)](https://travis-ci.org/hindman/bmv)
+
 # Bmv
 
 A bulk file and directory renamer, written in Ruby.
