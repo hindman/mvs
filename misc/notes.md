@@ -12,6 +12,10 @@
         stdin
         ARGV
 
+    Input structures:
+        --concatenated      # ORIG names, then NEW names
+        --pairs
+
     Tranformations:
         --rename CODE
         - support filename components: path, directory, file_name, stem, ext
@@ -19,19 +23,6 @@
     Options and modes:
         --dryrun         # Also support: --dry and --dry-run
         --confirm
-
-
-### Input options to take OLD and NEW names
-
-    Input structures:
-        --concatenated      # ORIG names, then NEW names
-        --pairs
-        --rows
-        --delimiter X
-
-    Input filters:
-        --file_only
-        --dirs_only
 
 
 ### Important options
@@ -43,6 +34,11 @@
         --copy
         --link SOFT|HARD
 
+### Project
+
+    README: bare bones
+    Gemspec
+    Travis CI
 
 ### Tranformations: sequences and scriptlets
 
@@ -68,6 +64,8 @@
 ### More input sources and structures
 
     Input sources:
+        --rows
+        --delimiter X
         --input FILE
         --clipboard
         --input_glob GLOB    # Mainly for Windows.
@@ -78,6 +76,8 @@
         --reverse            # reverse names
 
     Input filters
+        --file_only
+        --dirs_only
         --filter CODE        # Retain input item if code returns true.
 
 
@@ -85,6 +85,13 @@
 
     Options and modes:
         ~/.bmv/options.yml
+
+
+### Project
+
+    README
+    Release Gem
+    Announce: Stackoverflow, etc
 
 
 ### Undo mode and log management

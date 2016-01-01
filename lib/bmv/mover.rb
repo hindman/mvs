@@ -33,6 +33,8 @@ module Bmv
       # Defaults.
       @opts        = OpenStruct.new
       opts.rename  = nil
+      opts.pairs   = false
+      opts.concat  = false
       opts.dryrun  = false
       opts.confirm = false
       opts.help    = false
@@ -50,6 +52,14 @@ module Bmv
 
         p.on('-r', '--rename CODE') { |c|
           opts.rename = c
+        }
+
+        p.on('--pairs', 'Supply old and new paths in pairwise fashion') {
+          opts.pairs = true
+        }
+
+        p.on('--concat', 'Supply old and new paths in concatenated fashion') {
+          opts.concat = true
         }
 
         p.on('--dryrun', '--dry-run', '--dry_run', 'Dryrun mode') {
@@ -90,8 +100,9 @@ module Bmv
 
       # Parse CLI options and get old paths.
       parse_options(args)
-      handle_options
+      handle_special_options
       process_stdin
+      handle_normal_options
 
       # Create the Renaming instances, with both old_path and new_path.
       initialize_renamings
@@ -120,13 +131,14 @@ module Bmv
     ####
 
     def parse_options(args)
-      # Parse CLI options and get any positional arguments.
+      # Parse CLI options and get any positional arguments. If the user did not
+      # supply positional arguments, get the input paths from standard input.
       @cli_args = Array.new(args)
       @pos_args = Array.new(args)
       @parser.parse!(@pos_args)
     end
 
-    def handle_options
+    def handle_special_options
       # Help.
       if opts.help
         quit(0, parser.to_s)
@@ -148,10 +160,23 @@ module Bmv
     end
 
     def process_stdin
-      # If the user did not supply positional arguments, get the old paths
-      # from standard input.
-      return unless pos_args.empty?
-      @pos_args = streams[:stdin].map(&:chomp)
+      @pos_args = streams[:stdin].map(&:chomp) if pos_args.empty?
+    end
+
+    def handle_normal_options
+      # Input paths: require at least 1.
+      if pos_args.size < 1
+        msg = 'At least one input path is required.'
+        quit(1, msg)
+      end
+
+      # Input paths: require even number with some options.
+      if pos_args.size.odd?
+        if opts.pairs || opts.concat
+          msg = 'An even number of input paths is required for --pairs and --concat.'
+          quit(1, msg)
+        end
+      end
     end
 
     ####
@@ -160,19 +185,24 @@ module Bmv
 
     def initialize_renamings
       # Create the Renaming objects.
-      @renamings = pos_args.map { |path| Bmv::Renaming.new(old_path: path) }
+      @renamings = positional_indexes.map { |i, j|
+        op = pos_args[i]
+        np = pos_args[j]
+        Bmv::Renaming.new(old_path: op, new_path: np)
+      }
     end
 
     def set_new_paths
+      return if opts.pairs
+      return if opts.concat
+      return if opts.rename.nil?
       # Use the user-supplied code to add a method to the Renaming class.
-      unless opts.rename.nil?
-        renaming_code = %Q[
-          def compute_new_path
-            #{opts.rename}
-          end
-        ]
-        Bmv::Renaming.send(:class_eval, renaming_code)
-      end
+      renaming_code = %Q[
+        def compute_new_path
+          #{opts.rename}
+        end
+      ]
+      Bmv::Renaming.send(:class_eval, renaming_code)
       # Execute that method to create the new paths.
       renamings.each { |r|
         r.new_path = r.compute_new_path()
@@ -283,6 +313,25 @@ module Bmv
       say(summary.to_yaml)
     end
 
+    ####
+    # Data structures during the renaming process.
+    ####
+
+    def positional_indexes
+      # Returns an array of index pairs. Each pair provide the indexes to get
+      # an old_path and new_path from @pos_args. In the default case, the
+      # old_path and new_path start out with the same value.
+      size = pos_args.size
+      half = size / 2
+      if opts.pairs
+        (0...size).step(2).map { |i| [i, i + 1] }
+      elsif opts.concat
+        (0...half).map { |i| [i, i + half] }
+      else
+        (0...size).map { |i| [i, i] }
+      end
+    end
+
     def summary
       {
         'n_paths'   => renamings.size,
@@ -290,10 +339,6 @@ module Bmv
         'log_file'  => log_path,
       }
     end
-
-    ####
-    # The renamings as a data structure.
-    ####
 
     def to_h(brief = false)
       if brief

@@ -64,14 +64,6 @@ module Bmv
     end
 
     ####
-    # The default renaming code: new path same as old path.
-    ####
-
-    def compute_new_path
-      old_path.path.to_s
-    end
-
-    ####
     # Convenience methods to get file name components from the old_path.
     # These are intended to be used in the user-supplied renaming code.
     ####
