@@ -3,7 +3,7 @@ require 'spec_helper'
 describe Bmv::Renaming do
 
   let(:br) {
-    Bmv::Renaming.new(old_path: 'foo', new_path: 'bar')
+    Bmv::Renaming.new({:old_path => 'foo', :new_path => 'bar'})
   }
 
   context 'path setting' do
@@ -55,7 +55,7 @@ describe Bmv::Renaming do
         :ext  => '.txt',
         :stem => 'fubb',
       }
-      r = Bmv::Renaming.new(old_path: h[:path])
+      r = Bmv::Renaming.new({:old_path => h[:path]})
       h.each { |k, v|
         expect(r.send(k)).to eql(v)
       }
