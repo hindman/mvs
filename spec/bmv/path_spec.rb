@@ -4,41 +4,41 @@ describe Bmv::Path do
 
   let(:full_path) {
       {
-        path:      'foo/bar/fubb.txt',
-        directory: 'foo/bar',
-        file_name: 'fubb.txt',
-        extension: '.txt',
-        stem:      'fubb',
+        :path      => 'foo/bar/fubb.txt',
+        :directory => 'foo/bar',
+        :file_name => 'fubb.txt',
+        :extension => '.txt',
+        :stem      => 'fubb',
       }
   }
 
   let(:bare_file_name) {
       {
-        path:      'fubb',
-        directory: '.',
-        file_name: 'fubb',
-        extension: '',
-        stem:      'fubb',
+        :path      => 'fubb',
+        :directory => '.',
+        :file_name => 'fubb',
+        :extension => '',
+        :stem      => 'fubb',
       }
   }
 
   let(:extra_chars) {
       {
-        path:      'foo//bar//fubb..txt',
-        directory: 'foo//bar',
-        file_name: 'fubb..txt',
-        extension: '.txt',
-        stem:      'fubb.',
+        :path      => 'foo//bar//fubb..txt',
+        :directory => 'foo//bar',
+        :file_name => 'fubb..txt',
+        :extension => '.txt',
+        :stem      => 'fubb.',
       }
   }
 
   let(:empty_path) {
       {
-        path:      '',
-        directory: '.',
-        file_name: '',
-        extension: '',
-        stem:      '',
+        :path      => '',
+        :directory => '.',
+        :file_name => '',
+        :extension => '',
+        :stem      => '',
       }
   }
 

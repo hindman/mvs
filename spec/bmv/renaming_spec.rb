@@ -49,11 +49,11 @@ describe Bmv::Renaming do
 
     it 'expected values' do
       h = {
-        path: 'foo/bar/fubb.txt',
-        dir:  'foo/bar',
-        file: 'fubb.txt',
-        ext:  '.txt',
-        stem: 'fubb',
+        :path => 'foo/bar/fubb.txt',
+        :dir  => 'foo/bar',
+        :file => 'fubb.txt',
+        :ext  => '.txt',
+        :stem => 'fubb',
       }
       r = Bmv::Renaming.new(old_path: h[:path])
       h.each { |k, v|
