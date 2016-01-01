@@ -188,7 +188,7 @@ module Bmv
       @renamings = positional_indexes.map { |i, j|
         op = pos_args[i]
         np = pos_args[j]
-        Bmv::Renaming.new(old_path: op, new_path: np)
+        Bmv::Renaming.new({:old_path => op, :new_path => np})
       }
     end
 
