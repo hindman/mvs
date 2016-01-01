@@ -1,5 +1,5 @@
-require 'bmv/bulk_mover'
-require 'bmv/file_name'
+require 'bmv/mover'
+require 'bmv/path'
 require 'bmv/renaming'
 require 'bmv/version'
 

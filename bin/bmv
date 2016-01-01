@@ -3,7 +3,7 @@
 require 'bmv'
 
 def main(args)
-  Bmv::BulkMover.new.run(args: args)
+  Bmv::Mover.new.run(args: args)
 end
 
 main(ARGV) if __FILE__ == $PROGRAM_NAME

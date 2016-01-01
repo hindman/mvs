@@ -6,9 +6,7 @@
         - Fail fast.
         - Take OLD names first via ARGV, else via STDIN.
         - Rename only if NEW name differs from OLD name.
-        - Print only basic metadata as YAML:
-            - stats: N OLD, renamed
-            - log location
+        - Print only summary metadata as YAML.
 
     Input sources:
         stdin
@@ -16,9 +14,11 @@
 
     Tranformations:
         --rename CODE
+        - support filename components: path, directory, file_name, stem, ext
 
     Options and modes:
         --dryrun         # Also support: --dry and --dry-run
+        --confirm
 
 
 ### Input options to take OLD and NEW names
@@ -37,7 +37,6 @@
 ### Important options
 
     Options and modes:
-        --confirm
         --clobber yes|no|ask
         --make_dirs
         --backup EXT|N|CODE
@@ -45,19 +44,14 @@
         --link SOFT|HARD
 
 
-### File naming patterns and sequences
+### Tranformations: sequences and scriptlets
 
     Tranformations:
-        - file name patterns
+
         - sequence numbers: n1, n2, n3
             --n1 START
             --n1 START,STOP             # Cycle when hitting STOP.
             --n1 START,STOP,SKIP
-
-
-### Tranformations via scriptlets
-
-    Tranformations:
 
         - Implement tranformation recipes as scriptlets, some of which will be
           supplied by bmv and some via a user scriptlet directory.
