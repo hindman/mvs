@@ -295,11 +295,13 @@ module Bmv
 
     def rename_files
       # Implement the renamings.
-      return unless should_rename
       renamings.each { |r|
-        flag = r.should_rename ? 'Y' : 'n'
-        r.was_renamed = r.should_rename
-        say("RENAME: #{flag}: #{r.old_path.path} -> #{r.new_path.path}")
+        if should_rename && r.should_rename
+          FileUtils.mv(r.old_path.path, r.new_path.path)
+          r.was_renamed = true
+        else
+          r.was_renamed = false
+        end
       }
     end
 
