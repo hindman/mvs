@@ -35,6 +35,7 @@ module Bmv
       opts.rename  = nil
       opts.pairs   = false
       opts.concat  = false
+      opts.stdin   = false
       opts.dryrun  = false
       opts.confirm = false
       opts.help    = false
@@ -60,6 +61,10 @@ module Bmv
 
         p.on('--concat', 'Supply old and new paths in concatenated fashion') {
           opts.concat = true
+        }
+
+        p.on('--stdin', 'Supply paths via standard input') {
+          opts.stdin = true
         }
 
         p.on('--dryrun', '--dry-run', '--dry_run', 'Dryrun mode') {
@@ -99,10 +104,10 @@ module Bmv
       }
 
       # Parse CLI options and get old paths.
-      parse_options(args)
+      parse_cli_args(args)
       handle_special_options
       process_stdin
-      handle_normal_options
+      validate_cli_args
 
       # Create the Renaming instances, with both old_path and new_path.
       initialize_renamings
@@ -130,12 +135,18 @@ module Bmv
     # The renaming process: options and old paths.
     ####
 
-    def parse_options(args)
-      # Parse CLI options and get any positional arguments. If the user did not
-      # supply positional arguments, get the input paths from standard input.
+    def parse_cli_args(args)
+      # Parse CLI options and get any positional arguments.
       @cli_args = Array.new(args)
       @pos_args = Array.new(args)
-      @parser.parse!(@pos_args)
+      parser.parse!(pos_args)
+      # If the user supplied the conventional argument for stdin,
+      # make the needed adjustments. We will read from stdin
+      # after checking for special options.
+      if pos_args == ['-']
+        pos_args.pop
+        opts.stdin = true
+      end
     end
 
     def handle_special_options
@@ -156,14 +167,16 @@ module Bmv
         msg = 'The .bmv directory does not exist. Run `bmv --init` to create it.'
         quit(1, msg)
       end
-
     end
 
     def process_stdin
-      @pos_args = streams[:stdin].map(&:chomp) if pos_args.empty?
+      @pos_args = streams[:stdin].map(&:chomp) if opts.stdin
     end
 
-    def handle_normal_options
+    def validate_cli_args
+      # Input paths cannot be empty strings.
+      @pos_args = pos_args.reject(&:empty?)
+
       # Input paths: require at least 1.
       if pos_args.size < 1
         msg = 'At least one input path is required.'
