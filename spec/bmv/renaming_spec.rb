@@ -66,7 +66,7 @@ describe Bmv::Renaming do
   context 'can exercise' do
 
     it '#to_h' do
-      expect(br.to_h).to       be_a Hash
+      expect(br.to_h).to be_a Hash
       expect(br.to_h(true)).to be_a Hash
     end
 

@@ -1,32 +1,77 @@
 =begin
 
+Implement exit codes:
+  1 no bmv dir
+  2 no paths or invalid N paths
+  3 should_rename = false  due to fatal problem
+  4 should_rename = false  due to failed confirmation
 
+  - Use a class-level hash
+  - Pass a symbol when calling quit()
+  - Include exit code in summary or maybe in to_h
 
-pos_args via stdin
-pos_args with empty strings
-no pos_args
+Run bmv using open3:
+  require 'open3'
+  Open3.popen3(cmd) { |stdin, stdout, stderr, wait_thr|
+    # Interact with streams.
+    stdin.puts('y')
+    out = stdout.read()
+    err = stderr.read()
 
-help option
-mising bmv directory
-init option
+    # Get process info.
+    pstat = wait_thr.value  # Process::Status
+    pstat.pid               # pid
+    pstat.exited?           # bool
+    pstat.exitstatus        # exit code
+  }
 
-pairs option
-concat option
-pairs and concat options with odd N args
+Confirm that failure scenarios are working:
+  diagnostic: missing old paths
+  diagnostic: unchanged paths (confirm data structure is correct)
+  diagnostic: new path duplicates
+  diagnostic: clobbers
+  diagnostic: missing new dirs
 
-dryrun option
+  no pos_args
+  pos_arg all empty
 
-prompt option
+  pairs and concat options with odd N args
 
-confirm log file is written
+  mising bmv directory
 
-prompt_for_confirmation()
+Special options:
+  help option
+  init option
 
-check print summary
+Renaming scenarios
+  pos_args via stdin
+  pos_args with some empty strings
+  basic regex
+  use every path element
+    path
+    dir
+    file
+    stem
+    ext
+  pairs option
+  concat option
 
+  check the following for each scenario:
+    file sys
+    to_h data
+    log file is written
+    print summary
 
+  dryrun option: nothing should be renamed
 
+  prompt option:
+    - if no: nothing should be renamed
+    - if yes: renamed stuff
 
+Special unit tests:
+  prompt_for_confirmation()
+  positional_indexes()
+  quit()
 
 
 Notes for mocking, if needed:
