@@ -3,19 +3,19 @@ require 'spec_helper'
 describe Bmv::Renaming do
 
   let(:br) {
-    Bmv::Renaming.new({:old_path => 'foo', :new_path => 'bar'})
+    Bmv::Renaming.new('foo', 'bar')
   }
 
   context 'path setting' do
 
     it 'nil in constructor' do
-      r = Bmv::Renaming.new
+      r = Bmv::Renaming.new(nil, nil)
       expect(r.old_path).to be nil
       expect(r.new_path).to be nil
     end
 
     it 'set with nil' do
-      r = Bmv::Renaming.new
+      r = Bmv::Renaming.new(nil, nil)
       r.old_path = nil
       r.new_path = nil
       expect(r.old_path).to be nil
@@ -23,7 +23,7 @@ describe Bmv::Renaming do
     end
 
     it 'set with non-nil' do
-      r = Bmv::Renaming.new
+      r = Bmv::Renaming.new(nil, nil)
       r.old_path = 'foo'
       r.new_path = 'xxx'
       expect(r.old_path).to be_a Bmv::Path
@@ -55,7 +55,7 @@ describe Bmv::Renaming do
         :ext  => '.txt',
         :stem => 'fubb',
       }
-      r = Bmv::Renaming.new({:old_path => h[:path]})
+      r = Bmv::Renaming.new(h[:path], nil)
       h.each { |k, v|
         expect(r.send(k)).to eql(v)
       }

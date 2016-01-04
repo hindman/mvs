@@ -96,6 +96,7 @@ module Bmv
 
     def run(kws = {})
       # Unpack input parameters.
+      # TODO: should validate kws.
       args = kws.fetch(:args, [])
       @streams = {
         :stdout => kws.fetch(:stdout, $stdout),
@@ -199,9 +200,9 @@ module Bmv
     def initialize_renamings
       # Create the Renaming objects.
       @renamings = positional_indexes.map { |i, j|
-        op = pos_args[i]
-        np = pos_args[j]
-        Bmv::Renaming.new({:old_path => op, :new_path => np})
+        old_path = pos_args[i]
+        new_path = pos_args[j]
+        Bmv::Renaming.new(old_path, new_path)
       }
     end
 

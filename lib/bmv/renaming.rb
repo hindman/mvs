@@ -12,9 +12,9 @@ module Bmv
       :was_renamed
     )
 
-    def initialize(kws = {})
-      self.old_path  = kws.fetch(:old_path, nil)
-      self.new_path  = kws.fetch(:new_path, nil)
+    def initialize(old_path, new_path)
+      self.old_path  = old_path
+      self.new_path  = new_path
       @diagnostics   = Set.new
       @should_rename = nil
       @was_renamed   = nil

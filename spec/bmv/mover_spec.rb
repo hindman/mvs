@@ -1,3 +1,72 @@
+=begin
+
+
+
+pos_args via stdin
+pos_args with empty strings
+no pos_args
+
+help option
+mising bmv directory
+init option
+
+pairs option
+concat option
+pairs and concat options with odd N args
+
+dryrun option
+
+prompt option
+
+confirm log file is written
+
+prompt_for_confirmation()
+
+check print summary
+
+
+
+
+
+
+Notes for mocking, if needed:
+
+  stdin
+    map
+    gets
+
+  stderr
+    puts
+
+  stdout
+    puts
+    write
+
+  quit
+    streams
+    exit
+
+  say
+    streams
+
+  handle_options
+    quit
+
+  get_confirmation
+    say
+    streams
+
+  process_stdin
+    streams
+
+  rename_files
+    rename, etc.
+
+  print_summary
+    say
+
+=end
+
 require 'spec_helper'
 
 describe Bmv::Mover do
@@ -67,59 +136,4 @@ describe Bmv::Mover do
   end
 
 end
-
-__END__
-
-Special testing:
-
-  pos_args
-    via args
-    via stdin
-
-  special options
-    help
-    init
-    missing bmv_dir
-
-  get_confirmation
-
-  confirm log file is written
-
-  check print summary
-
-Notes for mocking, if needed:
-
-  stdin
-    map
-    gets
-
-  stderr
-    puts
-
-  stdout
-    puts
-    write
-
-  quit
-    streams
-    exit
-
-  say
-    streams
-
-  handle_options
-    quit
-
-  get_confirmation
-    say
-    streams
-
-  process_stdin
-    streams
-
-  rename_files
-    rename, etc.
-
-  print_summary
-    say
 
