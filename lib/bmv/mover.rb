@@ -37,8 +37,9 @@ module Bmv
       opts.concat  = false
       opts.stdin   = false
       opts.dryrun  = false
-      opts.prompt = false
+      opts.prompt  = false
       opts.help    = false
+      opts.verbose = false
       opts.init    = false
 
       # Create the option parser.
@@ -81,6 +82,10 @@ module Bmv
 
         p.on('-h', '--help', 'Show this message') {
           opts.help = true
+        }
+
+        p.on('--verbose', 'Print more renaming information') {
+          opts.verbose = true
         }
 
         p.on('--init', 'Create the .bmv directory') {
@@ -285,8 +290,10 @@ module Bmv
       renamings.each { |r|
         ds = r.diagnostics
         if (ds & fatal).empty?
+          # No fatal problems, but we might want to skip this renaming.
           r.should_rename = ds.empty?
         else
+          # Fatal problem.
           r.should_rename = false
           @should_rename = false
         end
@@ -326,7 +333,9 @@ module Bmv
 
     def print_summary
       # Print summary information.
-      say(summary.to_yaml)
+      h = summary
+      h.update(to_h) if opts.verbose
+      say(h.to_yaml)
     end
 
     ####
