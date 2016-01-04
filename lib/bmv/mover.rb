@@ -37,7 +37,7 @@ module Bmv
       opts.concat  = false
       opts.stdin   = false
       opts.dryrun  = false
-      opts.confirm = false
+      opts.prompt = false
       opts.help    = false
       opts.init    = false
 
@@ -71,8 +71,8 @@ module Bmv
           opts.dryrun = true
         }
 
-        p.on('--confirm', 'Get user confirmation before renaming') {
-          opts.confirm = true
+        p.on('--prompt', 'Prompt for user confirmation before renaming') {
+          opts.prompt = true
         }
 
         # Other options.
@@ -123,7 +123,7 @@ module Bmv
 
       # Decide whether to proceed with any renamings.
       handle_diagnostics
-      get_confirmation
+      prompt_for_confirmation
 
       # Implement the renaming and write output.
       rename_files
@@ -292,9 +292,9 @@ module Bmv
       }
     end
 
-    def get_confirmation
+    def prompt_for_confirmation
       # Get user confirmation, if needed.
-      return unless opts.confirm
+      return unless opts.prompt
       return unless should_rename
       say(to_yaml(brief = true))
       say("\nProceed? [y/n] ", :write)
