@@ -1,15 +1,5 @@
 =begin
 
-Implement exit codes:
-  1 no bmv dir
-  2 no paths or invalid N paths
-  3 should_rename = false  due to fatal problem
-  4 should_rename = false  due to failed confirmation
-
-  - Use a class-level hash
-  - Pass a symbol when calling quit()
-  - Include exit code in summary or maybe in to_h
-
 Run bmv using open3:
   require 'open3'
   Open3.popen3(cmd) { |stdin, stdout, stderr, wait_thr|

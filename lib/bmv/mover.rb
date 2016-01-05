@@ -15,8 +15,17 @@ module Bmv
       :renamings,
       :should_rename,
       :run_time,
-      :streams
+      :streams,
+      :exit_code
     )
+
+    EXIT_CODES = {
+      :ok                => 0,
+      :no_bmv_dir        => 1,
+      :invalid_n_paths   => 2,
+      :failed_diagnostic => 3,
+      :no_confirmation   => 4,
+    }
 
     ####
     # Initialization.
@@ -27,6 +36,7 @@ module Bmv
       @should_rename = nil
       @run_time = Time.now
       @streams = nil
+      @exit_code = nil
     end
 
     def setup_options_parser
@@ -135,6 +145,7 @@ module Bmv
       rename_files
       write_log
       print_summary
+      quit(exit_code, nil)
     end
 
     ####
@@ -158,20 +169,20 @@ module Bmv
     def handle_special_options
       # Help.
       if opts.help
-        quit(0, parser.to_s)
+        quit(:ok, parser.to_s)
       end
 
       # Create .bmv directory.
       if opts.init
         create_directory(log_dir)
         msg = "Created directory: #{bmv_dir}"
-        quit(0, msg)
+        quit(:ok, msg)
       end
 
       # Quit if there is no .bmv directory.
       unless directory_exists(log_dir)
         msg = 'The .bmv directory does not exist. Run `bmv --init` to create it.'
-        quit(1, msg)
+        quit(:no_bmv_dir, msg)
       end
     end
 
@@ -186,14 +197,14 @@ module Bmv
       # Input paths: require at least 1.
       if pos_args.size < 1
         msg = 'At least one input path is required.'
-        quit(1, msg)
+        quit(:invalid_n_paths, msg)
       end
 
       # Input paths: require even number with some options.
       if pos_args.size.odd?
         if opts.pairs || opts.concat
           msg = 'An even number of input paths is required for --pairs and --concat.'
-          quit(1, msg)
+          quit(:invalid_n_paths, msg)
         end
       end
     end
@@ -296,6 +307,7 @@ module Bmv
           # Fatal problem.
           r.should_rename = false
           @should_rename = false
+          @exit_code = :failed_diagnostic
         end
       }
     end
@@ -307,7 +319,12 @@ module Bmv
       say(to_yaml(brief = true))
       say("\nProceed? [y/n] ", :write)
       reply = streams[:stdin].gets.chomp.downcase
-      @should_rename = false unless reply == 'y'
+      if reply == 'y'
+        @should_rename = true
+      else
+        @should_rename = false
+        @exit_code = :no_confirmation
+      end
     end
 
     ####
@@ -324,6 +341,7 @@ module Bmv
           r.was_renamed = false
         end
       }
+      @exit_code = :ok if exit_code.nil?
     end
 
     def write_log
@@ -374,6 +392,7 @@ module Bmv
           'cli_args'      => cli_args,
           'renamings'     => renamings.map(&:to_h),
           'should_rename' => should_rename,
+          'exit_code'     => exit_code.to_s,
           'bmv_version'   => Bmv::VERSION,
         }
       end
@@ -406,9 +425,9 @@ module Bmv
     ####
 
     def quit(code, msg)
-      stream = code == 0 ? streams[:stdout] : streams[:stderr]
+      stream = code == :ok ? streams[:stdout] : streams[:stderr]
       stream.puts(msg) unless msg.nil?
-      Kernel.exit(code)
+      Kernel.exit(EXIT_CODES.fetch(code, 999))
     end
 
     def say(msg, meth = :puts)
