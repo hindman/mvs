@@ -2,6 +2,7 @@ $LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
 
 require 'bmv'
 require 'fileutils'
+require 'open3'
 
 
 module Bmv
@@ -67,14 +68,23 @@ module Bmv
 
     def run_bmv(arg_str, parse = true)
       # Runs bmv with the given arguments string. Returns a hash of info.
+      h = {}
       cmd = bmv_cmd(arg_str)
-      output = `#{cmd}`
-      data = parse ? YAML.load(output) : nil
-      return {
-        :cmd    => cmd,
-        :output => output,
-        :data   => data,
+      Open3.popen3(cmd) { |stdin, stdout, stderr, wait_thr|
+        pstat = wait_thr.value    # A Process::Status instance.
+        out = stdout.read()
+        err = stdout.read()
+        h.update({
+          :stdout    => out,
+          :stderr    => err,
+          :pid       => pstat.pid,
+          :exit_code => pstat.exitstatus,
+        })
       }
+      h.update({
+        :cmd  => cmd,
+        :data => parse ? YAML.load(h[:stdout]) : nil,
+      })
     end
 
     def check_bmv_data(bmv_data, exp_n_paths, exp_n_renamed)

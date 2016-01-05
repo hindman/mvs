@@ -1,20 +1,5 @@
 =begin
 
-Run bmv using open3:
-  require 'open3'
-  Open3.popen3(cmd) { |stdin, stdout, stderr, wait_thr|
-    # Interact with streams.
-    stdin.puts('y')
-    out = stdout.read()
-    err = stderr.read()
-
-    # Get process info.
-    pstat = wait_thr.value  # Process::Status
-    pstat.pid               # pid
-    pstat.exited?           # bool
-    pstat.exitstatus        # exit code
-  }
-
 Confirm that failure scenarios are working:
   diagnostic: missing old paths
   diagnostic: unchanged paths (confirm data structure is correct)
