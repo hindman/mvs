@@ -1,6 +1,9 @@
 =begin
 
 Confirm that failure scenarios are working:
+
+  check_bmv_data(): enhance
+
   diagnostic: missing old paths
   diagnostic: unchanged paths (confirm data structure is correct)
   diagnostic: new path duplicates
@@ -115,19 +118,44 @@ describe Bmv::Mover do
   it '#parse_work_area_text' do
     got = parse_work_area_text(ex1)
     exp = %w{
-      d1/
-      d1/f1
-      d1/f2.txt
-      d2/
-      d2/f3.txt
-      d2/f4.mp3
-      d2/f5.mp3
-      d3/
-      d3/f6.txt
-      d3/f7a.txt
-      d3/f7b.mp3
+        d1/
+        d1/f1
+        d1/f2.txt
+        d2/
+        d2/f3.txt
+        d2/f4.mp3
+        d2/f5.mp3
+        d3/
+        d3/f6.txt
+        d3/f7a.txt
+        d3/f7b.mp3
     }
     expect(got).to eql(exp)
+  end
+
+  context 'Failed diagnostics' do
+
+    it 'missing old paths' do
+      create_work_area(ex1)
+      h = run_bmv(%q{--rename 'path.sub /b/, "B"'})
+      got = read_work_area()
+      exp = sorted_work_area_text(ex1)
+      expect(got).to eql(exp)
+      check_bmv_data(h, nil, nil)
+    end
+
+    it 'unchanged paths' do
+    end
+
+    it 'new path duplicates' do
+    end
+
+    it 'clobbers' do
+    end
+
+    it 'missing new dirs' do
+    end
+
   end
 
   context 'Scenarios' do

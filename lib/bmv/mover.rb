@@ -297,12 +297,18 @@ module Bmv
       # should_rename attribute of both the individual Renaming instances and
       # in the overall Mover instance.
       fatal = Set.new([:duplicate, :clobber, :directory])
+      n = 0
       @should_rename = true
       renamings.each { |r|
         ds = r.diagnostics
         if (ds & fatal).empty?
           # No fatal problems, but we might want to skip this renaming.
-          r.should_rename = ds.empty?
+          if ds.empty?
+            r.should_rename = true
+            n += 1
+          else
+            r.should_rename = false
+          end
         else
           # Fatal problem.
           r.should_rename = false
@@ -310,6 +316,10 @@ module Bmv
           @exit_code = :failed_diagnostic
         end
       }
+      if n < 1
+        @should_rename = false
+        @exit_code = :failed_diagnostic
+      end
     end
 
     def prompt_for_confirmation
@@ -416,7 +426,7 @@ module Bmv
     end
 
     def log_path
-      file_name = run_time.strftime('%Y_%m_%d_%H_%M_%S') + '.yaml'
+      file_name = run_time.strftime('%Y_%m_%d_%H_%M_%S_%L') + '.yaml'
       File.join(log_dir, file_name)
     end
 
