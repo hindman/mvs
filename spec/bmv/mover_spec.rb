@@ -2,7 +2,12 @@
 
 Confirm that failure scenarios are working:
 
-  check_bmv_data(): enhance
+  check_bmv_data(): enhance to check everything
+      - exit code
+      - stdout data
+      - stderr data
+      - dir tree
+      - log file
 
   diagnostic: missing old paths
   diagnostic: unchanged paths (confirm data structure is correct)
