@@ -30,7 +30,7 @@ module Bmv
       # Returns a sorted array of all files and directories in the work area.
       i = WORK_AREA_ROOT.size + 1
       glob_pattern = File.join(WORK_AREA_ROOT, '**/*')
-      Dir.glob(glob_pattern).sort.map { |path| path[i..-1] }
+      return Dir.glob(glob_pattern).sort.map { |path| path[i..-1] }
     end
 
     def create_work_area(txt)
@@ -48,12 +48,12 @@ module Bmv
 
     def parse_work_area_text(txt)
       # Takes some text and parses into stripped, non-empty lines.
-      txt.split("\n").map(&:strip).reject(&:empty?)
+      return txt.split("\n").map(&:strip).reject(&:empty?)
     end
 
     def sorted_work_area_text(txt)
       # Ditto, but sorts and removes trailing slashes.
-      parse_work_area_text(txt).sort.map { |f| f.chomp('/') }
+      return parse_work_area_text(txt).sort.map { |f| f.chomp('/') }
     end
 
     ####
@@ -63,14 +63,18 @@ module Bmv
     def bmv_cmd(arg_str)
       # Returns a command string to execute bmv.
       path = File.join(PROJECT_ROOT, 'bin/bmv')
-      "bundle exec #{path} #{arg_str}".strip
+      return "bundle exec #{path} #{arg_str}".strip
     end
 
     def run_bmv(arg_str, parse = true)
       # Runs bmv with the given arguments string. Returns a hash of info.
       h = {
-        :cmd  => bmv_cmd(arg_str),
-        :data => {},
+        :cmd       => bmv_cmd(arg_str),
+        :stdout    => nil,
+        :stderr    => nil,
+        :pid       => nil,
+        :exit_code => nil,
+        :data      => nil,
       }
       Open3.popen3(h[:cmd]) { |stdin, stdout, stderr, wait_thr|
         pstat = wait_thr.value    # A Process::Status instance.
@@ -81,15 +85,16 @@ module Bmv
           :stderr    => err,
           :pid       => pstat.pid,
           :exit_code => pstat.exitstatus,
+          :data      => (parse && out.size > 0) ? YAML.load(out) : {},
         })
-        h[:data] = YAML.load(out) if parse && h[:stdout].size > 0
       }
       return h
     end
 
-    def check_bmv_data(bmv_data, exp_n_paths, exp_n_renamed)
+    def check_bmv_data(bmv_data, exp_n_paths, exp_n_renamed, exp_stderr)
       # Takes a hash from a bmv run and makes assertions about the counts.
       d = bmv_data[:data]
+      expect(bmv_data[:stderr]).to eql(exp_stderr)
       expect(d['n_paths']).to eql(exp_n_paths)
       expect(d['n_renamed']).to eql(exp_n_renamed)
       # expect(d['log_file']).to be_a(String)

@@ -33,7 +33,7 @@ module Bmv
     end
 
     def make_path(path)
-      path.nil? ? nil : Bmv::Path.new(path)
+      return path.nil? ? nil : Bmv::Path.new(path)
     end
 
     ####
@@ -41,19 +41,19 @@ module Bmv
     ####
 
     def to_s
-      "#<Renaming old_path=#{old_path.path}, new_path=#{new_path.path}"
+      return "#<Renaming old_path=#{old_path.path}, new_path=#{new_path.path}"
     end
 
     def to_h(brief = false)
       op = old_path.path.to_s
       np = new_path.path.to_s
       if brief
-        {
+        return {
           'old_path' => op,
           'new_path' => np,
         }
       else
-        {
+        return {
           'old_path'      => op,
           'new_path'      => np,
           'diagnostics'   => diagnostics.map(&:to_s).sort,

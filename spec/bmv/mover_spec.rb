@@ -146,7 +146,7 @@ describe Bmv::Mover do
       got = read_work_area()
       exp = sorted_work_area_text(ex1)
       expect(got).to eql(exp)
-      check_bmv_data(h, nil, nil)
+      check_bmv_data(h, nil, nil, "At least one input path is required.\n")
     end
 
     it 'unchanged paths' do
@@ -182,8 +182,8 @@ describe Bmv::Mover do
         d3/G___G7a.txt
         d3/f7b.mp3
       })
+      check_bmv_data(h, 4, 4, '')
       expect(got).to eql(exp)
-      check_bmv_data(h, 4, 4)
     end
 
   end

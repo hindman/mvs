@@ -32,28 +32,30 @@ module Bmv
     ####
 
     def initialize
-      setup_options_parser
+      @opts = default_options()
+      @parser = options_parser()
       @should_rename = nil
       @run_time = Time.now
       @streams = nil
       @exit_code = nil
     end
 
-    def setup_options_parser
-      # Defaults.
-      @opts        = OpenStruct.new
-      opts.rename  = nil
-      opts.pairs   = false
-      opts.concat  = false
-      opts.stdin   = false
-      opts.dryrun  = false
-      opts.prompt  = false
-      opts.help    = false
-      opts.verbose = false
-      opts.init    = false
+    def default_options
+      o         = OpenStruct.new
+      o.rename  = nil
+      o.pairs   = false
+      o.concat  = false
+      o.stdin   = false
+      o.dryrun  = false
+      o.prompt  = false
+      o.help    = false
+      o.verbose = false
+      o.init    = false
+      return o
+    end
 
-      # Create the option parser.
-      @parser = OptionParser.new { |p|
+    def options_parser
+      return OptionParser.new { |p|
 
         # Banner.
         p.banner = 'Usage: bmv [options] [ORIG_FILES]'
@@ -377,16 +379,16 @@ module Bmv
       size = pos_args.size
       half = size / 2
       if opts.pairs
-        (0...size).step(2).map { |i| [i, i + 1] }
+        return (0...size).step(2).map { |i| [i, i + 1] }
       elsif opts.concat
-        (0...half).map { |i| [i, i + half] }
+        return (0...half).map { |i| [i, i + half] }
       else
-        (0...size).map { |i| [i, i] }
+        return (0...size).map { |i| [i, i] }
       end
     end
 
     def summary
-      {
+      return {
         'n_paths'   => renamings.size,
         'n_renamed' => renamings.select(&:was_renamed).size,
         'log_file'  => log_path,
@@ -410,7 +412,7 @@ module Bmv
 
     def to_yaml(brief = false)
       h = to_h(brief = brief)
-      h.to_yaml
+      return h.to_yaml
     end
 
     ####
@@ -418,16 +420,16 @@ module Bmv
     ####
 
     def bmv_dir
-      File.join(File.expand_path('~'), '.bmv')
+      return File.join(File.expand_path('~'), '.bmv')
     end
 
     def log_dir
-      File.join(bmv_dir, 'logs')
+      return File.join(bmv_dir, 'logs')
     end
 
     def log_path
       file_name = run_time.strftime('%Y_%m_%d_%H_%M_%S_%L') + '.yaml'
-      File.join(log_dir, file_name)
+      return File.join(log_dir, file_name)
     end
 
     ####
