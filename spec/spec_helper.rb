@@ -105,6 +105,14 @@ end
 
 
 RSpec.configure do |c|
+
+  # So we can call helper methods directly in our Rspec tests.
   c.include Bmv::SpecHelpers
+
+  # Create the .bmv work directory if it doesn't exist.
+  c.before(:suite) {
+    Class.new.extend(Bmv::SpecHelpers).run_bmv('--init')
+  }
+
 end
 
