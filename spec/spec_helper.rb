@@ -77,14 +77,22 @@ module Bmv
         :data      => nil,
       }
       Open3.popen3(h[:cmd]) { |stdin, stdout, stderr, wait_thr|
-        pstat = wait_thr.value    # A Process::Status instance.
+        # Collect output.
         out = stdout.read()
         err = stderr.read()
+
+        # Get the Process::Status instance, and its PID and exit code.
+        # In Ruby 1.8.7 popen3 does not provide wait_thr.
+        pstat = wait_thr.nil? ? $? : wait_thr.value
+        pid = pstat.pid
+        exit_code = pstat.exitstatus
+
+        # Update the info hash.
         h.update({
           :stdout    => out,
           :stderr    => err,
-          :pid       => pstat.pid,
-          :exit_code => pstat.exitstatus,
+          :pid       => pid,
+          :exit_code => exit_code,
           :data      => (parse && out.size > 0) ? YAML.load(out) : {},
         })
       }
