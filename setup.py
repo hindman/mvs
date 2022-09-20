@@ -79,6 +79,12 @@ package_data = {
     package_name: [],
 }
 
+entry_points = {
+    'console_scripts': [
+        'bmv = bmv.cli:main',
+    ],
+}
+
 ####
 # Install.
 ####
@@ -101,5 +107,6 @@ setup(
     long_description = long_desc,
     long_description_content_type = long_desc_type,
     # classifiers = classifiers,
+    entry_points = entry_points,
 )
 

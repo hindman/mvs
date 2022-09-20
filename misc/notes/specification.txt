@@ -2,5 +2,60 @@
 usage: Usage
 --------
 
-...
+Major usage patterns: what the user provides:
+
+    Both old-paths and new-paths.
+
+    Just old-paths, plus renaming options.
+
+Mechanisms to supply old/new paths:
+
+    ARGS     # Old-paths only.
+    STDIN
+    FILE
+    CLIP
+
+Structures for paths:
+
+    Paragraphs  # First old-paths, then new-paths.
+    Pairs       # Old-path, new-path, etc.
+    Rows        # Tab delimited by default
+
+Validations:
+
+    Old-path and new-path differ for each pair.
+    Old-paths exist.
+    New-paths do not exist.
+    New-paths do not collide among themselves.
+    Directories of the new-paths exist.
+
+Behaviors:
+
+    # Initial
+    Input mechanism: old-paths via ARGS.
+    Validations.
+    Dryrun mode.
+
+        bmv [--dryrun] --rename 'return ...' --old ...
+
+    # Second
+    Input structure: paragraphs, pairs, rows.
+    Input mechanism: STDIN, FILE, CLIP.
+
+    # Third
+    Path-components in renaming code: path, directory, name, stem, extension.
+    Sequence numbering.
+
+    # Fourth.
+    Logging.
+    Log inquiries.
+
+    # Later
+    Case-change-only renamings.
+    Remove common prefix/suffix.
+    Other operations: copy, backup, link, chmod, touch.
+    Validation overrides: clobber, skip-equal, create-dirs.
+    Old-path filtering: files-only, dirs-only.
+    Alternative dryrun output styles.
+    Undo.
 
