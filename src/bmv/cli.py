@@ -3,29 +3,32 @@ import argparse
 import re
 from collections import Counter
 from pathlib import Path
-
+from textwrap import dedent
+from dataclasses import dataclass
 
 '''
 
-Next:
+Initial implementation:
 
-    Data objects:
-
-        - for user code
-        - for old/new pairs
-
-    Output style:
-
-        - for dryrun
-        - for error reporting
-
-Behaviors:
+    bmv [--dryrun] --rename 'return ...' --old ...
 
     Input mechanism: old-paths via ARGS.
     Validations.
     Dryrun mode.
 
-        bmv [--dryrun] --rename 'return ...' --old ...
+Next:
+
+    User code: provide access to a Path instance.
+    Handle execeptions raised by user code.
+    Handle invalid data types return by user code (allow str or Path).
+
+    Implement renaming behavior.
+
+    Usage text.
+
+    Tests for validations.
+
+TODO:
 
 '''
 
@@ -57,7 +60,30 @@ class Constants:
         },
     )
 
+    replacer_code_fmt = dedent('''
+        def {replacer_name}(old):
+        {indent}{user_code}
+    ''').lstrip()
+
 CON = Constants()
+
+@dataclass
+class RenamePair:
+    old: str
+    new: str
+
+    @property
+    def formatted(self):
+        return f'{self.old}\n{self.new}\n'
+
+@dataclass
+class ValidationFailure:
+    rp: RenamePair
+    msg: str
+
+    @property
+    def formatted(self):
+        return f'{self.msg}:\n{self.rp.formatted}'
 
 ####
 # Entry point.
@@ -68,45 +94,21 @@ def main(args = None):
     ap, opts = parse_args(args)
     
     # Generate new paths.
-    olds = opts.old
+    olds = tuple(opts.old)
     replacer = make_replacer_func(opts.rename)
-    news = list(map(replacer, olds))
+    news = tuple(map(replacer, olds))
+    rps = tuple(RenamePair(old, new) for old, new in zip(olds, news))
 
-    # TODO: improve validation output:
-    # - Show both old and new path where useful.
-    # - Show all errors where feasible.
-
-    # Validate: old-path and new-path differ for each pair.
-    for old, new in zip(olds, news):
-        if old == new:
-            fail_validation(f'Old path and new path are the same: {old} {new}')
-
-    # Validate: old-paths exist.
-    for old in olds:
-        if not Path(old).exists():
-            fail_validation(f'Old path does not exist: {old}')
-
-    # Validate: new-paths do not exist.
-    for new in news:
-        if Path(new).exists():
-            fail_validation(f'New path exists: {new}')
-
-    # Validate: new-paths do not collide among themselves.
-    for new, count in Counter(news).items():
-        if count > 1:
-            fail_validation(f'Collision among new paths: {new}')
-
-    # Validate: directories of the new-paths exist.
-    for new in news:
-        if not Path(new).parent.exists():
-            fail_validation(f'Parent directory of new path does not exist: {new}')
+    fails = validate_rename_pairs(rps)
+    if fails:
+        for f in fails:
+            print(f.formatted)
+        quit(code = CON.exit_fail)
 
     # Dry run mode: print and stop.
     if opts.dryrun:
-        for o, n in zip(olds, news):
-            print()
-            print(o)
-            print(n)
+        for rp in rps:
+            print(rp.formatted)
         return
 
     # Rename.
@@ -122,14 +124,65 @@ def parse_args(args):
     return (ap, opts)
 
 def make_replacer_func(user_code, i = 4):
-    indent = ' ' * i
-    code = f'def {CON.replacer_name}(old):\n{indent}{user_code}\n'
-    globs = dict(
-        re = re,
+    # Define the text of the replacer code.
+    code = CON.replacer_code_fmt.format(
+        replacer_name = CON.replacer_name,
+        indent = ' ' * i,
+        user_code = user_code,
     )
+    # Create the replacer function via exec() in the context of:
+    # - Globals that we want to make available to the user's code.
+    # - A locals dict that we can use to return the generated function.
+    globs = dict(re = re)
     locs = {}
     exec(code, globs, locs)
     return locs[CON.replacer_name]
+
+def validate_rename_pairs(rps):
+    fails = []
+
+    # Organize rps into dict-of-list, keyed by new.
+    grouped_by_new = {}
+    for rp in rps:
+        grouped_by_new.setdefault(str(rp.new), []).append(rp)
+
+    # Old should exist.
+    fails.extend(
+        ValidationFailure(rp, 'Old path does not exist')
+        for rp in rps
+        if not Path(rp.old).exists()
+    )
+
+    # New should not exist.
+    fails.extend(
+        ValidationFailure(rp, 'New path exists')
+        for rp in rps
+        if Path(rp.new).exists()
+    )
+
+    # Parent of new should exist.
+    fails.extend(
+        ValidationFailure(rp, 'Parent directory of new path does not exist')
+        for rp in rps
+        if not Path(rp.new).parent.exists()
+    )
+
+    # Old and new should differ.
+    fails.extend(
+        ValidationFailure(rp, 'Old path and new path are the same')
+        for rp in rps
+        if rp.old == rp.new
+    )
+
+    # News should not collide among themselves.
+    fails.extend(
+        ValidationFailure(rp, 'New path collides with another new path')
+        for group in grouped_by_new.values()
+        for rp in group
+        if len(group) > 1
+    )
+
+    return fails
 
 ####
 # Utilities.
