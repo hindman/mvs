@@ -10,23 +10,21 @@ from dataclasses import dataclass
 
 Initial implementation:
 
-    bmv [--dryrun] --rename 'return ...' --old ...
+    bmv [--dryrun] --rename 'return ...' --original ...
 
-    Input mechanism: old-paths via ARGS.
+    Input mechanism: original-paths via ARGS.
     Validations.
     Dryrun mode.
 
 Next:
 
-    User code: provide access to a Path instance.
-    Handle execeptions raised by user code.
-    Handle invalid data types return by user code (allow str or Path).
-
-    Implement renaming behavior.
-
-    Usage text.
-
     Tests for validations.
+
+    Implement renaming:
+
+        - Confirmation: [unless --yes option was supplied]
+            - List 5 renamings.
+            - Prompt user: list, no, or yes.
 
 TODO:
 
@@ -44,24 +42,42 @@ class Constants:
 
     # CLI configuration.
     names = 'names'
+    description = 'Renames or moves files in bulk.'
+    epilog = (
+        'The user-supplied renaming code has access to the original file path as a str [variable: o], '
+        'its pathlib.Path representation [variable: p], '
+        'and the following Python libraries [re, Path]. '
+        'It should explicitly return the desired new path, either as a str or a Path. '
+        'The code should omit indentation on its first line, but must provide it for subsequent lines.'
+    )
     opts_config = (
         {
-            names: '--old -o',
+            names: '--original -o',
             'nargs': '+',
             'metavar': 'PATH',
+            'help': 'Original file paths',
         },
         {
             names: '--rename -r',
             'metavar': 'CODE',
+            'help': 'Code to convert orignal path to new path',
+        },
+        {
+            names: '--indent -i',
+            'type': int,
+            'metavar': 'N',
+            'default': 4,
+            'help': 'Number of spaces for indentation in user-supplied code',
         },
         {
             names: '--dryrun -d',
             'action': 'store_true',
+            'help': 'List renamings without performing them',
         },
     )
 
     replacer_code_fmt = dedent('''
-        def {replacer_name}(old):
+        def {replacer_name}(o, p):
         {indent}{user_code}
     ''').lstrip()
 
@@ -69,12 +85,12 @@ CON = Constants()
 
 @dataclass
 class RenamePair:
-    old: str
+    orig: str
     new: str
 
     @property
     def formatted(self):
-        return f'{self.old}\n{self.new}\n'
+        return f'{self.orig}\n{self.new}\n'
 
 @dataclass
 class ValidationFailure:
@@ -94,11 +110,25 @@ def main(args = None):
     ap, opts = parse_args(args)
     
     # Generate new paths.
-    olds = tuple(opts.old)
-    replacer = make_replacer_func(opts.rename)
-    news = tuple(map(replacer, olds))
-    rps = tuple(RenamePair(old, new) for old, new in zip(olds, news))
+    origs = tuple(opts.original)
+    replacer = make_replacer_func(opts.rename, opts.indent)
+    news = []
+    for o in origs:
+        try:
+            new = replacer(o, Path(o))
+            if isinstance(new, (str, Path)):
+                new = str(new)
+            else:
+                typ = type(new).__name__
+                msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {o}]'
+                quit(CON.exit_fail, msg)
+            news.append(new)
+        except Exception as e:
+            msg = f'Error in user-supplied renaming code: {e} [original path: {o}]'
+            quit(CON.exit_fail, msg)
+    rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
 
+    # Validation.
     fails = validate_rename_pairs(rps)
     if fails:
         for f in fails:
@@ -115,7 +145,10 @@ def main(args = None):
     print('Not implemented: renaming')
 
 def parse_args(args):
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description = CON.description,
+        epilog = CON.epilog,
+    )
     for oc in CON.opts_config:
         kws = dict(oc)
         xs = kws.pop(CON.names).split()
@@ -123,11 +156,11 @@ def parse_args(args):
     opts = ap.parse_args(args)
     return (ap, opts)
 
-def make_replacer_func(user_code, i = 4):
+def make_replacer_func(user_code, indent = 4):
     # Define the text of the replacer code.
     code = CON.replacer_code_fmt.format(
         replacer_name = CON.replacer_name,
-        indent = ' ' * i,
+        indent = ' ' * indent,
         user_code = user_code,
     )
     # Create the replacer function via exec() in the context of:
@@ -146,11 +179,11 @@ def validate_rename_pairs(rps):
     for rp in rps:
         grouped_by_new.setdefault(str(rp.new), []).append(rp)
 
-    # Old should exist.
+    # Original should exist.
     fails.extend(
-        ValidationFailure(rp, 'Old path does not exist')
+        ValidationFailure(rp, 'Original path does not exist')
         for rp in rps
-        if not Path(rp.old).exists()
+        if not Path(rp.orig).exists()
     )
 
     # New should not exist.
@@ -167,11 +200,11 @@ def validate_rename_pairs(rps):
         if not Path(rp.new).parent.exists()
     )
 
-    # Old and new should differ.
+    # Original and new should differ.
     fails.extend(
-        ValidationFailure(rp, 'Old path and new path are the same')
+        ValidationFailure(rp, 'Original path and new path are the same')
         for rp in rps
-        if rp.old == rp.new
+        if rp.orig == rp.new
     )
 
     # News should not collide among themselves.
