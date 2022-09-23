@@ -18,8 +18,6 @@ Initial implementation:
 
 Next:
 
-    Tests for validations.
-
     Implement renaming:
 
         - Confirmation: [unless --yes option was supplied]
@@ -34,15 +32,14 @@ TODO:
 # Constants.
 ####
 
-class Constants:
+class CON:
     newline = '\n'
     exit_ok = 0
     exit_fail = 1
-    replacer_name = 'do_replace'
+    renamer_name = 'do_rename'
 
     # CLI configuration.
-    names = 'names'
-    description = 'Renames or moves files in bulk.'
+    description = 'Renames or moves files in bulk, via user-supplied Python code.'
     epilog = (
         'The user-supplied renaming code has access to the original file path as a str [variable: o], '
         'its pathlib.Path representation [variable: p], '
@@ -50,6 +47,7 @@ class Constants:
         'It should explicitly return the desired new path, either as a str or a Path. '
         'The code should omit indentation on its first line, but must provide it for subsequent lines.'
     )
+    names = 'names'
     opts_config = (
         {
             names: '--original -o',
@@ -76,12 +74,17 @@ class Constants:
         },
     )
 
-    replacer_code_fmt = dedent('''
-        def {replacer_name}(o, p):
+    # Format for user-supplied renaming code.
+    renamer_code_fmt = dedent('''
+        def {renamer_name}(o, p):
         {indent}{user_code}
     ''').lstrip()
 
-CON = Constants()
+    fail_orig_missing = 'Original path does not exist'
+    fail_new_exists = 'New path exists'
+    fail_new_parent_missing = 'Parent directory of new path does not exist'
+    fail_orig_new_same = 'Original path and new path are the same'
+    fail_new_collision = 'New path collides with another new path'
 
 @dataclass
 class RenamePair:
@@ -106,26 +109,34 @@ class ValidationFailure:
 ####
 
 def main(args = None):
+    # Parse arguments and get original paths.
     args = sys.argv[1:] if args is None else args
     ap, opts = parse_args(args)
-    
-    # Generate new paths.
     origs = tuple(opts.original)
-    replacer = make_replacer_func(opts.rename, opts.indent)
+
+    # Create the renamer function based on the user-supplied code.
+    renamer = make_renamer_func(opts.rename, opts.indent)
+
+    # Use that function to generate the new paths.
     news = []
     for o in origs:
         try:
-            new = replacer(o, Path(o))
-            if isinstance(new, (str, Path)):
-                new = str(new)
-            else:
-                typ = type(new).__name__
-                msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {o}]'
-                quit(CON.exit_fail, msg)
-            news.append(new)
+            news.append(renamer(o, Path(o)))
         except Exception as e:
             msg = f'Error in user-supplied renaming code: {e} [original path: {o}]'
             quit(CON.exit_fail, msg)
+
+    # Confirm that those new paths have a valid data type.
+    for i, new in enumerate(news):
+        if isinstance(new, (str, Path)):
+            news[i] = str(new)
+        else:
+            typ = type(new).__name__
+            msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {o}]'
+            quit(CON.exit_fail, msg)
+            news.append(new)
+
+    # Bundle the orig-new paths into RenamePair instances.
     rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
 
     # Validation.
@@ -156,20 +167,20 @@ def parse_args(args):
     opts = ap.parse_args(args)
     return (ap, opts)
 
-def make_replacer_func(user_code, indent = 4):
-    # Define the text of the replacer code.
-    code = CON.replacer_code_fmt.format(
-        replacer_name = CON.replacer_name,
+def make_renamer_func(user_code, indent = 4):
+    # Define the text of the renamer code.
+    code = CON.renamer_code_fmt.format(
+        renamer_name = CON.renamer_name,
         indent = ' ' * indent,
         user_code = user_code,
     )
-    # Create the replacer function via exec() in the context of:
+    # Create the renamer function via exec() in the context of:
     # - Globals that we want to make available to the user's code.
     # - A locals dict that we can use to return the generated function.
     globs = dict(re = re)
     locs = {}
     exec(code, globs, locs)
-    return locs[CON.replacer_name]
+    return locs[CON.renamer_name]
 
 def validate_rename_pairs(rps):
     fails = []
@@ -181,35 +192,35 @@ def validate_rename_pairs(rps):
 
     # Original should exist.
     fails.extend(
-        ValidationFailure(rp, 'Original path does not exist')
+        ValidationFailure(rp, CON.fail_orig_missing)
         for rp in rps
         if not Path(rp.orig).exists()
     )
 
     # New should not exist.
     fails.extend(
-        ValidationFailure(rp, 'New path exists')
+        ValidationFailure(rp, CON.fail_new_exists)
         for rp in rps
         if Path(rp.new).exists()
     )
 
     # Parent of new should exist.
     fails.extend(
-        ValidationFailure(rp, 'Parent directory of new path does not exist')
+        ValidationFailure(rp, CON.fail_new_parent_missing)
         for rp in rps
         if not Path(rp.new).parent.exists()
     )
 
     # Original and new should differ.
     fails.extend(
-        ValidationFailure(rp, 'Original path and new path are the same')
+        ValidationFailure(rp, CON.fail_orig_new_same)
         for rp in rps
         if rp.orig == rp.new
     )
 
     # News should not collide among themselves.
     fails.extend(
-        ValidationFailure(rp, 'New path collides with another new path')
+        ValidationFailure(rp, CON.fail_new_collision)
         for group in grouped_by_new.values()
         for rp in group
         if len(group) > 1

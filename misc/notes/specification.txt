@@ -51,6 +51,8 @@ Behaviors:
     Log inquiries.
 
     # Later
+    Complex failure/validation scenarios: prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
+    Renaming via library use case.
     Case-change-only renamings.
     Remove common prefix/suffix.
     Other operations: copy, backup, link, chmod, touch.

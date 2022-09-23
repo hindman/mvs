@@ -9,6 +9,8 @@ def tr():
 
 class TestResource(object):
 
+    WORK_AREA_ROOT = 'tests/work_area/'
+
     def dump(self, val = None, label = 'dump()'):
         fmt = '\n--------\n{label} =>\n{val}'
         msg = fmt.format(label = label, val = val)
