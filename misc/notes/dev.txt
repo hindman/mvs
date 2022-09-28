@@ -6,7 +6,7 @@ Creating a new virtualenv:
 
     v='3.9.4'
     deactivate
-    pyenv versions
+    pyenv shell $v && pyenv versions
     mkvirtualenv bmv-$v
     pip install -U pip
     pip install -e .[dev,test] && pip list

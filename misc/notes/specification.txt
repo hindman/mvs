@@ -29,35 +29,3 @@ Validations:
     New-paths do not collide among themselves.
     Directories of the new-paths exist.
 
-Behaviors:
-
-    # Initial
-    Input mechanism: old-paths via ARGS.
-    Validations.
-    Dryrun mode.
-
-        bmv [--dryrun] --rename 'return ...' --old ...
-
-    # Second
-    Input structure: paragraphs, pairs, rows.
-    Input mechanism: STDIN, FILE, CLIP.
-
-    # Third
-    Path-components in renaming code: path, directory, name, stem, extension.
-    Sequence numbering.
-
-    # Fourth.
-    Logging.
-    Log inquiries.
-
-    # Later
-    Complex failure/validation scenarios: prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
-    Renaming via library use case.
-    Case-change-only renamings.
-    Remove common prefix/suffix.
-    Other operations: copy, backup, link, chmod, touch.
-    Validation overrides: clobber, skip-equal, create-dirs.
-    Old-path filtering: files-only, dirs-only.
-    Alternative dryrun output styles.
-    Undo.
-

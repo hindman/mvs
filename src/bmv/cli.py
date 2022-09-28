@@ -8,17 +8,20 @@ from dataclasses import dataclass
 
 '''
 
-Initial implementation:
+Input mechanisms:
+    - Expect ARGV to be empty.
 
-    bmv [--dryrun] --rename 'return ...' --original ...
+    --stdin
+    --file PATH
+    --clipboard
 
-    Input mechanism: original-paths via ARGS.
-    Validations.
-    Dryrun mode.
+Input structure:
+    - Expect no --rename argument.
+    - Expect ARGV to be empty.
 
-Next:
-
-TODO:
+    --paragraphs
+    --pairs
+    --rows
 
 '''
 

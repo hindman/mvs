@@ -2,8 +2,39 @@
 todos: TODOs
 --------
 
+Input mechanisms:
+    STDIN
+    FILE
+    CLIP
+
+Input structure:
+    paragraphs
+    pairs
+    rows
+
 --------
 road-map: Road map
 --------
 
+Document useful Path components:
+    p = Path('/foo/bar/fubb.txt')
+    p.parent    /foo/bar
+    p.name      fubb.txt
+    p.suffix    .txt
+    p.stem      fubb
+
+Sequence numbering.
+
+Logging.
+Log inquiries.
+
+Complex failure/validation scenarios: prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
+Renaming via library use case.
+Case-change-only renamings.
+Remove common prefix/suffix.
+Other operations: copy, backup, link, chmod, touch.
+Validation overrides: clobber, skip-equal, create-dirs.
+Old-path filtering: files-only, dirs-only.
+Alternative dryrun output styles.
+Undo.
 
