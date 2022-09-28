@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 Input mechanisms:
     - Expect ARGV to be empty.
+    - If --rename is present, implies that input text consists of just old-paths.
 
     --stdin
     --file PATH
@@ -19,7 +20,7 @@ Input structure:
     - Expect no --rename argument.
     - Expect ARGV to be empty.
 
-    --paragraphs
+    --blocks
     --pairs
     --rows
 
