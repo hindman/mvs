@@ -11,8 +11,8 @@
 #   inv tags
 #   inv test [--cov]
 #   inv tox
+#   inv bump [--kind <major|minor|patch>] [--local]
 #   # inv dist [--publish] [--test]
-#   # inv bump [--kind <major|minor|patch>] [--local]
 #
 ####
 
@@ -65,6 +65,41 @@ def workareas(c):
                 c.run(f'touch {f}.txt')
                 c.run(f'touch {f}.mp3')
 
+@task
+def bump(c, kind = 'minor', local = False):
+    '''
+    Version bump: minor unless --kind major|patch. Commits/pushes unless --local.
+    '''
+    # Validate.
+    assert kind in ('major', 'minor', 'patch')
+
+    # Get current version as a 3-element list.
+    path = f'src/{LIB}/version.py'
+    lines = open(path).readlines()
+    version = lines[0].split("'")[1]
+    major, minor, patch = [int(x) for x in version.split('.')]
+
+    # Compute new version.
+    tup = (
+        (major + 1, 0, 0) if kind == 'major' else
+        (major, minor + 1, 0) if kind == 'minor' else
+        (major, minor, patch + 1)
+    )
+    version = '.'.join(str(x) for x in tup)
+
+    # Write new version file.
+    if c['run']['dry']:
+        print(f'# Dry run: modify version.py: {version}')
+    else:
+        with open(path, 'w') as fh:
+            fh.write(f"__version__ = '{version}'\n\n")
+        print(f'Bumped to {version}.')
+
+    # Commit and push.
+    if not local:
+        c.run(f"git commit {path} -m 'Version {version}'")
+        c.run('git push origin master')
+
 # @task
 # def dist(c, publish = False, test = False):
 #     '''
@@ -77,39 +112,4 @@ def workareas(c):
 #     c.run('twine check dist/*')
 #     if publish:
 #         c.run(f'twine upload -r {repo} dist/*')
-
-# @task
-# def bump(c, kind = 'minor', local = False):
-#     '''
-#     Version bump: minor unless --kind major|patch. Commits/pushes unless --local.
-#     '''
-#     # Validate.
-#     assert kind in ('major', 'minor', 'patch')
-# 
-#     # Get current version as a 3-element list.
-#     path = f'src/{LIB}/version.py'
-#     lines = open(path).readlines()
-#     version = lines[0].split("'")[1]
-#     major, minor, patch = [int(x) for x in version.split('.')]
-# 
-#     # Compute new version.
-#     tup = (
-#         (major + 1, 0, 0) if kind == 'major' else
-#         (major, minor + 1, 0) if kind == 'minor' else
-#         (major, minor, patch + 1)
-#     )
-#     version = '.'.join(str(x) for x in tup)
-# 
-#     # Write new version file.
-#     if c['run']['dry']:
-#         print(f'# Dry run: modify version.py: {version}')
-#     else:
-#         with open(path, 'w') as fh:
-#             fh.write(f"__version__ = '{version}'\n\n")
-#         print(f'Bumped to {version}.')
-# 
-#     # Commit and push.
-#     if not local:
-#         c.run(f"git commit {path} -m 'Version {version}'")
-#         c.run('git push origin master')
 
