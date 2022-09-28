@@ -47,6 +47,24 @@ def tox(c):
     d = dict(PYENV_VERSION = '3.9.4:3.8.9:3.7.10:3.6.13:3.5.10')
     c.run('tox', env = d)
 
+@task
+def workareas(c):
+    '''
+    Create renaming work areas in tmp directory
+    '''
+    ws = ('tmp/work1', 'tmp/work2')
+    subdirs = ('d1', 'd2', 'd3')
+    for w in ws:
+        c.run(f'rm -rf {w}')
+        c.run(f'mkdir {w}')
+        for sd in subdirs:
+            c.run(f'mkdir {w}/{sd}')
+            n = int(sd[-1]) * 10
+            for i in range(n, n + 3):
+                f = f'{w}/{sd}/{i}'
+                c.run(f'touch {f}.txt')
+                c.run(f'touch {f}.mp3')
+
 # @task
 # def dist(c, publish = False, test = False):
 #     '''

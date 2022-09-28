@@ -18,12 +18,6 @@ Initial implementation:
 
 Next:
 
-    Implement renaming:
-
-        - Confirmation: [unless --yes option was supplied]
-            - List 5 renamings.
-            - Prompt user: list, no, or yes.
-
 TODO:
 
 '''
@@ -43,7 +37,7 @@ class CON:
     epilog = (
         'The user-supplied renaming code has access to the original file path as a str [variable: o], '
         'its pathlib.Path representation [variable: p], '
-        'and the following Python libraries [re, Path]. '
+        'and the following Python libraries or classes [re, Path]. '
         'It should explicitly return the desired new path, either as a str or a Path. '
         'The code should omit indentation on its first line, but must provide it for subsequent lines.'
     )
@@ -68,6 +62,11 @@ class CON:
             'help': 'Number of spaces for indentation in user-supplied code',
         },
         {
+            names: '--yes -y',
+            'action': 'store_true',
+            'help': 'Rename files without user confirmation step',
+        },
+        {
             names: '--dryrun -d',
             'action': 'store_true',
             'help': 'List renamings without performing them',
@@ -85,6 +84,10 @@ class CON:
     fail_new_parent_missing = 'Parent directory of new path does not exist'
     fail_orig_new_same = 'Original path and new path are the same'
     fail_new_collision = 'New path collides with another new path'
+
+    no_action_msg = '\nNo action taken.'
+
+    listing_batch_size = 10
 
 @dataclass
 class RenamePair:
@@ -152,8 +155,27 @@ def main(args = None):
             print(rp.formatted)
         return
 
+    # User confirmation.
+    if not opts.yes:
+        # Listing.
+        for i, rp in enumerate(rps):
+            if i > 0 and i % CON.listing_batch_size == 0:
+                if not get_confirmation('Continue listing', expected = 'y'):
+                    break
+                print()
+            print(rp.formatted)
+        # Confirmation.
+        if not get_confirmation('Rename files', expected = 'yes'):
+            quit(CON.exit_ok, CON.no_action_msg)
+        print()
+
     # Rename.
-    print('Not implemented: renaming')
+    for rp in rps:
+        Path(rp.orig).rename(rp.new)
+
+def get_confirmation(prompt, expected = 'y'):
+    r = input(prompt + f' [{expected}]? ').lower().strip()
+    return r == expected
 
 def parse_args(args):
     ap = argparse.ArgumentParser(
@@ -177,7 +199,7 @@ def make_renamer_func(user_code, indent = 4):
     # Create the renamer function via exec() in the context of:
     # - Globals that we want to make available to the user's code.
     # - A locals dict that we can use to return the generated function.
-    globs = dict(re = re)
+    globs = dict(re = re, Path = Path)
     locs = {}
     exec(code, globs, locs)
     return locs[CON.renamer_name]
