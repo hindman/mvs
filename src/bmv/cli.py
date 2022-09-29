@@ -8,19 +8,39 @@ from dataclasses import dataclass
 
 '''
 
+Add another opts validation:
+
+    Should be at least one of:
+        sources
+        structures or opts.rename
+
+Get the inputs:
+
+    --original
+    --clipboard
+    --file
+    --stdin
+
+Assemble original-new pairs:
+
+    --rename
+
+    --paragraphs
+    --pairs
+    --rows
+
 Input mechanisms:
-    - Expect ARGV to be empty.
-    - If --rename is present, implies that input text consists of just old-paths.
+    - opts.original will be empty
+    - If --rename is present, implies that input text consists of just orig-paths.
 
     --stdin
     --file PATH
     --clipboard
 
 Input structure:
-    - Expect no --rename argument.
-    - Expect ARGV to be empty.
+    - opts.original and opts.rename will be empty
 
-    --blocks
+    --paragraphs
     --pairs
     --rows
 
@@ -56,17 +76,47 @@ class CON:
         {
             names: '--rename -r',
             'metavar': 'CODE',
-            'help': 'Code to convert orignal path to new path',
+            'help': 'Code to convert original path to new path',
         },
         {
-            names: '--indent -i',
+            names: '--indent',
             'type': int,
             'metavar': 'N',
             'default': 4,
             'help': 'Number of spaces for indentation in user-supplied code',
         },
         {
-            names: '--yes -y',
+            names: '--stdin',
+            'action': 'store_true',
+            'help': 'Input paths via STDIN',
+        },
+        {
+            names: '--clipboard',
+            'action': 'store_true',
+            'help': 'Input paths via the clipboard',
+        },
+        {
+            names: '--file',
+            'metavar': 'PATH',
+            'help': 'Input paths via a text file',
+        },
+        {
+            names: '--paragraphs',
+            'action': 'store_true',
+            'help': 'Input paths in paragraphs: originals, blank line, then news',
+        },
+        {
+            names: '--pairs',
+            'action': 'store_true',
+            'help': 'Input paths in line pairs: original, new, original, new, etc.',
+        },
+        {
+            names: '--rows',
+            'action': 'store_true',
+            'help': 'Input paths in tab-delimited rows: original, tab, new',
+        },
+        {
+            names: '--yes',
             'action': 'store_true',
             'help': 'Rename files without user confirmation step',
         },
@@ -93,6 +143,32 @@ class CON:
 
     listing_batch_size = 10
 
+def validate_options(opts):
+    '''
+    Input mechanisms:
+        - If --rename is present, implies that input text consists of just orig-paths.
+
+        --stdin
+        --file PATH
+        --clipboard
+
+    Input structure:
+        - Expect no --rename argument.
+
+        --paragraphs
+        --pairs
+        --rows
+
+    '''
+
+    sources = ('stdin', 'file', 'clipboard')
+    structures = ('paragraphs', 'pairs', 'rows')
+    check_option_conflicts(opts, 'original', sources, structures)
+    check_option_conflicts(opts, 'rename', structures, tuple())
+
+    print('OK')
+    quit()
+
 @dataclass
 class RenamePair:
     orig: str
@@ -118,13 +194,16 @@ class ValidationFailure:
 def main(args = None):
     # Parse arguments and get original paths.
     args = sys.argv[1:] if args is None else args
-    ap, opts = parse_args(args)
-    origs = tuple(opts.original)
+    opts = parse_args(args)
+
+    # Validate options.
+    validate_options(opts)
 
     # Create the renamer function based on the user-supplied code.
     renamer = make_renamer_func(opts.rename, opts.indent)
 
     # Use that function to generate the new paths.
+    origs = tuple(opts.original)
     news = []
     for o in origs:
         try:
@@ -191,7 +270,25 @@ def parse_args(args):
         xs = kws.pop(CON.names).split()
         ap.add_argument(*xs, **kws)
     opts = ap.parse_args(args)
-    return (ap, opts)
+    return opts
+
+def check_option_conflicts(opts, attr, ks1, ks2):
+    # Helper function to quit on failure.
+    def do_quit(names, base_msg):
+        joined = ', '.join(f'--{nm}' for nm in names)
+        quit(code = CON.exit_fail, msg = f'{base_msg}: {joined}')
+
+    # Do not use opts.ATTR with any opts.K1 or any opts.K2.
+    if getattr(opts, attr):
+        used = tuple(k for k in ks1 + ks2 if getattr(opts, k))
+        if used:
+            do_quit(used, f'The --{attr} option should not be used with')
+
+    # Do not use multiple opts.K1 or multiple opts.K2.
+    for ks in (ks1, ks2):
+        used = tuple(k for k in ks if getattr(opts, k))
+        if len(used) > 1:
+            do_quit(used, f'Options should not be used with each other')
 
 def make_renamer_func(user_code, indent = 4):
     # Define the text of the renamer code.
