@@ -5,17 +5,9 @@ from collections import Counter
 from pathlib import Path
 from textwrap import dedent
 from dataclasses import dataclass
+import subprocess
 
 '''
-
-Get the input paths:
-
-    --original
-
-    OR one of:
-        --clipboard
-        --file
-        --stdin
 
 Parse inputs to assemble original-new pairs:
 
@@ -155,6 +147,41 @@ class ValidationFailure:
 # Entry point.
 ####
 
+def get_input_paths(opts):
+    if opts.original:
+        return tuple(opts.original)
+    else:
+        text = (
+            read_from_clipboard() if opts.clipboard else
+            read_from_file(opts.file) if opts.file else
+            sys.stdin.read()
+        )
+        return tuple(
+            line.strip()
+            for line in text.split(CON.newline)
+        )
+
+def read_from_file(path):
+    with open(path) as fh:
+        return fh.read()
+
+def read_from_clipboard():
+    cp = subprocess.run(
+        ['pbpaste'],
+        capture_output = True,
+        check = True,
+        text = True,
+    )
+    return cp.stdout
+
+def write_to_clipboard(text):
+    subprocess.run(
+        ['pbcopy'],
+        check = True,
+        text = True,
+        input = text,
+    )
+
 def main(args = None):
     # Parse arguments and get original paths.
     args = sys.argv[1:] if args is None else args
@@ -165,6 +192,15 @@ def main(args = None):
 
     # Create the renamer function based on the user-supplied code.
     renamer = make_renamer_func(opts.rename, opts.indent)
+
+    # Get the input paths.
+    inputs = get_input_paths(opts)
+
+    # Parse inputs to assemble the original-new pairs:
+    origs, news = parse_inputs(opts, inputs)
+
+    print([inputs])
+    quit()
 
     # Use that function to generate the new paths.
     origs = tuple(opts.original)
