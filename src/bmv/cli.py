@@ -8,41 +8,31 @@ from dataclasses import dataclass
 
 '''
 
-Add another opts validation:
-
-    Should be at least one of:
-        sources
-        structures or opts.rename
-
-Get the inputs:
+Get the input paths:
 
     --original
-    --clipboard
-    --file
-    --stdin
 
-Assemble original-new pairs:
+    OR one of:
+        --clipboard
+        --file
+        --stdin
+
+Parse inputs to assemble original-new pairs:
 
     --rename
 
-    --paragraphs
-    --pairs
-    --rows
-
-Input mechanisms:
-    - opts.original will be empty
-    - If --rename is present, implies that input text consists of just orig-paths.
-
-    --stdin
-    --file PATH
-    --clipboard
-
-Input structure:
-    - opts.original and opts.rename will be empty
+    OR one of:
 
     --paragraphs
     --pairs
     --rows
+
+    If --rename:
+        - Input text consists of just orig-paths.
+
+Refactor validate_options():
+    - return data rather than quitting
+    - write tests
 
 '''
 
@@ -142,32 +132,6 @@ class CON:
     no_action_msg = '\nNo action taken.'
 
     listing_batch_size = 10
-
-def validate_options(opts):
-    '''
-    Input mechanisms:
-        - If --rename is present, implies that input text consists of just orig-paths.
-
-        --stdin
-        --file PATH
-        --clipboard
-
-    Input structure:
-        - Expect no --rename argument.
-
-        --paragraphs
-        --pairs
-        --rows
-
-    '''
-
-    sources = ('stdin', 'file', 'clipboard')
-    structures = ('paragraphs', 'pairs', 'rows')
-    check_option_conflicts(opts, 'original', sources, structures)
-    check_option_conflicts(opts, 'rename', structures, tuple())
-
-    print('OK')
-    quit()
 
 @dataclass
 class RenamePair:
@@ -272,23 +236,44 @@ def parse_args(args):
     opts = ap.parse_args(args)
     return opts
 
-def check_option_conflicts(opts, attr, ks1, ks2):
-    # Helper function to quit on failure.
-    def do_quit(names, base_msg):
-        joined = ', '.join(f'--{nm}' for nm in names)
-        quit(code = CON.exit_fail, msg = f'{base_msg}: {joined}')
+def validate_options(opts):
+    sources = ('stdin', 'file', 'clipboard')
+    structures = ('paragraphs', 'pairs', 'rows')
+    original = ('original',)
+    rename = ('rename',)
+    # Don't used --original or --rename with incompatible options.
+    check_opts_conflicts(opts, original[0], sources)
+    check_opts_conflicts(opts, original[0], structures)
+    check_opts_conflicts(opts, rename[0], structures)
+    # Don't use multiple source or structures.
+    check_opts_mutex(opts, sources)
+    check_opts_mutex(opts, structures)
+    # Use --original or a source option; use --rename or a structure option.
+    check_opts_require_one(opts, original + sources)
+    check_opts_require_one(opts, rename + structures)
 
-    # Do not use opts.ATTR with any opts.K1 or any opts.K2.
+def check_opts_conflicts(opts, attr, ks):
+    # Do not use opts.ATTR with any opts.K.
     if getattr(opts, attr):
-        used = tuple(k for k in ks1 + ks2 if getattr(opts, k))
-        if used:
-            do_quit(used, f'The --{attr} option should not be used with')
-
-    # Do not use multiple opts.K1 or multiple opts.K2.
-    for ks in (ks1, ks2):
         used = tuple(k for k in ks if getattr(opts, k))
-        if len(used) > 1:
-            do_quit(used, f'Options should not be used with each other')
+        if used:
+            quit_with_bad_opts(used, f'The --{attr} option should not be used with')
+
+def check_opts_mutex(opts, ks):
+    # Do not use multiple opts.K.
+    used = tuple(k for k in ks if getattr(opts, k))
+    if len(used) > 1:
+        quit_with_bad_opts(used, f'Options should not be used with each other')
+
+def check_opts_require_one(opts, ks):
+    # Use at least one of opts.K.
+    used = tuple(k for k in ks if getattr(opts, k))
+    if not used:
+        quit_with_bad_opts(ks, f'At least one of these options should be used')
+
+def quit_with_bad_opts(opt_names, base_msg):
+    joined = ', '.join(f'--{nm}' for nm in opt_names)
+    quit(code = CON.exit_fail, msg = f'{base_msg}: {joined}')
 
 def make_renamer_func(user_code, indent = 4):
     # Define the text of the renamer code.
