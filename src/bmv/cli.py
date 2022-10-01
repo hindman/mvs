@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 from textwrap import dedent
 from dataclasses import dataclass
+from itertools import groupby
 import subprocess
 
 '''
@@ -34,6 +35,7 @@ Refactor validate_options():
 
 class CON:
     newline = '\n'
+    tab = '\t'
     exit_ok = 0
     exit_fail = 1
     renamer_name = 'do_rename'
@@ -181,6 +183,48 @@ def write_to_clipboard(text):
         text = True,
         input = text,
     )
+
+def parse_inputs(opts, inputs):
+    if opts.paragraphs:
+        # Paragraphs: first orig paths, then new paths.
+        groups = [
+            list(lines)
+            for g, lines in groupby(inputs, key = bool)
+            if g
+        ]
+        if len(groups) != 2:
+            msg = 'The --paragraphs option expects exactly two paragraphs'
+            quit(CON.exit_fail, msg)
+    elif opts.pairs:
+        # Pairs: orig path, new path, orig path, etc.
+        groups = [[], []]
+        i = 0
+        for line in inputs:
+            if line:
+                groups[i].append(line)
+                i = int(not i)
+    elif opts.rows:
+        # Rows: orig-new path pairs, as tab-delimited rows.
+        groups = [[], []]
+        for row in inputs:
+            if row:
+                cells = row.split(CON.tab)
+                if len(cells) == 2:
+                    for i, val in enumerate(cells):
+                        groups[i].append(val)
+                else:
+                    msg = 'The --rows option expects rows with exactly two cells: {row!r}'
+                    quit(CON.exit_fail, msg)
+    else:
+        # The --original options: just orig paths.
+        groups = [list(opts.original)), None]
+
+    g1, g2 = groups
+    if g2 is None or len(g1) == len(g2):
+        return tuple(tuple(g1), tuple(g2))
+    else:
+        msg = 'Got an unequal number of original paths and new paths'
+        quit(CON.exit_fail, msg)
 
 def main(args = None):
     # Parse arguments and get original paths.
