@@ -27,6 +27,31 @@ Refactor validate_options():
     - return data rather than quitting
     - write tests
 
+    For example:
+
+        @dataclass
+        class Failure:
+            msg: str
+
+        @dataclass
+        class OptionsFailure(Failure):
+            ...
+
+        def handle_failure(x):
+            if isinstance(x, Failure):
+                quit(code = CON.exit_fail, msg = x.msg)
+            else:
+                return x
+
+
+        # Usage
+        x = might_fail(...)                     # Before
+        x = handle_failure(might_fail(...))     # After
+
+        # Notes
+        This approach allows one to implement might_fail() as
+        a data-returning function and test it accordingly.
+
 '''
 
 ####
@@ -185,46 +210,50 @@ def write_to_clipboard(text):
     )
 
 def parse_inputs(opts, inputs):
+    # Handle --original option: just original paths.
+    if opts.original:
+        return (tuple(opts.original), None)
+
+    # Otherwise, organize inputs into original paths and new paths.
     if opts.paragraphs:
-        # Paragraphs: first orig paths, then new paths.
+        # Paragraphs: first original paths, then new paths.
         groups = [
             list(lines)
             for g, lines in groupby(inputs, key = bool)
             if g
         ]
-        if len(groups) != 2:
+        if len(groups) == 2:
+            origs, news = groups
+        else:
             msg = 'The --paragraphs option expects exactly two paragraphs'
             quit(CON.exit_fail, msg)
     elif opts.pairs:
-        # Pairs: orig path, new path, orig path, etc.
-        groups = [[], []]
-        i = 0
-        for line in inputs:
-            if line:
-                groups[i].append(line)
-                i = int(not i)
-    elif opts.rows:
-        # Rows: orig-new path pairs, as tab-delimited rows.
-        groups = [[], []]
+        # Pairs: original path, new path, original path, etc.
+        origs = []
+        news = []
+        for i, line in enumerate(inputs):
+            (news if i % 2 else origs).append(line)
+    else:
+        # Rows: original-new path pairs, as tab-delimited rows.
+        origs = []
+        news = []
         for row in inputs:
             if row:
                 cells = row.split(CON.tab)
                 if len(cells) == 2:
-                    for i, val in enumerate(cells):
-                        groups[i].append(val)
+                    origs.append(cells[0])
+                    news.append(cells[1])
                 else:
                     msg = 'The --rows option expects rows with exactly two cells: {row!r}'
                     quit(CON.exit_fail, msg)
-    else:
-        # The --original options: just orig paths.
-        groups = [list(opts.original)), None]
 
-    g1, g2 = groups
-    if g2 is None or len(g1) == len(g2):
-        return tuple(tuple(g1), tuple(g2))
-    else:
+    # Stop if we got unqual numbers of paths.
+    if len(origs) != len(news):
         msg = 'Got an unequal number of original paths and new paths'
         quit(CON.exit_fail, msg)
+
+    # Return as tuples.
+    return (tuple(origs), tuple(news))
 
 def main(args = None):
     # Parse arguments and get original paths.
