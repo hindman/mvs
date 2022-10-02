@@ -1,13 +1,19 @@
 import pytest
+from types import SimpleNamespace
 
 from bmv import (
     __version__,
+
 )
 
 from bmv.cli import (
     RenamePair,
-    ValidationFailure,
+    RenamePairFailure,
     validate_rename_pairs,
+    validate_options,
+    parse_inputs,
+    OptsFailure,
+    ParseFailure,
     CON,
 )
 
@@ -91,4 +97,87 @@ def test_validation_new_uniqueness(tr):
     assert fails[1].rp is rps[2]
     assert fails[0].msg == CON.fail_new_collision
     assert fails[1].msg == CON.fail_new_collision
+
+def test_opts_conflicts(tr):
+    # Do not use --original with sources or structures.
+    for s in CON.opts_sources + CON.opts_structures:
+        opts = SimpleNamespace(original = True)
+        setattr(opts, s, True)
+        of = validate_options(opts)
+        assert isinstance(of, OptsFailure)
+        assert of.msg.startswith(CON.fail_opts_conflicts.format(attr = 'original'))
+        assert f'--{s}' in of.msg
+    # Do not use --rename with structures.
+    for s in CON.opts_structures:
+        opts = SimpleNamespace(rename = 'some code')
+        setattr(opts, s, True)
+        of = validate_options(opts)
+        assert isinstance(of, OptsFailure)
+        assert of.msg.startswith(CON.fail_opts_conflicts.format(attr = 'rename'))
+        assert f'--{s}' in of.msg
+
+def test_opts_mutex(tr):
+    # Do not use multiple sources.
+    opts = SimpleNamespace(stdin = True, file = True)
+    of = validate_options(opts)
+    assert isinstance(of, OptsFailure)
+    assert of.msg.startswith(CON.fail_opts_mutex)
+    assert f'--stdin' in of.msg
+    assert f'--file' in of.msg
+    # Do not use multiple structures.
+    opts = SimpleNamespace(rows = True, pairs = True)
+    of = validate_options(opts)
+    assert isinstance(of, OptsFailure)
+    assert of.msg.startswith(CON.fail_opts_mutex)
+    assert f'--rows' in of.msg
+    assert f'--pairs' in of.msg
+
+def test_opts_require_one(tr):
+    # Use --original or a source.
+    opts = SimpleNamespace()
+    of = validate_options(opts)
+    assert isinstance(of, OptsFailure)
+    assert of.msg.startswith(CON.fail_opts_require_one)
+    assert '--original' in of.msg
+    # Use --rename or a structure.
+    opts = SimpleNamespace(original = True)
+    of = validate_options(opts)
+    assert isinstance(of, OptsFailure)
+    assert of.msg.startswith(CON.fail_opts_require_one)
+    assert '--rename' in of.msg
+
+def test_parse_inputs(tr):
+
+    # Scenario: --original option.
+    pass
+
+    # Scenario: --paragraphs: exactly two.
+    pass
+
+    # Scenario: --paragraphs: not exactly two.
+    pass
+
+    # Scenario: --pairs.
+    pass
+
+    # Scenario: --pairs: unequal.
+    pass
+
+    # Scenario: --rows.
+    pass
+
+    # Scenario: --rows: unequal.
+    pass
+
+    # Scenario: unexpected opts.
+    opts = SimpleNamespace(
+        original = False,
+        paragraphs = False,
+        pairs = False,
+        rows = False,
+    )
+    inputs = ()
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg == CON.fail_parsing_opts
 

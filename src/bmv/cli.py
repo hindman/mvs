@@ -10,47 +10,14 @@ import subprocess
 
 '''
 
-Parse inputs to assemble original-new pairs:
+parse_inputs():
+    - finish writing tests
 
-    --rename
+main(): rework the execution of the user-supplied renaming code
 
-    OR one of:
+options: add --delimiter  [tab for rows]
 
-    --paragraphs
-    --pairs
-    --rows
-
-    If --rename:
-        - Input text consists of just orig-paths.
-
-Refactor validate_options():
-    - return data rather than quitting
-    - write tests
-
-    For example:
-
-        @dataclass
-        class Failure:
-            msg: str
-
-        @dataclass
-        class OptionsFailure(Failure):
-            ...
-
-        def handle_failure(x):
-            if isinstance(x, Failure):
-                quit(code = CON.exit_fail, msg = x.msg)
-            else:
-                return x
-
-
-        # Usage
-        x = might_fail(...)                     # Before
-        x = handle_failure(might_fail(...))     # After
-
-        # Notes
-        This approach allows one to implement might_fail() as
-        a data-returning function and test it accordingly.
+catch_failure(x, multiple = False): add ability to handle a sequence of failures.
 
 '''
 
@@ -147,10 +114,20 @@ class CON:
     fail_new_parent_missing = 'Parent directory of new path does not exist'
     fail_orig_new_same = 'Original path and new path are the same'
     fail_new_collision = 'New path collides with another new path'
+    fail_parsing_opts = 'Unexpected options during parsing: no --original or structures given'
+    fail_invalid_row = 'The --rows option expects rows with exactly two cells: {row!r}'
+    fail_invalid_paragraphs = 'The --paragraphs option expects exactly two paragraphs'
+    fail_parsing_inequality = 'Got an unequal number of original paths and new paths'
+    fail_opts_conflicts = 'The --{attr} option should not be used with'
+    fail_opts_mutex = 'Options should not be used with each other'
+    fail_opts_require_one = 'At least one of these options should be used'
 
     no_action_msg = '\nNo action taken.'
 
     listing_batch_size = 10
+
+    opts_sources = ('stdin', 'file', 'clipboard')
+    opts_structures = ('paragraphs', 'pairs', 'rows')
 
 @dataclass
 class RenamePair:
@@ -162,13 +139,30 @@ class RenamePair:
         return f'{self.orig}\n{self.new}\n'
 
 @dataclass
-class ValidationFailure:
-    rp: RenamePair
+class Failure:
     msg: str
+
+@dataclass
+class OptsFailure(Failure):
+    pass
+
+@dataclass
+class ParseFailure(Failure):
+    pass
+
+@dataclass
+class RenamePairFailure(Failure):
+    rp: RenamePair
 
     @property
     def formatted(self):
         return f'{self.msg}:\n{self.rp.formatted}'
+
+def catch_failure(x):
+    if isinstance(x, Failure):
+        quit(code = CON.exit_fail, msg = x.msg)
+    else:
+        return x
 
 ####
 # Entry point.
@@ -225,15 +219,14 @@ def parse_inputs(opts, inputs):
         if len(groups) == 2:
             origs, news = groups
         else:
-            msg = 'The --paragraphs option expects exactly two paragraphs'
-            quit(CON.exit_fail, msg)
+            return ParseFailure(CON.fail_invalid_paragraphs)
     elif opts.pairs:
         # Pairs: original path, new path, original path, etc.
         origs = []
         news = []
         for i, line in enumerate(inputs):
             (news if i % 2 else origs).append(line)
-    else:
+    elif opts.rows:
         # Rows: original-new path pairs, as tab-delimited rows.
         origs = []
         news = []
@@ -244,36 +237,35 @@ def parse_inputs(opts, inputs):
                     origs.append(cells[0])
                     news.append(cells[1])
                 else:
-                    msg = 'The --rows option expects rows with exactly two cells: {row!r}'
-                    quit(CON.exit_fail, msg)
+                    return ParseFailure(CON.fail_invalid_row.format(row = row))
+    else:
+        return ParseFailure(CON.fail_parsing_opts)
 
     # Stop if we got unqual numbers of paths.
     if len(origs) != len(news):
-        msg = 'Got an unequal number of original paths and new paths'
-        quit(CON.exit_fail, msg)
+        return ParseFailure(CON.fail_parsing_inequality)
 
     # Return as tuples.
     return (tuple(origs), tuple(news))
 
 def main(args = None):
     # Parse arguments and get original paths.
-    args = sys.argv[1:] if args is None else args
-    opts = parse_args(args)
+    opts = parse_args(sys.argv[1:] if args is None else args)
 
     # Validate options.
-    validate_options(opts)
-
-    # Create the renamer function based on the user-supplied code.
-    renamer = make_renamer_func(opts.rename, opts.indent)
+    catch_failure(validate_options(opts))
 
     # Get the input paths.
     inputs = get_input_paths(opts)
 
     # Parse inputs to assemble the original-new pairs:
-    origs, news = parse_inputs(opts, inputs)
+    origs, news = catch_failure(parse_inputs(opts, inputs))
 
     print([inputs])
     quit()
+
+    # Create the renamer function based on the user-supplied code.
+    renamer = make_renamer_func(opts.rename, opts.indent)
 
     # Use that function to generate the new paths.
     origs = tuple(opts.original)
@@ -346,43 +338,53 @@ def parse_args(args):
     return opts
 
 def validate_options(opts):
-    sources = ('stdin', 'file', 'clipboard')
-    structures = ('paragraphs', 'pairs', 'rows')
-    original = ('original',)
-    rename = ('rename',)
-    # Don't used --original or --rename with incompatible options.
-    check_opts_conflicts(opts, original[0], sources)
-    check_opts_conflicts(opts, original[0], structures)
-    check_opts_conflicts(opts, rename[0], structures)
-    # Don't use multiple source or structures.
-    check_opts_mutex(opts, sources)
-    check_opts_mutex(opts, structures)
-    # Use --original or a source option; use --rename or a structure option.
-    check_opts_require_one(opts, original + sources)
-    check_opts_require_one(opts, rename + structures)
+    # Define each check as a function and its arguments.
+    checks = (
+        # Don't used --original or --rename with incompatible options.
+        (check_opts_conflicts, opts, 'original', CON.opts_sources),
+        (check_opts_conflicts, opts, 'original', CON.opts_structures),
+        (check_opts_conflicts, opts, 'rename', CON.opts_structures),
+        # Don't use multiple source or structures.
+        (check_opts_mutex, opts, CON.opts_sources),
+        (check_opts_mutex, opts, CON.opts_structures),
+        # Use --original or a source option; use --rename or a structure option.
+        (check_opts_require_one, opts, ('original',) + CON.opts_sources),
+        (check_opts_require_one, opts, ('rename',) + CON.opts_structures),
+    )
+    # Run the checks, all of which return OptsFailure or None.
+    for func, *xs in checks:
+        result = func(*xs)
+        if result:
+            return result
+    return None
 
 def check_opts_conflicts(opts, attr, ks):
     # Do not use opts.ATTR with any opts.K.
-    if getattr(opts, attr):
-        used = tuple(k for k in ks if getattr(opts, k))
+    if getattr(opts, attr, None):
+        used = tuple(k for k in ks if getattr(opts, k, None))
         if used:
-            quit_with_bad_opts(used, f'The --{attr} option should not be used with')
+            return bad_opts_failure(used, CON.fail_opts_conflicts.format(attr = attr))
+    return None
 
 def check_opts_mutex(opts, ks):
     # Do not use multiple opts.K.
-    used = tuple(k for k in ks if getattr(opts, k))
-    if len(used) > 1:
-        quit_with_bad_opts(used, f'Options should not be used with each other')
+    used = tuple(k for k in ks if getattr(opts, k, None))
+    return (
+        None if len(used) <= 1 else
+        bad_opts_failure(used, CON.fail_opts_mutex)
+    )
 
 def check_opts_require_one(opts, ks):
     # Use at least one of opts.K.
-    used = tuple(k for k in ks if getattr(opts, k))
-    if not used:
-        quit_with_bad_opts(ks, f'At least one of these options should be used')
+    used = tuple(k for k in ks if getattr(opts, k, None))
+    return (
+        None if used else
+        bad_opts_failure(ks, CON.fail_opts_require_one)
+    )
 
-def quit_with_bad_opts(opt_names, base_msg):
+def bad_opts_failure(opt_names, base_msg):
     joined = ', '.join(f'--{nm}' for nm in opt_names)
-    quit(code = CON.exit_fail, msg = f'{base_msg}: {joined}')
+    return OptsFailure(f'{base_msg}: {joined}')
 
 def make_renamer_func(user_code, indent = 4):
     # Define the text of the renamer code.
@@ -409,35 +411,35 @@ def validate_rename_pairs(rps):
 
     # Original should exist.
     fails.extend(
-        ValidationFailure(rp, CON.fail_orig_missing)
+        RenamePairFailure(CON.fail_orig_missing, rp)
         for rp in rps
         if not Path(rp.orig).exists()
     )
 
     # New should not exist.
     fails.extend(
-        ValidationFailure(rp, CON.fail_new_exists)
+        RenamePairFailure(CON.fail_new_exists, rp)
         for rp in rps
         if Path(rp.new).exists()
     )
 
     # Parent of new should exist.
     fails.extend(
-        ValidationFailure(rp, CON.fail_new_parent_missing)
+        RenamePairFailure(CON.fail_new_parent_missing, rp)
         for rp in rps
         if not Path(rp.new).parent.exists()
     )
 
     # Original and new should differ.
     fails.extend(
-        ValidationFailure(rp, CON.fail_orig_new_same)
+        RenamePairFailure(CON.fail_orig_new_same, rp)
         for rp in rps
         if rp.orig == rp.new
     )
 
     # News should not collide among themselves.
     fails.extend(
-        ValidationFailure(rp, CON.fail_new_collision)
+        RenamePairFailure(CON.fail_new_collision, rp)
         for group in grouped_by_new.values()
         for rp in group
         if len(group) > 1
@@ -448,9 +450,6 @@ def validate_rename_pairs(rps):
 ####
 # Utilities.
 ####
-
-def fail_validation(msg):
-    quit(CON.exit_fail, msg)
 
 def quit(code = None, msg = None):
     code = CON.exit_ok if code is None else code
