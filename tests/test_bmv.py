@@ -235,7 +235,7 @@ def test_parse_inputs(tr):
     assert isinstance(of, ParseFailure)
     assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
 
-    # Scenario: opts with no sources.
+    # Scenario: opts with neither --original nor structures.
     inputs = ()
     opts = make_opts()
     of = parse_inputs(opts, inputs)

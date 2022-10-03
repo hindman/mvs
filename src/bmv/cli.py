@@ -340,6 +340,56 @@ def parse_args(args):
     return opts
 
 def validate_options(opts):
+    '''
+
+    Current situation:
+
+        The code enforces the following paradigm. But this is overly complex
+        and has at least one logical flaw, in that it a disallows a scenario
+        that could make sense.
+
+        original | rename | source | structure | Scenario or invalid reasons
+        --------------------------------------------------------------------
+        .        | .      | .      | .         | R4, R5
+        .        | .      | .      | Yes       | R4
+        .        | .      | Yes    | .         | R5
+        .        | .      | Yes    | Yes       | OK: All paths via a source and structure.
+        .        | Yes    | .      | .         | R4
+        .        | Yes    | .      | Yes       | R2, R4
+        .        | Yes    | Yes    | .         | OK: --rename with a source for old-paths.
+        .        | Yes    | Yes    | Yes       | R2
+        Yes      | .      | .      | .         | R5
+        Yes      | .      | .      | Yes       | R1
+        Yes      | .      | Yes    | .         | R3, R5 [potentially allowable]
+        Yes      | .      | Yes    | Yes       | R1, R3
+        Yes      | Yes    | .      | .         | OK: --rename with --original for old-paths.
+        Yes      | Yes    | .      | Yes       | R1, R2
+        Yes      | Yes    | Yes    | .         | R3
+        Yes      | Yes    | Yes    | Yes       | R1, R2, R3
+
+        Reasons:
+            R1: --original makes no sense with structures than imply original-new pairs
+            R2: --rename makes no sense with structures than imply original-new pairs
+            R3: --original not currently allowed with input sources
+            R4: need either --original or a source
+            R5: need either --rename or a structure
+
+    A simpler approach:
+
+        Start by asking where will we obtain the old-paths and new-paths.
+
+            Old-paths  | New-Paths | Note
+            ---------------------------------------------
+            SOURCE     | SOURCE    | .
+            SOURCE     | code      | .
+            --original | code      | .
+            --original | SOURCE    | Could be allowed
+
+        And then add the fact that --rename and pair-implying structures don't
+        make sense together.
+
+    '''
+
     # Define each check as a function and its arguments.
     checks = (
         # Don't used --original or --rename with incompatible options.
