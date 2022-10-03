@@ -10,9 +10,6 @@ import subprocess
 
 '''
 
-parse_inputs():
-    - finish writing tests
-
 main(): rework the execution of the user-supplied renaming code
 
 options: add --delimiter  [tab for rows]
@@ -115,8 +112,8 @@ class CON:
     fail_orig_new_same = 'Original path and new path are the same'
     fail_new_collision = 'New path collides with another new path'
     fail_parsing_opts = 'Unexpected options during parsing: no --original or structures given'
-    fail_invalid_row = 'The --rows option expects rows with exactly two cells: {row!r}'
-    fail_invalid_paragraphs = 'The --paragraphs option expects exactly two paragraphs'
+    fail_parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}'
+    fail_parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs'
     fail_parsing_inequality = 'Got an unequal number of original paths and new paths'
     fail_opts_conflicts = 'The --{attr} option should not be used with'
     fail_opts_mutex = 'Options should not be used with each other'
@@ -169,6 +166,8 @@ def catch_failure(x):
 ####
 
 def get_input_paths(opts):
+    # Get the input path text from the source.
+    # Returns a tuple of stripped lines.
     if opts.original:
         return tuple(opts.original)
     else:
@@ -219,13 +218,16 @@ def parse_inputs(opts, inputs):
         if len(groups) == 2:
             origs, news = groups
         else:
-            return ParseFailure(CON.fail_invalid_paragraphs)
+            return ParseFailure(CON.fail_parsing_paragraphs)
     elif opts.pairs:
         # Pairs: original path, new path, original path, etc.
         origs = []
         news = []
-        for i, line in enumerate(inputs):
-            (news if i % 2 else origs).append(line)
+        current = origs
+        for line in inputs:
+            if line:
+                current.append(line)
+                current = news if current is origs else origs
     elif opts.rows:
         # Rows: original-new path pairs, as tab-delimited rows.
         origs = []
@@ -237,7 +239,7 @@ def parse_inputs(opts, inputs):
                     origs.append(cells[0])
                     news.append(cells[1])
                 else:
-                    return ParseFailure(CON.fail_invalid_row.format(row = row))
+                    return ParseFailure(CON.fail_parsing_row.format(row = row))
     else:
         return ParseFailure(CON.fail_parsing_opts)
 

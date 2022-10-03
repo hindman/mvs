@@ -147,36 +147,97 @@ def test_opts_require_one(tr):
     assert '--rename' in of.msg
 
 def test_parse_inputs(tr):
+    # Some constants.
+    ORIGS = [
+        'foo.txt',
+        'bar.doc',
+    ]
+    NEWS = [
+        'foo.txt.new',
+        'bar.doc.new',
+    ]
+    OTHER = [
+        'xxxx.x',
+        'yyyy.yy',
+        'zzzz.zzz',
+    ]
+    BLANKS = [''] * 30
+    ROWS = [
+        f'{o}\t{n}'
+        for o, n in zip(ORIGS, NEWS)
+    ]
+    EXP = (tuple(ORIGS), tuple(NEWS))
 
-    # Scenario: --original option.
-    pass
+    # A function to return a SimpleNamespace as an opts standin.
+    def make_opts(**kws):
+        d = dict(original = False, paragraphs = False, pairs = False, rows = False)
+        d.update(kws)
+        return SimpleNamespace(**d)
+
+    # Scenario: old paths via the --original option.
+    # We expect None for the new paths.
+    opts = make_opts(original = ['a', 'b', 'c'])
+    inputs = ()
+    got = parse_inputs(opts, inputs)
+    assert got == (tuple(opts.original), None)
 
     # Scenario: --paragraphs: exactly two.
-    pass
+    opts = make_opts(paragraphs = True)
+    inputs = (*ORIGS, '', '', *NEWS, '')
+    got = parse_inputs(opts, inputs)
+    assert got == EXP
 
     # Scenario: --paragraphs: not exactly two.
-    pass
+    opts = make_opts(paragraphs = True)
+    inputs = ('', *ORIGS, '', '', *NEWS, '', *OTHER, '')
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg == CON.fail_parsing_paragraphs
 
     # Scenario: --pairs.
-    pass
+    opts = make_opts(pairs = True)
+    inputs = tuple(
+        line
+        for tup in zip(BLANKS, ORIGS, BLANKS, NEWS, BLANKS)
+        for line in tup
+    )
+    got = parse_inputs(opts, inputs)
+    assert got == EXP
 
     # Scenario: --pairs: unequal.
-    pass
+    opts = make_opts(pairs = True)
+    inputs = inputs + tuple(OTHER)
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg == CON.fail_parsing_inequality
 
     # Scenario: --rows.
-    pass
+    opts = make_opts(rows = True)
+    inputs = [
+        line
+        for tup in zip(ROWS, BLANKS)
+        for line in tup
+    ]
+    got = parse_inputs(opts, inputs)
+    assert got == EXP
 
-    # Scenario: --rows: unequal.
-    pass
+    # Scenario: --rows: just one cell.
+    opts = make_opts(rows = True)
+    inputs = ROWS + ['just-one-cell']
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
 
-    # Scenario: unexpected opts.
-    opts = SimpleNamespace(
-        original = False,
-        paragraphs = False,
-        pairs = False,
-        rows = False,
-    )
+    # Scenario: --rows: more than two cells.
+    opts = make_opts(rows = True)
+    inputs = ROWS + ['x\ty\tz']
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
+
+    # Scenario: opts with no sources.
     inputs = ()
+    opts = make_opts()
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
     assert of.msg == CON.fail_parsing_opts
