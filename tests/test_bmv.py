@@ -1,9 +1,9 @@
 import pytest
 from types import SimpleNamespace
+from random import sample, choice
 
 from bmv import (
     __version__,
-
 )
 
 from bmv.cli import (
@@ -98,53 +98,48 @@ def test_validation_new_uniqueness(tr):
     assert fails[0].msg == CON.fail_new_collision
     assert fails[1].msg == CON.fail_new_collision
 
-def test_opts_conflicts(tr):
-    # Do not use --original with sources or structures.
-    for s in CON.opts_sources + CON.opts_structures:
-        opts = SimpleNamespace(original = True)
-        setattr(opts, s, True)
-        of = validate_options(opts)
-        assert isinstance(of, OptsFailure)
-        assert of.msg.startswith(CON.fail_opts_conflicts.format(attr = 'original'))
-        assert f'--{s}' in of.msg
-    # Do not use --rename with structures.
-    for s in CON.opts_structures:
-        opts = SimpleNamespace(rename = 'some code')
-        setattr(opts, s, True)
-        of = validate_options(opts)
-        assert isinstance(of, OptsFailure)
-        assert of.msg.startswith(CON.fail_opts_conflicts.format(attr = 'rename'))
-        assert f'--{s}' in of.msg
+def test_validate_options(tr):
+    # Define the two groups of options we are testing.
+    # Note: to test opts_structures, we need to set at least one of opts_sources.
+    OPT_NAME_GROUPS = (
+        (CON.opts_sources, False),
+        (CON.opts_structures, True),
+    )
 
-def test_opts_mutex(tr):
-    # Do not use multiple sources.
-    opts = SimpleNamespace(stdin = True, file = True)
-    of = validate_options(opts)
-    assert isinstance(of, OptsFailure)
-    assert of.msg.startswith(CON.fail_opts_mutex)
-    assert f'--stdin' in of.msg
-    assert f'--file' in of.msg
-    # Do not use multiple structures.
-    opts = SimpleNamespace(rows = True, pairs = True)
-    of = validate_options(opts)
-    assert isinstance(of, OptsFailure)
-    assert of.msg.startswith(CON.fail_opts_mutex)
-    assert f'--rows' in of.msg
-    assert f'--pairs' in of.msg
-
-def test_opts_require_one(tr):
-    # Use --original or a source.
+    # Scenario: zero sources: invalid.
     opts = SimpleNamespace()
     of = validate_options(opts)
     assert isinstance(of, OptsFailure)
     assert of.msg.startswith(CON.fail_opts_require_one)
-    assert '--original' in of.msg
-    # Use --rename or a structure.
-    opts = SimpleNamespace(original = True)
+
+    # Scenario: zero structures: valid.
+    opts = SimpleNamespace()
+    setattr(opts, choice(CON.opts_sources), True)
     of = validate_options(opts)
-    assert isinstance(of, OptsFailure)
-    assert of.msg.startswith(CON.fail_opts_require_one)
-    assert '--rename' in of.msg
+    assert of is None
+
+    # Scenario: exactly one source or one structure: valid.
+    for opt_names, set_source in OPT_NAME_GROUPS:
+        for nm in opt_names:
+            opts = SimpleNamespace()
+            setattr(opts, nm, True)
+            if set_source:
+                setattr(opts, choice(CON.opts_sources), True)
+            of = validate_options(opts)
+            assert of is None
+
+    # Scenario: multiple sources or multiple structure: invalid.
+    for opt_names, set_source in OPT_NAME_GROUPS:
+        size_rng = range(2, len(opt_names))
+        for _ in range(10):
+            opts = SimpleNamespace()
+            for nm in sample(opt_names, choice(size_rng)):
+                setattr(opts, nm, True)
+            if set_source:
+                setattr(opts, choice(CON.opts_sources), True)
+            of = validate_options(opts)
+            assert isinstance(of, OptsFailure)
+            assert of.msg.startswith(CON.fail_opts_mutex)
 
 def test_parse_inputs(tr):
     # Some constants.
@@ -170,16 +165,16 @@ def test_parse_inputs(tr):
 
     # A function to return a SimpleNamespace as an opts standin.
     def make_opts(**kws):
-        d = dict(original = False, paragraphs = False, pairs = False, rows = False)
+        d = dict(paths = False, paragraphs = False, pairs = False, rows = False)
         d.update(kws)
         return SimpleNamespace(**d)
 
-    # Scenario: old paths via the --original option.
+    # Scenario: old paths via the paths option.
     # We expect None for the new paths.
-    opts = make_opts(original = ['a', 'b', 'c'])
+    opts = make_opts(paths = ['a', 'b', 'c'])
     inputs = ()
     got = parse_inputs(opts, inputs)
-    assert got == (tuple(opts.original), None)
+    assert got == (tuple(opts.paths), None)
 
     # Scenario: --paragraphs: exactly two.
     opts = make_opts(paragraphs = True)
@@ -235,7 +230,7 @@ def test_parse_inputs(tr):
     assert isinstance(of, ParseFailure)
     assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
 
-    # Scenario: opts with neither --original nor structures.
+    # Scenario: opts with neither paths nor structures.
     inputs = ()
     opts = make_opts()
     of = parse_inputs(opts, inputs)

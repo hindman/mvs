@@ -2,30 +2,43 @@
 usage: Usage
 --------
 
-Major usage patterns: what the user provides:
+Usage components:
 
-    Both old-paths and new-paths.
+    PATHS     : positionals
+    SOURCE    : PATHS | --stdin | --file PATH | --clipboard
+    STRUCTURE : --rename CODE | --paragraphs | --pairs | --rows | --flat
+    OTHER     : all other options
 
-    Just old-paths, plus renaming options.
+Usage schematic:
 
-Mechanisms to supply old/new paths:
+    bmv SOURCE [STRUCTURE] [OTHER]
 
-    ARGS     # Old-paths only.
-    STDIN
-    FILE
-    CLIP
+Usage notes.
 
-Structures for paths:
+    User must provide exactly one source for input paths.
 
-    Paragraphs  # First old-paths, then new-paths.
-    Pairs       # Old-path, new-path, etc.
-    Rows        # Tab delimited by default
+    The user must supply zero or one option defining the structure of the input
+    path data.
 
-Validations:
+    Structures for input path data:
 
-    Old-path and new-path differ for each pair.
-    Old-paths exist.
-    New-paths do not exist.
-    New-paths do not collide among themselves.
-    Directories of the new-paths exist.
+        - Paragraphs: two Unix-style paragraphs, one for original paths, one for new paths.
+        - Pairs: alternating lines (original, new, original, new, etc).
+        - Rows: tab-delimited rows (original, tab, new).
+        - Flat: original paths, then an equal number of new paths (blank lines irrelevant).
+
+    The --rename option is considered structural:
+
+        - It implies that the input path data consists solely of original paths.
+        - The other structural options imply original-new pairs in one form or another.
+
+--------
+renaming-validations: Renaming validations
+--------
+
+Old-path and new-path differ for each pair.
+Old-paths exist.
+New-paths do not exist.
+New-paths do not collide among themselves.
+Directories of the new-paths exist.
 

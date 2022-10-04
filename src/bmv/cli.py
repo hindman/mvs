@@ -10,9 +10,11 @@ import subprocess
 
 '''
 
-main(): rework the execution of the user-supplied renaming code
+parse_inputs():
+    - Add --flat option
+    - Modify the function in light of the new usage plan.
 
-options: add --delimiter  [tab for rows]
+main(): rework the execution of the user-supplied renaming code
 
 catch_failure(x, multiple = False): add ability to handle a sequence of failures.
 
@@ -41,10 +43,10 @@ class CON:
     names = 'names'
     opts_config = (
         {
-            names: '--original -o',
-            'nargs': '+',
+            names: 'paths',
+            'nargs': '*',
             'metavar': 'PATH',
-            'help': 'Original file paths',
+            'help': 'Input file paths',
         },
         {
             names: '--rename -r',
@@ -111,20 +113,20 @@ class CON:
     fail_new_parent_missing = 'Parent directory of new path does not exist'
     fail_orig_new_same = 'Original path and new path are the same'
     fail_new_collision = 'New path collides with another new path'
-    fail_parsing_opts = 'Unexpected options during parsing: no --original or structures given'
+    fail_parsing_opts = 'Unexpected options during parsing: no paths or structures given'
     fail_parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}'
     fail_parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs'
     fail_parsing_inequality = 'Got an unequal number of original paths and new paths'
-    fail_opts_conflicts = 'The --{attr} option should not be used with'
-    fail_opts_mutex = 'Options should not be used with each other'
-    fail_opts_require_one = 'At least one of these options should be used'
+    fail_opts_require_one = 'One of these options is required'
+    fail_opts_mutex = 'No more than one of these options should be used'
 
     no_action_msg = '\nNo action taken.'
 
     listing_batch_size = 10
 
-    opts_sources = ('stdin', 'file', 'clipboard')
-    opts_structures = ('paragraphs', 'pairs', 'rows')
+    opts_paths = 'paths'
+    opts_sources = (opts_paths, 'stdin', 'file', 'clipboard')
+    opts_structures = ('rename', 'paragraphs', 'pairs', 'rows')
 
 @dataclass
 class RenamePair:
@@ -168,18 +170,16 @@ def catch_failure(x):
 def get_input_paths(opts):
     # Get the input path text from the source.
     # Returns a tuple of stripped lines.
-    if opts.original:
-        return tuple(opts.original)
+    if opts.paths:
+        paths = opts.paths
     else:
         text = (
             read_from_clipboard() if opts.clipboard else
             read_from_file(opts.file) if opts.file else
             sys.stdin.read()
         )
-        return tuple(
-            line.strip()
-            for line in text.split(CON.newline)
-        )
+        paths = text.split(CON.newline)
+    return tuple(path.strip() for path in paths)
 
 def read_from_file(path):
     with open(path) as fh:
@@ -203,9 +203,9 @@ def write_to_clipboard(text):
     )
 
 def parse_inputs(opts, inputs):
-    # Handle --original option: just original paths.
-    if opts.original:
-        return (tuple(opts.original), None)
+    # Handle paths option: just original paths.
+    if opts.paths:
+        return (tuple(opts.paths), None)
 
     # Otherwise, organize inputs into original paths and new paths.
     if opts.paragraphs:
@@ -263,14 +263,13 @@ def main(args = None):
     # Parse inputs to assemble the original-new pairs:
     origs, news = catch_failure(parse_inputs(opts, inputs))
 
-    print([inputs])
-    quit()
-
     # Create the renamer function based on the user-supplied code.
     renamer = make_renamer_func(opts.rename, opts.indent)
 
+    quit()
+
     # Use that function to generate the new paths.
-    origs = tuple(opts.original)
+    origs = tuple(opts.paths)
     news = []
     for o in origs:
         try:
@@ -340,102 +339,41 @@ def parse_args(args):
     return opts
 
 def validate_options(opts):
-    '''
-
-    Current situation:
-
-        The code enforces the following paradigm. But this is overly complex
-        and has at least one logical flaw, in that it a disallows a scenario
-        that could make sense.
-
-        original | rename | source | structure | Scenario or invalid reasons
-        --------------------------------------------------------------------
-        .        | .      | .      | .         | R4, R5
-        .        | .      | .      | Yes       | R4
-        .        | .      | Yes    | .         | R5
-        .        | .      | Yes    | Yes       | OK: All paths via a source and structure.
-        .        | Yes    | .      | .         | R4
-        .        | Yes    | .      | Yes       | R2, R4
-        .        | Yes    | Yes    | .         | OK: --rename with a source for old-paths.
-        .        | Yes    | Yes    | Yes       | R2
-        Yes      | .      | .      | .         | R5
-        Yes      | .      | .      | Yes       | R1
-        Yes      | .      | Yes    | .         | R3, R5 [potentially allowable]
-        Yes      | .      | Yes    | Yes       | R1, R3
-        Yes      | Yes    | .      | .         | OK: --rename with --original for old-paths.
-        Yes      | Yes    | .      | Yes       | R1, R2
-        Yes      | Yes    | Yes    | .         | R3
-        Yes      | Yes    | Yes    | Yes       | R1, R2, R3
-
-        Reasons:
-            R1: --original makes no sense with structures than imply original-new pairs
-            R2: --rename makes no sense with structures than imply original-new pairs
-            R3: --original not currently allowed with input sources
-            R4: need either --original or a source
-            R5: need either --rename or a structure
-
-    A simpler approach:
-
-        Start by asking where will we obtain the old-paths and new-paths.
-
-            Old-paths  | New-Paths | Note
-            ---------------------------------------------
-            SOURCE     | SOURCE    | .
-            SOURCE     | code      | .
-            --original | code      | .
-            --original | SOURCE    | Could be allowed
-
-        And then add the fact that --rename and pair-implying structures don't
-        make sense together.
-
-    '''
-
-    # Define each check as a function and its arguments.
+    # Define the option checks.
     checks = (
-        # Don't used --original or --rename with incompatible options.
-        (check_opts_conflicts, opts, 'original', CON.opts_sources),
-        (check_opts_conflicts, opts, 'original', CON.opts_structures),
-        (check_opts_conflicts, opts, 'rename', CON.opts_structures),
-        # Don't use multiple source or structures.
-        (check_opts_mutex, opts, CON.opts_sources),
-        (check_opts_mutex, opts, CON.opts_structures),
-        # Use --original or a source option; use --rename or a structure option.
-        (check_opts_require_one, opts, ('original',) + CON.opts_sources),
-        (check_opts_require_one, opts, ('rename',) + CON.opts_structures),
+        # Exactly one source for input paths.
+        (CON.opts_sources, False),
+        # Zero or one option specifying an input structure.
+        (CON.opts_structures, True),
     )
+
     # Run the checks, all of which return OptsFailure or None.
-    for func, *xs in checks:
-        result = func(*xs)
+    for opt_names, zero_ok in checks:
+        result = check_opts_require_one(opts, opt_names, zero_ok)
         if result:
             return result
     return None
 
-def check_opts_conflicts(opts, attr, ks):
-    # Do not use opts.ATTR with any opts.K.
-    if getattr(opts, attr, None):
-        used = tuple(k for k in ks if getattr(opts, k, None))
-        if used:
-            return bad_opts_failure(used, CON.fail_opts_conflicts.format(attr = attr))
-    return None
-
-def check_opts_mutex(opts, ks):
-    # Do not use multiple opts.K.
-    used = tuple(k for k in ks if getattr(opts, k, None))
-    return (
-        None if len(used) <= 1 else
-        bad_opts_failure(used, CON.fail_opts_mutex)
+def check_opts_require_one(opts, opt_names, zero_ok):
+    used = tuple(
+        nm for nm in opt_names
+        if getattr(opts, nm, None)
     )
+    n = len(used)
+    if n == 0 and zero_ok:
+        return None
+    elif n == 0:
+        return create_opts_failure(opt_names, CON.fail_opts_require_one)
+    elif n == 1:
+        return None
+    else:
+        return create_opts_failure(opt_names, CON.fail_opts_mutex)
 
-def check_opts_require_one(opts, ks):
-    # Use at least one of opts.K.
-    used = tuple(k for k in ks if getattr(opts, k, None))
-    return (
-        None if used else
-        bad_opts_failure(ks, CON.fail_opts_require_one)
+def create_opts_failure(opt_names, base_msg):
+    joined = ', '.join(
+        ('' if nm == CON.opts_paths else '--') + nm
+        for nm in opt_names
     )
-
-def bad_opts_failure(opt_names, base_msg):
-    joined = ', '.join(f'--{nm}' for nm in opt_names)
     return OptsFailure(f'{base_msg}: {joined}')
 
 def make_renamer_func(user_code, indent = 4):

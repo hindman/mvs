@@ -28,13 +28,21 @@ Sequence numbering.
 Logging.
 Log inquiries.
 
-Complex failure/validation scenarios: prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
-Renaming via library use case.
 Case-change-only renamings.
 Remove common prefix/suffix.
+
 Other operations: copy, backup, link, chmod, touch.
+
+Renaming via library use case.
+
+Option: --row-delimiter [default: tab]
+Option: --path-delimiter [default: newline]
+Option: --no-strip [default: paths are stripped]
 Validation overrides: clobber, skip-equal, create-dirs.
-Old-path filtering: files-only, dirs-only.
-Alternative dryrun output styles.
-Undo.
+
+Other stuff:
+    Undo.
+    Alternative dryrun output styles: should support the same behavior as input structures.
+    Complex failure/validation scenarios: prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
+    Old-path filtering: files-only, dirs-only.
 
