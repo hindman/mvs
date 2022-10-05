@@ -10,7 +10,11 @@ import subprocess
 
 '''
 
-main(): rework the execution of the user-supplied renaming code
+main(): rework remaining steps:
+
+    - RenamePair validation
+    - Handling dryrun mode
+    - Confirmation
 
 catch_failure(x, multiple = False): add ability to handle a sequence of failures.
 
@@ -151,6 +155,10 @@ class ParseFailure(Failure):
     pass
 
 @dataclass
+class RenameFailure(Failure):
+    pass
+
+@dataclass
 class RenamePairFailure(Failure):
     rp: RenamePair
 
@@ -257,47 +265,26 @@ def parse_inputs(opts, inputs):
     return (tuple(origs), tuple(news))
 
 def main(args = None):
-    # Parse arguments and get original paths.
+    # Parse and validate command-line arguments.
     opts = parse_args(sys.argv[1:] if args is None else args)
-
-    # Validate options.
     catch_failure(validate_options(opts))
 
-    # Get the input paths.
+    # Get the input paths and parse them to assemble the original and new paths.
     inputs = get_input_paths(opts)
-
-    # Parse inputs to assemble the original-new pairs:
     origs, news = catch_failure(parse_inputs(opts, inputs))
 
-    # Create the renamer function based on the user-supplied code.
-    renamer = make_renamer_func(opts.rename, opts.indent)
+    # If user supplied renaming code, use it to generate new paths.
+    if opts.rename:
+        renamer = make_renamer_func(opts.rename, opts.indent)
+        news = [
+            catch_failure(compute_new_path(renamer, o))
+            for o in origs
+        ]
 
-    quit()
-
-    # Use that function to generate the new paths.
-    origs = tuple(opts.paths)
-    news = []
-    for o in origs:
-        try:
-            news.append(renamer(o, Path(o)))
-        except Exception as e:
-            msg = f'Error in user-supplied renaming code: {e} [original path: {o}]'
-            quit(CON.exit_fail, msg)
-
-    # Confirm that those new paths have a valid data type.
-    for i, new in enumerate(news):
-        if isinstance(new, (str, Path)):
-            news[i] = str(new)
-        else:
-            typ = type(new).__name__
-            msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {o}]'
-            quit(CON.exit_fail, msg)
-            news.append(new)
-
-    # Bundle the orig-new paths into RenamePair instances.
+    # Bundle the original and new paths into RenamePair instances.
     rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
 
-    # Validation.
+    # Validate the renaming plan.
     fails = validate_rename_pairs(rps)
     if fails:
         for f in fails:
@@ -308,7 +295,7 @@ def main(args = None):
     if opts.dryrun:
         for rp in rps:
             print(rp.formatted)
-        return
+        quit(code = CON.exit_ok)
 
     # User confirmation.
     if not opts.yes:
@@ -327,6 +314,24 @@ def main(args = None):
     # Rename.
     for rp in rps:
         Path(rp.orig).rename(rp.new)
+
+def compute_new_path(renamer, orig):
+    # Run the user-supplied code to get the new path.
+    try:
+        new = renamer(orig, Path(orig))
+    except Exception as e:
+        msg = f'Error in user-supplied renaming code: {e} [original path: {orig}]'
+        return RenameFailure(msg)
+
+    # Validate its type and return.
+    if isinstance(new, str):
+        return new
+    elif isinstance(new, Path):
+        return str(new)
+    else:
+        typ = type(new).__name__
+        msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
+        return RenameFailure(msg)
 
 def get_confirmation(prompt, expected = 'y'):
     r = input(prompt + f' [{expected}]? ').lower().strip()
@@ -405,35 +410,35 @@ def validate_rename_pairs(rps):
     for rp in rps:
         grouped_by_new.setdefault(str(rp.new), []).append(rp)
 
-    # Original should exist.
+    # Original paths should exist.
     fails.extend(
         RenamePairFailure(CON.fail_orig_missing, rp)
         for rp in rps
         if not Path(rp.orig).exists()
     )
 
-    # New should not exist.
+    # New paths should not exist.
     fails.extend(
         RenamePairFailure(CON.fail_new_exists, rp)
         for rp in rps
         if Path(rp.new).exists()
     )
 
-    # Parent of new should exist.
+    # Parent of new path should exist.
     fails.extend(
         RenamePairFailure(CON.fail_new_parent_missing, rp)
         for rp in rps
         if not Path(rp.new).parent.exists()
     )
 
-    # Original and new should differ.
+    # Original path and new path should differ.
     fails.extend(
         RenamePairFailure(CON.fail_orig_new_same, rp)
         for rp in rps
         if rp.orig == rp.new
     )
 
-    # News should not collide among themselves.
+    # New paths should not collide among themselves.
     fails.extend(
         RenamePairFailure(CON.fail_new_collision, rp)
         for group in grouped_by_new.values()
