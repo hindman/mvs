@@ -10,10 +10,6 @@ import subprocess
 
 '''
 
-parse_inputs():
-    - Add --flat option
-    - Modify the function in light of the new usage plan.
-
 main(): rework the execution of the user-supplied renaming code
 
 catch_failure(x, multiple = False): add ability to handle a sequence of failures.
@@ -81,6 +77,11 @@ class CON:
             'help': 'Input paths in paragraphs: originals, blank line, then news',
         },
         {
+            names: '--flat',
+            'action': 'store_true',
+            'help': 'Input paths in non-delimited paragraphs: originals, then news',
+        },
+        {
             names: '--pairs',
             'action': 'store_true',
             'help': 'Input paths in line pairs: original, new, original, new, etc.',
@@ -126,7 +127,7 @@ class CON:
 
     opts_paths = 'paths'
     opts_sources = (opts_paths, 'stdin', 'file', 'clipboard')
-    opts_structures = ('rename', 'paragraphs', 'pairs', 'rows')
+    opts_structures = ('rename', 'paragraphs', 'flat', 'pairs', 'rows')
 
 @dataclass
 class RenamePair:
@@ -203,9 +204,9 @@ def write_to_clipboard(text):
     )
 
 def parse_inputs(opts, inputs):
-    # Handle paths option: just original paths.
-    if opts.paths:
-        return (tuple(opts.paths), None)
+    # Handle --rename option: just original paths.
+    if opts.rename:
+        return (tuple(inputs), None)
 
     # Otherwise, organize inputs into original paths and new paths.
     if opts.paragraphs:
@@ -219,6 +220,11 @@ def parse_inputs(opts, inputs):
             origs, news = groups
         else:
             return ParseFailure(CON.fail_parsing_paragraphs)
+    elif opts.flat:
+        # Flat: like paragraphs without the blank-line delimiter.
+        paths = [line for line in inputs if line]
+        i = len(paths) // 2
+        origs, news = (paths[0:i], paths[i:])
     elif opts.pairs:
         # Pairs: original path, new path, original path, etc.
         origs = []

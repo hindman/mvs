@@ -165,16 +165,19 @@ def test_parse_inputs(tr):
 
     # A function to return a SimpleNamespace as an opts standin.
     def make_opts(**kws):
-        d = dict(paths = False, paragraphs = False, pairs = False, rows = False)
+        d = {
+            k : False
+            for k in CON.opts_structures
+        }
         d.update(kws)
         return SimpleNamespace(**d)
 
     # Scenario: old paths via the paths option.
     # We expect None for the new paths.
-    opts = make_opts(paths = ['a', 'b', 'c'])
-    inputs = ()
+    opts = make_opts(rename = True)
+    inputs = ['a', 'b', 'c']
     got = parse_inputs(opts, inputs)
-    assert got == (tuple(opts.paths), None)
+    assert got == (tuple(inputs), None)
 
     # Scenario: --paragraphs: exactly two.
     opts = make_opts(paragraphs = True)
@@ -188,6 +191,19 @@ def test_parse_inputs(tr):
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
     assert of.msg == CON.fail_parsing_paragraphs
+
+    # Scenario: --flat.
+    opts = make_opts(flat = True)
+    inputs = ('', *ORIGS, '', '', *NEWS, '')
+    got = parse_inputs(opts, inputs)
+    assert got == EXP
+
+    # Scenario: --flat: not the same numbers of paths.
+    opts = make_opts(flat = True)
+    inputs = ('', *ORIGS, '', '', *NEWS, *OTHER, '')
+    of = parse_inputs(opts, inputs)
+    assert isinstance(of, ParseFailure)
+    assert of.msg == CON.fail_parsing_inequality
 
     # Scenario: --pairs.
     opts = make_opts(pairs = True)
