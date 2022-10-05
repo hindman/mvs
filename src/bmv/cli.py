@@ -16,7 +16,28 @@ main(): rework remaining steps:
     - Handling dryrun mode
     - Confirmation
 
-catch_failure(x, multiple = False): add ability to handle a sequence of failures.
+Decide how to handle pagination issues:
+    - dryrun listing
+    - renaming listing
+    - failure listing
+
+    --list all|limit|paginate
+
+def paginate(text, pager = 'less'):
+    p = subprocess.Popen(pager, stdin = subprocess.PIPE, shell = True)
+    p.stdin.write(text.encode('utf-8'))
+    p.communicate()
+
+def main(args = None):
+
+    msg = 'Renamings:\n' + CON.newline.join(
+        str(i)
+        for i in range(50)
+    )
+    paginate(msg)
+    print()
+    print('done')
+    quit()
 
 '''
 
@@ -166,9 +187,20 @@ class RenamePairFailure(Failure):
     def formatted(self):
         return f'{self.msg}:\n{self.rp.formatted}'
 
-def catch_failure(x):
+def catch_failure(x, multiple = False, msg_attr = 'msg'):
+    # Handle a single Failure.
+    msg = None
     if isinstance(x, Failure):
-        quit(code = CON.exit_fail, msg = x.msg)
+        msg = getattr(x, msg_attr)
+
+    # Or a sequence of them.
+    if multiple and isinstance(x, (tuple, list)):
+        if x and isinstance(x[0], Failure):
+            msg = CON.newline.join(getattr(f, msg_attr) for f in x)
+
+    # Quit or return.
+    if msg:
+        quit(code = CON.exit_fail, msg = msg)
     else:
         return x
 
@@ -265,6 +297,7 @@ def parse_inputs(opts, inputs):
     return (tuple(origs), tuple(news))
 
 def main(args = None):
+
     # Parse and validate command-line arguments.
     opts = parse_args(sys.argv[1:] if args is None else args)
     catch_failure(validate_options(opts))
@@ -285,17 +318,16 @@ def main(args = None):
     rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
 
     # Validate the renaming plan.
-    fails = validate_rename_pairs(rps)
-    if fails:
-        for f in fails:
-            print(f.formatted)
-        quit(code = CON.exit_fail)
+    catch_failure(
+        validate_rename_pairs(rps),
+        multiple = True,
+        msg_attr = 'formatted',
+    )
 
     # Dry run mode: print and stop.
     if opts.dryrun:
-        for rp in rps:
-            print(rp.formatted)
-        quit(code = CON.exit_ok)
+        msg = CON.newline.join(rp.formatted for rp in rps)
+        quit(code = CON.exit_ok, msg = msg)
 
     # User confirmation.
     if not opts.yes:
