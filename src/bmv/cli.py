@@ -21,23 +21,49 @@ Decide how to handle pagination issues:
     - renaming listing
     - failure listing
 
-    --list all|limit|paginate
+    --pager CMD
+        - Default: `less`
+        - Accepts: any command-line string to a pager (can include options).
+        - Empty value to suppress pagination.
 
-def paginate(text, pager = 'less'):
-    p = subprocess.Popen(pager, stdin = subprocess.PIPE, shell = True)
-    p.stdin.write(text.encode('utf-8'))
-    p.communicate()
+    --limit N
+        - Default: None
+        - Places an upper bound on N of items listed (across all contexts).
 
-def main(args = None):
+    def limited(xs, n = None):
+        # Takes sequence and returns a limited form of it.
+        return xs if n is None else xs[:n]
 
-    msg = 'Renamings:\n' + CON.newline.join(
-        str(i)
-        for i in range(50)
-    )
-    paginate(msg)
-    print()
-    print('done')
-    quit()
+    def paginate(text, pager_cmd = 'less'):
+        if pager_cmd:
+            p = subprocess.Popen(pager_cmd, stdin = subprocess.PIPE, shell = True)
+            p.stdin.write(text.encode('utf-8'))
+            p.communicate()
+        else:
+            print(text)
+
+    def items_to_text(xs, prefix = None):
+        msg = CON.newline.join(str(x) for x in xs)
+        return f'{prefix}\n{msg}' if prefix else msg
+
+    def formatted(xs):
+        return tuple(x.formatted for x in xs)
+
+    def main(args = None):
+        # Code for experimentation.
+        msg = 'Renamings:\n' + CON.newline.join(
+            str(i)
+            for i in range(50)
+        )
+        paginate(msg)
+        print()
+        print('done')
+        quit()
+
+        # Example
+        if opts.dryrun:
+            prefix = 'Items to be renamed: {len(rps)}'
+            paginate(items_to_text(formatted(rps), prefix))
 
 '''
 
