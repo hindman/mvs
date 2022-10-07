@@ -1,69 +1,20 @@
-import sys
 import argparse
 import re
-from collections import Counter
-from pathlib import Path
-from textwrap import dedent
+import subprocess
+import sys
+
 from dataclasses import dataclass
 from itertools import groupby
-import subprocess
+from pathlib import Path
+from textwrap import dedent
 
 '''
 
-main(): rework remaining steps:
+General code reorg/cleanup:
 
-    - RenamePair validation
-    - Handling dryrun mode
-    - Confirmation
-
-Decide how to handle pagination issues:
-    - dryrun listing
-    - renaming listing
-    - failure listing
-
-    --pager CMD
-        - Default: `less`
-        - Accepts: any command-line string to a pager (can include options).
-        - Empty value to suppress pagination.
-
-    --limit N
-        - Default: None
-        - Places an upper bound on N of items listed (across all contexts).
-
-    def limited(xs, n = None):
-        # Takes sequence and returns a limited form of it.
-        return xs if n is None else xs[:n]
-
-    def paginate(text, pager_cmd = 'less'):
-        if pager_cmd:
-            p = subprocess.Popen(pager_cmd, stdin = subprocess.PIPE, shell = True)
-            p.stdin.write(text.encode('utf-8'))
-            p.communicate()
-        else:
-            print(text)
-
-    def items_to_text(xs, prefix = None):
-        msg = CON.newline.join(str(x) for x in xs)
-        return f'{prefix}\n{msg}' if prefix else msg
-
-    def formatted(xs):
-        return tuple(x.formatted for x in xs)
-
-    def main(args = None):
-        # Code for experimentation.
-        msg = 'Renamings:\n' + CON.newline.join(
-            str(i)
-            for i in range(50)
-        )
-        paginate(msg)
-        print()
-        print('done')
-        quit()
-
-        # Example
-        if opts.dryrun:
-            prefix = 'Items to be renamed: {len(rps)}'
-            paginate(items_to_text(formatted(rps), prefix))
+    - Organize code into sections.
+    - Ditto for tests.
+    - misc/notes
 
 '''
 
@@ -77,9 +28,14 @@ class CON:
     exit_ok = 0
     exit_fail = 1
     renamer_name = 'do_rename'
+    default_pager_cmd = 'less'
+    encoding = 'utf-8'
 
     # CLI configuration.
-    description = 'Renames or moves files in bulk, via user-supplied Python code.'
+    description = (
+        'Renames or moves files in bulk, via user-supplied Python '
+        'code or a data source mapping old paths to new paths.'
+    )
     epilog = (
         'The user-supplied renaming code has access to the original file path as a str [variable: o], '
         'its pathlib.Path representation [variable: p], '
@@ -89,6 +45,7 @@ class CON:
     )
     names = 'names'
     opts_config = (
+        # Sources for input paths.
         {
             names: 'paths',
             'nargs': '*',
@@ -96,16 +53,9 @@ class CON:
             'help': 'Input file paths',
         },
         {
-            names: '--rename -r',
-            'metavar': 'CODE',
-            'help': 'Code to convert original path to new path',
-        },
-        {
-            names: '--indent',
-            'type': int,
-            'metavar': 'N',
-            'default': 4,
-            'help': 'Number of spaces for indentation in user-supplied code',
+            names: '--clipboard',
+            'action': 'store_true',
+            'help': 'Input paths via the clipboard',
         },
         {
             names: '--stdin',
@@ -113,24 +63,25 @@ class CON:
             'help': 'Input paths via STDIN',
         },
         {
-            names: '--clipboard',
-            'action': 'store_true',
-            'help': 'Input paths via the clipboard',
-        },
-        {
             names: '--file',
             'metavar': 'PATH',
             'help': 'Input paths via a text file',
         },
+        # Options defining the structure of the input path data.
+        {
+            names: '--rename -r',
+            'metavar': 'CODE',
+            'help': 'Code to convert original path to new path',
+        },
         {
             names: '--paragraphs',
             'action': 'store_true',
-            'help': 'Input paths in paragraphs: originals, blank line, then news',
+            'help': 'Input paths in paragraphs: original paths, blank line, new paths',
         },
         {
             names: '--flat',
             'action': 'store_true',
-            'help': 'Input paths in non-delimited paragraphs: originals, then news',
+            'help': 'Input paths in non-delimited paragraphs: original paths, then new',
         },
         {
             names: '--pairs',
@@ -142,15 +93,39 @@ class CON:
             'action': 'store_true',
             'help': 'Input paths in tab-delimited rows: original, tab, new',
         },
+        # Pagination options.
         {
-            names: '--yes',
-            'action': 'store_true',
-            'help': 'Rename files without user confirmation step',
+            names: '--pager',
+            'metavar': 'CMD',
+            'default': default_pager_cmd,
+            'help': (
+                'Command string for paginating listings [default: '
+                f'`{default_pager_cmd}`; empty string to disable]'
+            ),
         },
+        {
+            names: '--limit',
+            'metavar': 'N',
+            'type': int,
+            'help': 'Upper limit on the number of items to display in listings [default: none]',
+        },
+        # Other options.
         {
             names: '--dryrun -d',
             'action': 'store_true',
             'help': 'List renamings without performing them',
+        },
+        {
+            names: '--yes',
+            'action': 'store_true',
+            'help': 'Rename files without a user confirmation step',
+        },
+        {
+            names: '--indent',
+            'type': int,
+            'metavar': 'N',
+            'default': 4,
+            'help': 'Number of spaces for indentation in user-supplied code',
         },
     )
 
@@ -213,20 +188,9 @@ class RenamePairFailure(Failure):
     def formatted(self):
         return f'{self.msg}:\n{self.rp.formatted}'
 
-def catch_failure(x, multiple = False, msg_attr = 'msg'):
-    # Handle a single Failure.
-    msg = None
+def catch_failure(x):
     if isinstance(x, Failure):
-        msg = getattr(x, msg_attr)
-
-    # Or a sequence of them.
-    if multiple and isinstance(x, (tuple, list)):
-        if x and isinstance(x[0], Failure):
-            msg = CON.newline.join(getattr(f, msg_attr) for f in x)
-
-    # Quit or return.
-    if msg:
-        quit(code = CON.exit_fail, msg = msg)
+        halt(CON.exit_fail, x.msg)
     else:
         return x
 
@@ -322,8 +286,28 @@ def parse_inputs(opts, inputs):
     # Return as tuples.
     return (tuple(origs), tuple(news))
 
-def main(args = None):
+def limited(xs, n):
+    # Takes sequence and returns a limited form of it.
+    return xs if n is None else xs[0:n]
 
+def paginate(text, pager_cmd):
+    if pager_cmd:
+        p = subprocess.Popen(pager_cmd, stdin = subprocess.PIPE, shell = True)
+        p.stdin.write(text.encode(CON.encoding))
+        p.communicate()
+    else:
+        print(text)
+
+def items_to_text(xs, limit, msg_fmt):
+    prefix = listing_msg(xs, limit, msg_fmt)
+    limited = xs if limit is None else xs[0:limit]
+    if limited:
+        msg = CON.newline.join(x.formatted for x in limited)
+        return f'{prefix}\n{msg}'
+    else:
+        return prefix
+
+def main(args = None):
     # Parse and validate command-line arguments.
     opts = parse_args(sys.argv[1:] if args is None else args)
     catch_failure(validate_options(opts))
@@ -344,34 +328,41 @@ def main(args = None):
     rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
 
     # Validate the renaming plan.
-    catch_failure(
-        validate_rename_pairs(rps),
-        multiple = True,
-        msg_attr = 'formatted',
-    )
+    fails = validate_rename_pairs(rps)
+    if fails:
+        msg = items_to_text(fails, opts.limit, 'Renaming validation failures{}.\n')
+        paginate(msg, opts.pager)
+        halt(CON.exit_fail, CON.no_action_msg)
 
-    # Dry run mode: print and stop.
+    # List the renamings.
+    if opts.dryrun or not opts.yes:
+        msg = items_to_text(rps, opts.limit, 'Paths to be renamed{}.\n')
+        paginate(msg, opts.pager)
+
+    # Stop if dryrun mode.
     if opts.dryrun:
-        msg = CON.newline.join(rp.formatted for rp in rps)
-        quit(code = CON.exit_ok, msg = msg)
+        halt(CON.exit_ok, CON.no_action_msg)
 
     # User confirmation.
     if not opts.yes:
-        # Listing.
-        for i, rp in enumerate(rps):
-            if i > 0 and i % CON.listing_batch_size == 0:
-                if not get_confirmation('Continue listing', expected = 'y'):
-                    break
-                print()
-            print(rp.formatted)
-        # Confirmation.
-        if not get_confirmation('Rename files', expected = 'yes'):
-            quit(CON.exit_ok, CON.no_action_msg)
-        print()
+        msg = listing_msg(rps, opts.limit, '\nRename paths{}')
+        if get_confirmation(msg, expected = 'yes'):
+            print()
+        else:
+            halt(CON.exit_ok, CON.no_action_msg)
 
     # Rename.
+    msg = listing_msg(rps, opts.limit, 'Paths to be renamed{}.')
+    print(msg)
+    halt(CON.exit_ok, 'RENAMING WOULD HAVE OCCURRED')     # TODO: remove.
     for rp in rps:
         Path(rp.orig).rename(rp.new)
+
+def listing_msg(items, limit, msg_fmt):
+    n = len(items)
+    lim = n if limit is None else limit
+    counts_msg = f' (total {n}, listed {lim})'
+    return msg_fmt.format(counts_msg)
 
 def compute_new_path(renamer, orig):
     # Run the user-supplied code to get the new path.
@@ -510,7 +501,7 @@ def validate_rename_pairs(rps):
 # Utilities.
 ####
 
-def quit(code = None, msg = None):
+def halt(code = None, msg = None):
     code = CON.exit_ok if code is None else code
     fh = sys.stderr if code else sys.stdout
     if msg:
