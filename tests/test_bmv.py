@@ -17,16 +17,9 @@ from bmv.cli import (
     CON,
 )
 
-def test_version(tr):
-    # Most just a test that we can import __version__ from bmv package.
-    assert isinstance(__version__, str)
-
-def tuples_to_rename_pairs(tups, root = ''):
-    # Helper used when checking validation code.
-    return tuple(
-        RenamePair(root + orig, root + new)
-        for orig, new in tups
-    )
+####
+# Renaming validation.
+####
 
 def test_validation_orig_existence(tr):
     # Original path should exist.
@@ -98,6 +91,10 @@ def test_validation_new_uniqueness(tr):
     assert fails[0].msg == CON.fail_new_collision
     assert fails[1].msg == CON.fail_new_collision
 
+####
+# Options validation.
+####
+
 def test_validate_options(tr):
     # Define the two groups of options we are testing.
     # Note: to test opts_structures, we need to set at least one of opts_sources.
@@ -140,6 +137,10 @@ def test_validate_options(tr):
             of = validate_options(opts)
             assert isinstance(of, OptsFailure)
             assert of.msg.startswith(CON.fail_opts_mutex)
+
+####
+# Parsing inputs.
+####
 
 def test_parse_inputs(tr):
     # Some constants.
@@ -252,4 +253,23 @@ def test_parse_inputs(tr):
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
     assert of.msg == CON.fail_parsing_opts
+
+####
+# Other tests.
+####
+
+def test_version(tr):
+    # Most just a test that we can import __version__ from bmv package.
+    assert isinstance(__version__, str)
+
+####
+# Utilities.
+####
+
+def tuples_to_rename_pairs(tups, root = ''):
+    # Helper used when checking validation code.
+    return tuple(
+        RenamePair(root + orig, root + new)
+        for orig, new in tups
+    )
 

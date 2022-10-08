@@ -1,0 +1,224 @@
+--------
+toc: Table of contents
+--------
+
+    toc                  | Table of contents
+    todos                | TODOs
+    road-map             | Road map
+    usage                | Usage
+    renaming-validations | Renaming validations
+    dev-notes            | Dev notes
+    other-tools          | Other tools
+
+--------
+todos: TODOs
+--------
+
+See cli.py.
+
+--------
+road-map: Road map
+--------
+
+Validation overrides: clobber-old, skip-equal, create-parents, clobber-new.
+
+Case-change-only renamings.
+    - Path(orig).rename(new): works
+    - But existence checks do not respect case.
+
+Logging: enable, suppress.
+Log inquiries, listing, pruning.
+
+Other operations: copy, backup, link, chmod, touch, timestamps.
+
+Project name: bmv is claimed. Possibilities: mvs, mvpy.
+
+Option: --row-delimiter [default: tab]
+Option: --path-delimiter [default: newline]
+Option: --no-strip [default: paths are stripped]
+
+Undo.
+
+Alternative dryrun output styles: should support the same behavior as input structures.
+
+Complex failure/validation scenarios:
+    - prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
+
+Preferences.
+
+--------
+usage: Usage
+--------
+
+Usage components:
+
+    PATHS     : positionals
+    SOURCE    : PATHS | --stdin | --file PATH | --clipboard
+    STRUCTURE : --rename CODE | --paragraphs | --pairs | --rows | --flat
+    OTHER     : all other options
+
+Usage schematic:
+
+    bmv SOURCE [STRUCTURE] [OTHER]
+
+Usage notes.
+
+    User must provide exactly one source for input paths.
+
+    The user must supply zero or one option defining the structure of the input
+    path data.
+
+    Structures for input path data:
+
+        - Paragraphs: two Unix-style paragraphs, one for original paths, one for new paths.
+        - Pairs: alternating lines (original, new, original, new, etc).
+        - Rows: tab-delimited rows (original, tab, new).
+        - Flat: original paths, then an equal number of new paths (blank lines irrelevant).
+
+    The --rename option is considered structural:
+
+        - It implies that the input path data consists solely of original paths.
+        - The other structural options imply original-new pairs in one form or another.
+
+--------
+renaming-validations: Renaming validations
+--------
+
+Old-path and new-path differ for each pair.
+
+Old-paths exist.
+
+New-paths do not exist.
+
+New-paths do not collide among themselves.
+
+Directories of the new-paths exist.
+
+--------
+dev-notes: Dev notes
+--------
+
+Creating a new virtualenv:
+
+    v='3.9.4'
+    deactivate
+    pyenv shell $v && pyenv versions
+    mkvirtualenv bmv-$v
+    pip install -U pip
+    pip install -e .[dev,test] && pip list
+
+Activate and run tests:
+
+    - Basic:
+
+        workon bmv-3.9.4
+        pytest -s -v tests/
+
+    - With invoke:
+
+        inv test
+        inv tox
+
+    - With tox directly:
+
+        pyenv shell 3.9.4  3.8.9  ...
+        tox
+
+Version bump:
+
+    - Edit/commit all changes, including CHANGES and README.
+
+    inv bump --kind major|minor|patch
+
+Publish:
+
+    inv dist [--publish] [--test]
+
+Installing from test pypi:
+
+    pip install --index-url https://test.pypi.org/simple/ bmv
+    pip uninstall attrs short-con
+    pip install attrs short-con
+
+Tag file creation:
+
+    inv tags
+
+--------
+other-tools: Other tools
+--------
+
+CLI tools:
+
+  - rename
+
+    - http://search.cpan.org/~pederst/rename-1.9/bin/rename.PL
+
+    - Classic Perl renaming utility by Larry Wall, subsequently maintained
+      (perhaps with minor enhancements) by others.
+
+    - The core concept was to use a Perl expression to convert ORIG names to
+      NEW names.
+
+  - brn
+
+    - http://search.cpan.org/~swestrup/App-FileTools-BulkRename-0.07/bin/brn
+
+    - Enhancement of the Perl rename tool.
+
+  - perlmv
+
+    - http://search.cpan.org/dist/App-perlmv/bin/perlmv
+
+    - Enhancement of the Perl rename tool.
+
+    - Scriptlets directory where a user could store small bits of renaming
+      logic. On the command-line, these common scenarios could be referenced by
+      name.
+
+  - pmv
+
+    - http://search.cpan.org/~jv/File-PerlMove-0.06/script/pmv
+
+    - Enhancement of the Perl rename tool.
+
+  - renameutils
+
+    - http://www.nongnu.org/renameutils/
+
+    - Editor mode: open candidate renamings in text file; user edits and quits;
+      then renaming occurs.
+
+  - mmv
+
+    - Unix mass move tool. Fairly basic.
+
+    - Very little information available aside from some archived man pages.
+
+  - rnm
+
+    - https://github.com/neurobin/rnm
+
+    - Many features, but nothing I haven't covered already.
+
+    - A long and cryptic set of options, codes, and terminology.
+
+
+GUI tools and OS-specific tools:
+
+  - pyrenamer
+
+    - https://github.com/SteveRyherd/pyRenamer
+
+  - gprename
+
+    - https://en.wikipedia.org/wiki/GPRename
+
+  - krename
+
+    - http://www.krename.net/home/
+
+  - Metamorphose
+
+    - https://github.com/metamorphose/metamorphose2
+
