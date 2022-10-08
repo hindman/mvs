@@ -10,17 +10,6 @@ from textwrap import dedent
 
 '''
 
-Usage improvements:
-
-    Argument groups.
-
-    Document useful Path components:
-        p = Path('/foo/bar/fubb.txt')
-        p.parent    /foo/bar
-        p.name      fubb.txt
-        p.suffix    .txt
-        p.stem      fubb
-
 Input path filtering.
 
 Renaming helpers:
@@ -38,7 +27,8 @@ Renaming via library use case.
 
 def main(args = None):
     # Parse and validate command-line arguments.
-    opts = parse_args(sys.argv[1:] if args is None else args)
+    ap, opts = parse_args(sys.argv[1:] if args is None else args)
+    exit_if_help_requested(ap, opts)
     catch_failure(validate_options(opts))
 
     # Get the input paths and parse them to assemble the original and new paths.
@@ -95,13 +85,17 @@ def parse_args(args):
     ap = argparse.ArgumentParser(
         description = CON.description,
         epilog = CON.epilog,
+        add_help = False,
     )
+    g = None
     for oc in CON.opts_config:
         kws = dict(oc)
+        if CON.group in kws:
+            g = ap.add_argument_group(kws.pop(CON.group))
         xs = kws.pop(CON.names).split()
-        ap.add_argument(*xs, **kws)
+        g.add_argument(*xs, **kws)
     opts = ap.parse_args(args)
-    return opts
+    return (ap, opts)
 
 def validate_options(opts):
     # Define the option checks.
@@ -139,6 +133,11 @@ def create_opts_failure(opt_names, base_msg):
         for nm in opt_names
     )
     return OptsFailure(f'{base_msg}: {joined}')
+
+def exit_if_help_requested(ap, opts):
+    if opts.help:
+        text = ap.format_help()
+        halt(CON.exit_ok, 'U' + text[1:])
 
 ####
 # Collecting input paths.
@@ -430,12 +429,15 @@ class CON:
         'its pathlib.Path representation [variable: p], '
         'and the following Python libraries or classes [re, Path]. '
         'It should explicitly return the desired new path, either as a str or a Path. '
-        'The code should omit indentation on its first line, but must provide it for subsequent lines.'
+        'The code should omit indentation on its first line, but must provide it for subsequent lines. '
+        'For reference, some useful Path components: p.parent, p.name, p.stem, p.suffix.'
     )
     names = 'names'
+    group = 'group'
     opts_config = (
         # Sources for input paths.
         {
+            group: 'Input path sources',
             names: 'paths',
             'nargs': '*',
             'metavar': 'PATH',
@@ -458,6 +460,7 @@ class CON:
         },
         # Options defining the structure of the input path data.
         {
+            group: 'Input path structures',
             names: '--rename -r',
             'metavar': 'CODE',
             'help': 'Code to convert original path to new path',
@@ -484,6 +487,7 @@ class CON:
         },
         # Pagination options.
         {
+            group: 'Listings',
             names: '--pager',
             'metavar': 'CMD',
             'default': default_pager_cmd,
@@ -499,6 +503,12 @@ class CON:
             'help': 'Upper limit on the number of items to display in listings [default: none]',
         },
         # Other options.
+        {
+            group: 'Other',
+            names: '--help -h',
+            'action': 'store_true',
+            'help': 'Display this help message and exit',
+        },
         {
             names: '--dryrun -d',
             'action': 'store_true',
