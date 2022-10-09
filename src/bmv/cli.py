@@ -12,10 +12,87 @@ from textwrap import dedent
 
 Input path filtering.
 
-Renaming helpers:
-    Sequence numbering.
-    Remove common prefix/suffix.
-    Whitespace cleanup, normalization.
+Renaming helper: remove common prefix/suffix.
+
+Renaming helper: whitespace cleanup, normalization.
+
+Renaming helper: sequences.
+    Cases:
+        1 : numeric, no padding
+        00001 : numeric, with zero-padding
+        A199 : string
+
+        String sequencing could directly handle the numeric sequences, other
+        than the issue of STEP.
+
+    How Perl does it:
+        - Start with the initial value.
+        - It must be 0-9, a-z, or A-Z.
+        - Classify each of its characters by type: digit, lower, or upper.
+        - When incrementing:
+            The classification of the each character remains constant.
+        - When carrying requires the addition of another character:
+            The new character will get the same type as the initial value's leftmost character.
+
+    Computing the sequence ID from an integer.
+
+        Aa0a
+            bins:  A-Z    a-z      0-9   a-z
+            ns:    26     26       10    26
+            cumul: 175760 6760     260   26
+
+    Usage:
+
+        --seq START [STOP [STEP]]        # NumSequence
+        --seq START [fixed]              # StrSequence
+
+
+    class NumSequence:
+        # Other than some argument handling and validation, this is just a range().
+
+    @dataclass(frozen = True)
+    class Wheel:
+        chars : tuple
+        min_val : str
+
+    class StrSequence:
+        NUMS = '01...'
+        LOWERS = 'abc...'
+        UPPERS = 'ABC...'
+        WHEELS = {
+            char : w
+            for w in (NUMS, LOWERS, UPPERS)
+            for char in w
+        }
+
+        def __init__(self, start, fixed = False):
+            self.fixed = fixed
+            self.wheels = tuple(
+                cycle(self.rotated(self.WHEELS[char], char))
+                for char in start
+            )
+            self.current = start
+            self.is_ready = True
+
+        def rotate(self, wheel, char):
+            # Return rotated version of WHEEL so it starts on CHAR
+
+        def __next__(self):
+            if self.is_ready:
+                self.is_ready = False
+                return self.current
+            else:
+                # Start with first char of self.current (rightmost).
+                # while True:
+                #   Get its next() value.
+                #   If the value is not the min of its wheel: break
+                #   Otherwise, advance leftward to the next character.
+                #   If there isn't a next character:
+                #       raise if self.fixed
+                #       otherwise, add another wheel of the same type of the leftmost wheel
+                # --
+                # join and return
+
 
 Renaming via library use case.
 
@@ -37,7 +114,12 @@ def main(args = None):
 
     # If user supplied renaming code, use it to generate new paths.
     if opts.rename:
-        renamer = make_renamer_func(opts.rename, opts.indent)
+        renamer = make_user_defined_func(
+            CON.renamer_code_fmt,
+            CON.renamer_name,
+            opts.rename,
+            opts.indent,
+        )
         news = [
             catch_failure(compute_new_path(renamer, o))
             for o in origs
@@ -224,21 +306,6 @@ class RenamePair:
     def formatted(self):
         return f'{self.orig}\n{self.new}\n'
 
-def make_renamer_func(user_code, indent = 4):
-    # Define the text of the renamer code.
-    code = CON.renamer_code_fmt.format(
-        renamer_name = CON.renamer_name,
-        indent = ' ' * indent,
-        user_code = user_code,
-    )
-    # Create the renamer function via exec() in the context of:
-    # - Globals that we want to make available to the user's code.
-    # - A locals dict that we can use to return the generated function.
-    globs = dict(re = re, Path = Path)
-    locs = {}
-    exec(code, globs, locs)
-    return locs[CON.renamer_name]
-
 def compute_new_path(renamer, orig):
     # Run the user-supplied code to get the new path.
     try:
@@ -302,6 +369,21 @@ def validate_rename_pairs(rps):
     )
 
     return fails
+
+def make_user_defined_func(code_fmt, func_name, user_code, indent = 4):
+    # Define the text of the code.
+    code = code_fmt.format(
+        func_name = func_name,
+        user_code = user_code,
+        indent = ' ' * indent,
+    )
+    # Create the function via exec() in the context of:
+    # - Globals that we want to make available to the user's code.
+    # - A locals dict that we can use to return the generated function.
+    globs = dict(re = re, Path = Path)
+    locs = {}
+    exec(code, globs, locs)
+    return locs[func_name]
 
 ####
 # Failure handling.
@@ -530,7 +612,7 @@ class CON:
 
     # Format for user-supplied renaming code.
     renamer_code_fmt = dedent('''
-        def {renamer_name}(o, p):
+        def {func_name}(o, p):
         {indent}{user_code}
     ''').lstrip()
 
