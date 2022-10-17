@@ -10,8 +10,6 @@ from textwrap import dedent
 
 '''
 
-Input path filtering.
-
 Renaming helper: remove common prefix/suffix.
 
 Renaming helper: whitespace cleanup, normalization.
@@ -108,32 +106,35 @@ def main(args = None):
     exit_if_help_requested(ap, opts)
     catch_failure(validate_options(opts))
 
-    # Get the input paths and parse them to assemble the original and new paths.
+    # Get the input paths and parse them to get RenamePair instances.
     inputs = get_input_paths(opts)
-    origs, news = catch_failure(parse_inputs(opts, inputs))
+    rps = catch_failure(parse_inputs(opts, inputs))
+
+    # If user supplied filtering code, use it to filter the paths.
+    if opts.filter:
+        filterer = make_user_defined_func('filter', opts)
+        rps = [
+            rp
+            for rp in rps
+            if catch_failure(filter_path(filterer, rp.orig))
+        ]
 
     # If user supplied renaming code, use it to generate new paths.
     if opts.rename:
-        renamer = make_user_defined_func(
-            CON.renamer_code_fmt,
-            CON.renamer_name,
-            opts.rename,
-            opts.indent,
-        )
-        news = [
-            catch_failure(compute_new_path(renamer, o))
-            for o in origs
-        ]
-
-    # Bundle the original and new paths into RenamePair instances.
-    rps = tuple(RenamePair(orig, new) for orig, new in zip(origs, news))
+        renamer = make_user_defined_func('rename', opts)
+        for rp in rps:
+            rp.new = catch_failure(compute_new_path(renamer, rp.orig))
 
     # Validate the renaming plan.
-    fails = validate_rename_pairs(rps)
-    if fails:
-        msg = items_to_text(fails, opts.limit, 'Renaming validation failures{}.\n')
-        paginate(msg, opts.pager)
-        halt(CON.exit_fail, CON.no_action_msg)
+    if rps:
+        fails = validate_rename_pairs(rps)
+        if fails:
+            msg = items_to_text(fails, opts.limit, 'Renaming validation failures{}.\n')
+            paginate(msg, opts.pager)
+            halt(CON.exit_fail, CON.no_action_msg)
+    else:
+        msg = 'No paths to be renamed.'
+        halt(CON.exit_fail, msg)
 
     # List the renamings.
     if opts.dryrun or not opts.yes:
@@ -242,7 +243,10 @@ def get_input_paths(opts):
 def parse_inputs(opts, inputs):
     # Handle --rename option: just original paths.
     if opts.rename:
-        return (tuple(inputs), None)
+        return tuple(
+            RenamePair(orig, None)
+            for orig in inputs
+        )
 
     # Otherwise, organize inputs into original paths and new paths.
     if opts.paragraphs:
@@ -289,14 +293,17 @@ def parse_inputs(opts, inputs):
     if len(origs) != len(news):
         return ParseFailure(CON.fail_parsing_inequality)
 
-    # Return as tuples.
-    return (tuple(origs), tuple(news))
+    # Return the RenamePair instances.
+    return tuple(
+        RenamePair(orig, new)
+        for orig, new in zip(origs, news)
+    )
 
 ####
 # Path renaming.
 ####
 
-@dataclass(frozen = True)
+@dataclass
 class RenamePair:
     # A data object to hold an original path and the corresponding new path.
     orig: str
@@ -323,6 +330,14 @@ def compute_new_path(renamer, orig):
         typ = type(new).__name__
         msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
         return RenameFailure(msg)
+
+def filter_path(filterer, orig):
+    # Run the user-supplied filtering code.
+    try:
+        return bool(filterer(orig, Path(orig)))
+    except Exception as e:
+        msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
+        return FilterFailure(msg)
 
 def validate_rename_pairs(rps):
     fails = []
@@ -370,12 +385,13 @@ def validate_rename_pairs(rps):
 
     return fails
 
-def make_user_defined_func(code_fmt, func_name, user_code, indent = 4):
+def make_user_defined_func(action, opts):
     # Define the text of the code.
-    code = code_fmt.format(
+    func_name = f'do_{action}'
+    code = CON.user_code_fmt.format(
         func_name = func_name,
-        user_code = user_code,
-        indent = ' ' * indent,
+        user_code = getattr(opts, action),
+        indent = ' ' * opts.indent,
     )
     # Create the function via exec() in the context of:
     # - Globals that we want to make available to the user's code.
@@ -403,6 +419,10 @@ class ParseFailure(Failure):
 
 @dataclass
 class RenameFailure(Failure):
+    pass
+
+@dataclass
+class FilterFailure(Failure):
     pass
 
 @dataclass
@@ -498,6 +518,7 @@ class CON:
     exit_ok = 0
     exit_fail = 1
     renamer_name = 'do_rename'
+    filterer_name = 'do_filter'
     default_pager_cmd = 'less'
     encoding = 'utf-8'
 
@@ -507,8 +528,8 @@ class CON:
         'code or a data source mapping old paths to new paths.'
     )
     epilog = (
-        'The user-supplied renaming code has access to the original file path as a str [variable: o], '
-        'its pathlib.Path representation [variable: p], '
+        'The user-supplied renaming and filtering code has access to the original file path as '
+        'a str [variable: o], its pathlib.Path representation [variable: p], '
         'and the following Python libraries or classes [re, Path]. '
         'It should explicitly return the desired new path, either as a str or a Path. '
         'The code should omit indentation on its first line, but must provide it for subsequent lines. '
@@ -608,10 +629,15 @@ class CON:
             'default': 4,
             'help': 'Number of spaces for indentation in user-supplied code',
         },
+        {
+            names: '--filter',
+            'metavar': 'CODE',
+            'help': 'Code to filter input paths',
+        },
     )
 
     # Format for user-supplied renaming code.
-    renamer_code_fmt = dedent('''
+    user_code_fmt = dedent('''
         def {func_name}(o, p):
         {indent}{user_code}
     ''').lstrip()

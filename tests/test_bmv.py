@@ -162,7 +162,10 @@ def test_parse_inputs(tr):
         f'{o}\t{n}'
         for o, n in zip(ORIGS, NEWS)
     ]
-    EXP = (tuple(ORIGS), tuple(NEWS))
+    EXP = tuple(
+        RenamePair(orig, new)
+        for orig, new in zip(ORIGS, NEWS)
+    )
 
     # A function to return a SimpleNamespace as an opts standin.
     def make_opts(**kws):
@@ -178,7 +181,7 @@ def test_parse_inputs(tr):
     opts = make_opts(rename = True)
     inputs = ['a', 'b', 'c']
     got = parse_inputs(opts, inputs)
-    assert got == (tuple(inputs), None)
+    assert got == tuple(RenamePair(orig, None) for orig in inputs)
 
     # Scenario: --paragraphs: exactly two.
     opts = make_opts(paragraphs = True)
