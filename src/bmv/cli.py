@@ -7,12 +7,9 @@ from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 from textwrap import dedent
+from os.path import commonprefix
 
 '''
-
-Renaming helper: remove common prefix/suffix.
-
-Renaming helper: whitespace cleanup, normalization.
 
 Renaming helper: sequences.
     Cases:
@@ -110,9 +107,11 @@ def main(args = None):
     inputs = get_input_paths(opts)
     rps = catch_failure(parse_inputs(opts, inputs))
 
+
+
     # If user supplied filtering code, use it to filter the paths.
     if opts.filter:
-        filterer = make_user_defined_func('filter', opts)
+        filterer = make_user_defined_func('filter', opts, rps)
         rps = [
             rp
             for rp in rps
@@ -121,7 +120,7 @@ def main(args = None):
 
     # If user supplied renaming code, use it to generate new paths.
     if opts.rename:
-        renamer = make_user_defined_func('rename', opts)
+        renamer = make_user_defined_func('rename', opts, rps)
         for rp in rps:
             rp.new = catch_failure(compute_new_path(renamer, rp.orig))
 
@@ -385,7 +384,7 @@ def validate_rename_pairs(rps):
 
     return fails
 
-def make_user_defined_func(action, opts):
+def make_user_defined_func(action, opts, rps):
     # Define the text of the code.
     func_name = f'do_{action}'
     code = CON.user_code_fmt.format(
@@ -396,10 +395,19 @@ def make_user_defined_func(action, opts):
     # Create the function via exec() in the context of:
     # - Globals that we want to make available to the user's code.
     # - A locals dict that we can use to return the generated function.
-    globs = dict(re = re, Path = Path)
+    globs = dict(
+        re = re,
+        Path = Path,
+        strip_prefix = make_prefix_stripper(rps),
+    )
     locs = {}
     exec(code, globs, locs)
     return locs[func_name]
+
+def make_prefix_stripper(rps):
+    origs = tuple(rp.orig for rp in rps)
+    i = len(commonprefix(origs))
+    return lambda x: x[i:] if i else x
 
 ####
 # Failure handling.
@@ -523,18 +531,22 @@ class CON:
     encoding = 'utf-8'
 
     # CLI configuration.
-    description = (
-        'Renames or moves files in bulk, via user-supplied Python '
-        'code or a data source mapping old paths to new paths.'
-    )
-    epilog = (
-        'The user-supplied renaming and filtering code has access to the original file path as '
-        'a str [variable: o], its pathlib.Path representation [variable: p], '
-        'and the following Python libraries or classes [re, Path]. '
-        'It should explicitly return the desired new path, either as a str or a Path. '
-        'The code should omit indentation on its first line, but must provide it for subsequent lines. '
-        'For reference, some useful Path components: p.parent, p.name, p.stem, p.suffix.'
-    )
+    description = '''
+        Renames or moves files in bulk, via user-supplied Python
+        code or a data source mapping old paths to new paths.
+    '''
+    epilog = '''
+        The user-supplied renaming and filtering code has access to the
+        original file path as a str [variable: o], its pathlib.Path
+        representation [variable: p], some Python libraries or classes [re,
+        Path], and some utility functions [strip_prefix]. The functions should
+        explicitly return a value: for renaming code, the desired new path,
+        either as a str or a Path; for filtering code, any true value to retain
+        the original path or any false value to reject it. The code should omit
+        indentation on its first line, but must provide it for subsequent
+        lines. For reference, some useful Path components: p.parent, p.name,
+        p.stem, p.suffix.
+    '''
     names = 'names'
     group = 'group'
     opts_config = (
