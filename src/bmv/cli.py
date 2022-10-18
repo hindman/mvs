@@ -1,93 +1,21 @@
 import argparse
 import re
+import string
 import subprocess
 import sys
 
 from dataclasses import dataclass
+from itertools import cycle
 from itertools import groupby
+from os.path import commonprefix
 from pathlib import Path
 from textwrap import dedent
-from os.path import commonprefix
 
 '''
 
 Renaming helper: sequences.
-    Cases:
-        1 : numeric, no padding
-        00001 : numeric, with zero-padding
-        A199 : string
 
-        String sequencing could directly handle the numeric sequences, other
-        than the issue of STEP.
-
-    How Perl does it:
-        - Start with the initial value.
-        - It must be 0-9, a-z, or A-Z.
-        - Classify each of its characters by type: digit, lower, or upper.
-        - When incrementing:
-            The classification of the each character remains constant.
-        - When carrying requires the addition of another character:
-            The new character will get the same type as the initial value's leftmost character.
-
-    Computing the sequence ID from an integer.
-
-        Aa0a
-            bins:  A-Z    a-z      0-9   a-z
-            ns:    26     26       10    26
-            cumul: 175760 6760     260   26
-
-    Usage:
-
-        --seq START [STOP [STEP]]        # NumSequence
-        --seq START [fixed]              # StrSequence
-
-
-    class NumSequence:
-        # Other than some argument handling and validation, this is just a range().
-
-    @dataclass(frozen = True)
-    class Wheel:
-        chars : tuple
-        min_val : str
-
-    class StrSequence:
-        NUMS = '01...'
-        LOWERS = 'abc...'
-        UPPERS = 'ABC...'
-        WHEELS = {
-            char : w
-            for w in (NUMS, LOWERS, UPPERS)
-            for char in w
-        }
-
-        def __init__(self, start, fixed = False):
-            self.fixed = fixed
-            self.wheels = tuple(
-                cycle(self.rotated(self.WHEELS[char], char))
-                for char in start
-            )
-            self.current = start
-            self.is_ready = True
-
-        def rotate(self, wheel, char):
-            # Return rotated version of WHEEL so it starts on CHAR
-
-        def __next__(self):
-            if self.is_ready:
-                self.is_ready = False
-                return self.current
-            else:
-                # Start with first char of self.current (rightmost).
-                # while True:
-                #   Get its next() value.
-                #   If the value is not the min of its wheel: break
-                #   Otherwise, advance leftward to the next character.
-                #   If there isn't a next character:
-                #       raise if self.fixed
-                #       otherwise, add another wheel of the same type of the leftmost wheel
-                # --
-                # join and return
-
+    --seq START --step N
 
 Renaming via library use case.
 
@@ -106,8 +34,6 @@ def main(args = None):
     # Get the input paths and parse them to get RenamePair instances.
     inputs = get_input_paths(opts)
     rps = catch_failure(parse_inputs(opts, inputs))
-
-
 
     # If user supplied filtering code, use it to filter the paths.
     if opts.filter:
@@ -515,6 +441,106 @@ def halt(code = None, msg = None):
         msg = msg if msg.endswith(nl) else msg + nl
         fh.write(msg)
     sys.exit(code)
+
+####
+# String sequences.
+####
+
+class StrSeq:
+    '''
+    An object to model an advancing string sequence in the spirit of Perl's
+    incrementing behavior for strings. Two examples to illustrate how they
+    advance:
+
+        Aa Ab Ac ... Ay Az Ba Bb ... Zy Zz AAa AAb ...
+        001 002 ... 998 999 1000 1001 ...
+
+    A StrSeq is modeled as a collection of odometer wheels. Each wheel has a
+    character type (digits, lowercase letters, or uppercase letters). To
+    increment the StrSeq, you advance the wheels the way the wheels of an
+    odometer would spin.
+
+    The start value defines the initial value of the StrSeq as well as the
+    character types of its wheels. When an increment operation requires the
+    addition of another wheel (on the left side), the character type of that
+    wheel will be the same as the type of the leftmost character of the start
+    value.
+
+    The step value is analogous to a range() step.
+    '''
+
+    # Map every character to its corresponding wheel characters.
+    WHEEL_CHARS = {
+        c : wcs
+        for wcs in (string.digits, string.ascii_lowercase, string.ascii_uppercase)
+        for c in wcs
+    }
+
+    def __init__(self, start, step = 1):
+        self.start = start
+        self.step = int(step)
+        self.wheels = tuple(
+            Wheel(self.WHEEL_CHARS[char], char)
+            for char in start
+        )
+
+    @property
+    def val(self):
+        return ''.join(w.val for w in self.wheels)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        for _ in range(self.step):
+            self.increment()
+        return self.val
+
+    def increment(self):
+        # To increment the StrSeq, start with rightmost Wheel.
+        # Advance it and then, if a carry operation is needed, move leftward.
+        i = len(self.wheels) - 1
+        while True:
+            w = self.wheels[i]
+            char, carry = next(w)
+            if carry and i == 0:
+                # Add another Wheel on the left side, leaving i at zero.
+                w = Wheel(self.WHEEL_CHARS[char])
+                self.wheels = (w,) + self.wheels
+            elif carry:
+                # Advance leftward to the next Wheel.
+                i -= 1
+            else:
+                # Done.
+                return
+
+class Wheel:
+    # Models a single "odometer wheel" of a StrSeq.
+
+    def __init__(self, chars, init = None):
+        # Set the Wheel's chars and initial value.
+        if init is None:
+            self.chars = chars
+        else:
+            i = chars.index(init)
+            self.chars = chars[i:] + chars[0:i]
+        self.val = self.chars[0]
+        # Attributes to manage Wheel iteration.
+        self.min = min(self.chars)
+        self.it = cycle(self.chars)
+        self.first_next = True
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # Advances the Wheel and sets its current VAL. If that causes the Wheel
+        # to roll over to its min value, carry will be true, except for during
+        # the Wheel's initial next() call.
+        self.val = next(self.it)
+        carry = (self.val == self.min and not self.first_next)
+        self.first_next = False
+        return (self.val, carry)
 
 ####
 # Constants.
