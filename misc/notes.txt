@@ -34,6 +34,7 @@ Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
 
+Logging: bootstrap (create $HOME/.bmv).
 Logging: list.
 Logging: prune.
 Logging: undo operation.

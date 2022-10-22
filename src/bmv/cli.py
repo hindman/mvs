@@ -1,20 +1,21 @@
 import argparse
+import json
 import re
 import string
 import subprocess
 import sys
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from datetime import datetime
 from itertools import cycle
 from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
 from textwrap import dedent
 
-'''
+from . import __version__
 
-Logging: enable.
-Logging: --nolog
+'''
 
 '''
 
@@ -23,6 +24,7 @@ Logging: --nolog
 ####
 
 def main(args = None):
+
     # Parse and validate command-line arguments.
     ap, opts = parse_args(sys.argv[1:] if args is None else args)
     exit_if_help_requested(ap, opts)
@@ -71,10 +73,12 @@ def main(args = None):
         else:
             halt(CON.exit_ok, CON.no_action_msg)
 
+    # Log the renamings.
+    if not opts.nolog:
+        log_renamings(logging_metadata(opts, rps))
+
     # Rename.
-    msg = listing_msg(rps, opts.limit, 'Paths to be renamed{}.')
-    print(msg)
-    halt(CON.exit_ok, 'RENAMING WOULD HAVE OCCURRED')     # TODO: remove.
+    halt(CON.exit_ok, 'Renaming currently DISABLED')
     for rp in rps:
         Path(rp.orig).rename(rp.new)
 
@@ -384,7 +388,7 @@ def catch_failure(x):
         return x
 
 ####
-# Utilities: listings and pagination.
+# Utilities: listings, pagination, and logging.
 ####
 
 def paginate(text, pager_cmd):
@@ -409,6 +413,25 @@ def listing_msg(items, limit, msg_fmt):
     lim = n if limit is None else limit
     counts_msg = f' (total {n}, listed {lim})'
     return msg_fmt.format(counts_msg)
+
+def logging_metadata(opts, rps):
+    return dict(
+        version = __version__,
+        current_directory = str(Path.cwd()),
+        opts = vars(opts),
+        rename_pairs = [asdict(rp) for rp in rps],
+    )
+
+def log_renamings(d):
+    path = log_file_path()
+    with open(path, 'w') as fh:
+        json.dump(d, fh, indent = 4)
+
+def log_file_path():
+    home = Path.home()
+    subdir = '.' + CON.app_name
+    now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return Path.home() / subdir / (now + '.json')
 
 ####
 # Utilities: reading from or writing to files, clipboard, etc.
@@ -470,6 +493,7 @@ class CON:
     encoding = 'utf-8'
 
     # CLI configuration.
+    app_name = 'bmv'
     description = '''
         Renames or moves files in bulk, via user-supplied Python
         code or a data source mapping old paths to new paths.
@@ -583,6 +607,11 @@ class CON:
             names: '--dryrun -d',
             'action': 'store_true',
             'help': 'List renamings without performing them',
+        },
+        {
+            names: '--nolog',
+            'action': 'store_true',
+            'help': 'Suppress logging',
         },
         {
             names: '--yes',
