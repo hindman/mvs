@@ -82,7 +82,6 @@ def main(args = None):
         log_renamings(logging_metadata(opts, rps))
 
     # Rename.
-    halt(CON.exit_ok, 'Renaming currently DISABLED')
     for rp in rps:
         Path(rp.orig).rename(rp.new)
 
