@@ -45,6 +45,10 @@ def main(args = None):
         for rp in rps:
             rp.new = catch_failure(compute_new_path(renamer, rp.orig, next(seq)))
 
+    # Skip RenamePair instances with equal paths.
+    if opts.skip_equal:
+        rps = [rp for rp in rps if rp.orig != rp.new]
+
     # Validate the renaming plan.
     if rps:
         fails = validate_rename_pairs(rps)
@@ -294,10 +298,12 @@ def validate_rename_pairs(rps):
     )
 
     # New paths should not exist.
+    # The failure is conditional on ORIG and NEW being different
+    # to avoid pointless reporting of multiple failures in such cases.
     fails.extend(
         RenamePairFailure(CON.fail_new_exists, rp)
         for rp in rps
-        if Path(rp.new).exists()
+        if rp.orig != rp.new and Path(rp.new).exists()
     )
 
     # Parent of new path should exist.
@@ -501,14 +507,14 @@ class CON:
     epilog = '''
         The user-supplied renaming and filtering code has access to the
         original file path as a str [variable: o], its pathlib.Path
-        representation [variable: p], some Python libraries or classes [re,
-        Path], and some utility functions [strip_prefix]. The functions should
-        explicitly return a value: for renaming code, the desired new path,
-        either as a str or a Path; for filtering code, any true value to retain
-        the original path or any false value to reject it. The code should omit
-        indentation on its first line, but must provide it for subsequent
-        lines. For reference, some useful Path components: p.parent, p.name,
-        p.stem, p.suffix.
+        representation [variable: p], the current sequence value [variable:
+        seq], some Python libraries or classes [re, Path], and some utility
+        functions [strip_prefix]. The functions should explicitly return a
+        value: for renaming code, the desired new path, either as a str or a
+        Path; for filtering code, any true value to retain the original path or
+        any false value to reject it. The code should omit indentation on its
+        first line, but must provide it for subsequent lines. For reference,
+        some useful Path components: p.parent, p.name, p.stem, p.suffix.
     '''
     names = 'names'
     group = 'group'
@@ -602,6 +608,11 @@ class CON:
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
+        },
+        {
+            names: '--skip-equal',
+            'action': 'store_true',
+            'help': 'Skip renamings with equal paths rather than reporting as errors',
         },
         {
             names: '--dryrun -d',

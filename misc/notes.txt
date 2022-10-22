@@ -20,12 +20,16 @@ See cli.py.
 road-map: Road map
 --------
 
+Assess design:
+    - the boundaries are stretching
+    - would a RenamingPlan class help?
+
 Testing: assess current status; add end-to-end tests
 
 Renaming via library use case.
 
 Validation overrides:
-    - skip-equal
+    - skip-equal [exists but done via a hack]
     - create-parents
     - clobber-old
     - clobber-new

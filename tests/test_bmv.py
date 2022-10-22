@@ -65,16 +65,13 @@ def test_validation_orig_and_new_difference(tr):
     # Original and new should differ.
     tups = (
         ('d1', 'dA'),
-        ('d1/aa.txt', 'd1/aa.txt'),  # Orig and new are the same (and new exists).
+        ('d1/aa.txt', 'd1/aa.txt'),
         ('d2', 'dB'),
     )
     rps = tuples_to_rename_pairs(tups, root = tr.WORK_AREA_ROOT)
     fails = validate_rename_pairs(rps)
-    assert len(fails) == 2
-    assert fails[0].rp is rps[1]
-    assert fails[1].rp is rps[1]
-    assert fails[0].msg == CON.fail_new_exists
-    assert fails[1].msg == CON.fail_orig_new_same
+    assert len(fails) == 1
+    assert fails[0].msg == CON.fail_orig_new_same
 
 def test_validation_new_uniqueness(tr):
     # News should not collide among themselves.
