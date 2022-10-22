@@ -20,14 +20,23 @@ See cli.py.
 road-map: Road map
 --------
 
-Validation overrides: clobber-old, skip-equal, create-parents, clobber-new.
+Testing: assess current status; add end-to-end tests
+
+Renaming via library use case.
+
+Validation overrides:
+    - skip-equal
+    - create-parents
+    - clobber-old
+    - clobber-new
 
 Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
 
-Logging: enable, suppress.
-Log inquiries, listing, pruning.
+Logging: list.
+Logging: prune.
+Logging: undo operation.
 
 Other operations: copy, backup, link, chmod, touch, timestamps.
 
@@ -36,8 +45,6 @@ Project name: bmv is claimed. Possibilities: mvs, mvpy.
 Option: --row-delimiter [default: tab]
 Option: --path-delimiter [default: newline]
 Option: --no-strip [default: paths are stripped]
-
-Undo.
 
 Alternative dryrun output styles: should support the same behavior as input structures.
 

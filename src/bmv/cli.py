@@ -13,11 +13,8 @@ from textwrap import dedent
 
 '''
 
-Renaming helper: sequences.
-
-    --seq START --step N
-
-Renaming via library use case.
+Logging: enable.
+Logging: --nolog
 
 '''
 
@@ -37,18 +34,14 @@ def main(args = None):
 
     # If user supplied filtering code, use it to filter the paths.
     if opts.filter:
-        filterer = make_user_defined_func('filter', opts, rps)
-        rps = [
-            rp
-            for rp in rps
-            if catch_failure(filter_path(filterer, rp.orig))
-        ]
+        rps = catch_failure(filtered_rename_pairs(rps, opts))
 
     # If user supplied renaming code, use it to generate new paths.
     if opts.rename:
         renamer = make_user_defined_func('rename', opts, rps)
+        seq = sequence_iterator(opts.seq, opts.step)
         for rp in rps:
-            rp.new = catch_failure(compute_new_path(renamer, rp.orig))
+            rp.new = catch_failure(compute_new_path(renamer, rp.orig, next(seq)))
 
     # Validate the renaming plan.
     if rps:
@@ -225,6 +218,31 @@ def parse_inputs(opts, inputs):
     )
 
 ####
+# Path filtering.
+####
+
+def filtered_rename_pairs(rps, opts):
+    func = make_user_defined_func('filter', opts, rps)
+    seq = sequence_iterator(opts.seq, opts.step)
+    filtered = []
+    for rp in rps:
+        seq_val = next(seq)
+        result = filter_path(func, rp.orig, seq_val)
+        if isinstance(result, FilterFailure):
+            return result
+        elif result:
+            filtered.append(rp)
+    return filtered
+
+def filter_path(filterer, orig, seq_val):
+    # Run the user-supplied filtering code.
+    try:
+        return bool(filterer(orig, Path(orig), seq_val))
+    except Exception as e:
+        msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
+        return FilterFailure(msg)
+
+####
 # Path renaming.
 ####
 
@@ -238,10 +256,10 @@ class RenamePair:
     def formatted(self):
         return f'{self.orig}\n{self.new}\n'
 
-def compute_new_path(renamer, orig):
+def compute_new_path(renamer, orig, seq_val):
     # Run the user-supplied code to get the new path.
     try:
-        new = renamer(orig, Path(orig))
+        new = renamer(orig, Path(orig), seq_val)
     except Exception as e:
         msg = f'Error in user-supplied renaming code: {e} [original path: {orig}]'
         return RenameFailure(msg)
@@ -255,14 +273,6 @@ def compute_new_path(renamer, orig):
         typ = type(new).__name__
         msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
         return RenameFailure(msg)
-
-def filter_path(filterer, orig):
-    # Run the user-supplied filtering code.
-    try:
-        return bool(filterer(orig, Path(orig)))
-    except Exception as e:
-        msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
-        return FilterFailure(msg)
 
 def validate_rename_pairs(rps):
     fails = []
@@ -442,105 +452,8 @@ def halt(code = None, msg = None):
         fh.write(msg)
     sys.exit(code)
 
-####
-# String sequences.
-####
-
-class StrSeq:
-    '''
-    An object to model an advancing string sequence in the spirit of Perl's
-    incrementing behavior for strings. Two examples to illustrate how they
-    advance:
-
-        Aa Ab Ac ... Ay Az Ba Bb ... Zy Zz AAa AAb ...
-        001 002 ... 998 999 1000 1001 ...
-
-    A StrSeq is modeled as a collection of odometer wheels. Each wheel has a
-    character type (digits, lowercase letters, or uppercase letters). To
-    increment the StrSeq, you advance the wheels the way the wheels of an
-    odometer would spin.
-
-    The start value defines the initial value of the StrSeq as well as the
-    character types of its wheels. When an increment operation requires the
-    addition of another wheel (on the left side), the character type of that
-    wheel will be the same as the type of the leftmost character of the start
-    value.
-
-    The step value is analogous to a range() step.
-    '''
-
-    # Map every character to its corresponding wheel characters.
-    WHEEL_CHARS = {
-        c : wcs
-        for wcs in (string.digits, string.ascii_lowercase, string.ascii_uppercase)
-        for c in wcs
-    }
-
-    def __init__(self, start, step = 1):
-        self.start = start
-        self.step = int(step)
-        self.wheels = tuple(
-            Wheel(self.WHEEL_CHARS[char], char)
-            for char in start
-        )
-
-    @property
-    def val(self):
-        return ''.join(w.val for w in self.wheels)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        for _ in range(self.step):
-            self.increment()
-        return self.val
-
-    def increment(self):
-        # To increment the StrSeq, start with rightmost Wheel.
-        # Advance it and then, if a carry operation is needed, move leftward.
-        i = len(self.wheels) - 1
-        while True:
-            w = self.wheels[i]
-            char, carry = next(w)
-            if carry and i == 0:
-                # Add another Wheel on the left side, leaving i at zero.
-                w = Wheel(self.WHEEL_CHARS[char])
-                self.wheels = (w,) + self.wheels
-            elif carry:
-                # Advance leftward to the next Wheel.
-                i -= 1
-            else:
-                # Done.
-                return
-
-class Wheel:
-    # Models a single "odometer wheel" of a StrSeq.
-
-    def __init__(self, chars, init = None):
-        # Set the Wheel's chars and initial value.
-        if init is None:
-            self.chars = chars
-        else:
-            i = chars.index(init)
-            self.chars = chars[i:] + chars[0:i]
-        self.val = self.chars[0]
-        # Attributes to manage Wheel iteration.
-        self.min = min(self.chars)
-        self.it = cycle(self.chars)
-        self.first_next = True
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        # Advances the Wheel and sets its current VAL. If that causes the Wheel
-        # to roll over to its min value, carry will be true, except for during
-        # the Wheel's initial next() call.
-        self.val = next(self.it)
-        carry = (self.val == self.min and not self.first_next)
-        self.first_next = False
-        return (self.val, carry)
+def sequence_iterator(start, step):
+    return iter(range(start, sys.maxsize, step))
 
 ####
 # Constants.
@@ -643,6 +556,22 @@ class CON:
             'type': int,
             'help': 'Upper limit on the number of items to display in listings [default: none]',
         },
+        # Sequence numbers.
+        {
+            group: 'Sequence numbers',
+            names: '--seq',
+            'metavar': 'N',
+            'type': int,
+            'default': 1,
+            'help': 'Sequence start value [default: 1]',
+        },
+        {
+            names: '--step',
+            'metavar': 'N',
+            'type': int,
+            'default': 1,
+            'help': 'Sequence step value [default: 1]',
+        },
         # Other options.
         {
             group: 'Other',
@@ -676,7 +605,7 @@ class CON:
 
     # Format for user-supplied renaming code.
     user_code_fmt = dedent('''
-        def {func_name}(o, p):
+        def {func_name}(o, p, seq):
         {indent}{user_code}
     ''').lstrip()
 
