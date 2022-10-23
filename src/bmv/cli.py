@@ -146,6 +146,9 @@ def exit_if_help_requested(ap, opts):
     if opts.help:
         text = ap.format_help()
         halt(CON.exit_ok, 'U' + text[1:])
+    elif opts.version:
+        text = f'{CON.app_name} v{__version__}'
+        halt(CON.exit_ok, text)
 
 ####
 # Collecting input paths.
@@ -607,6 +610,11 @@ class CON:
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
+        },
+        {
+            names: '--version',
+            'action': 'store_true',
+            'help': 'Display the version number and exit',
         },
         {
             names: '--skip-equal',

@@ -20,8 +20,6 @@ See cli.py.
 road-map: Road map
 --------
 
-bmv: --version
-
 Assess design:
     - the boundaries are stretching
     - would a RenamingPlan class help?
