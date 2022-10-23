@@ -17,6 +17,118 @@ from . import __version__
 
 '''
 
+# GET ARGS.
+# Flow: take input; compute. Might halt intentionally or due to error: usage, I/O.
+Parse command-line args.
+Handle special opts: --help --version [can quit]
+Validate opts [can error]
+
+# INPUT PATHS => VALID, FILTERED RPS.
+# Flow: compute. Might halt due to error: usage, user-code, I/O.
+Collect input paths.
+Parse input paths. [can fail or error; produces full or partial rps]
+Filter rps [can fail]
+Execute user's renaming code [can fail; at this point rps are full]
+Validate rps, contingent on opts [can fail or error; can further filter rps]
+
+# LIST, CONFIRM, LOG.
+# Flow: I/O. Might halt intentionally or due to error: I/O.
+List the renamings, unless suppressed by opts.
+Stop if dryrun mode.
+Get user confirmation, unless suppressed by opts.
+Log the renamings [can fail]
+
+# RENAME.
+# Flow: I/O. Might halt due to error: I/O.
+Rename paths [can fail]
+
+===============
+
+Where does nontrivial I/O occur?
+
+    Read inputs: can handle outside of RenamingPlan.
+    Filter paths: user code [see below].
+    Generate new paths: user code [see below].
+    Validate rps: various existence checks for ORIG and NEW paths.
+    Rename paths: would be bypassed during testing.
+
+    Note on user code:
+        - In real usage, the code could interact with file system.
+        - For my testing purposes, such scenarios need not be explored.
+
+===============
+
+RenamingPlan()
+    inputs: tuple[str]
+    rename: str[CODE]
+    structure: enum[para,flat,pairs,rows,rename]
+    seq: int
+    step: int
+    skip_equal: bool
+    dry_run: bool
+    filter: str[CODE]
+    indent: int
+
+main()
+    Parse command-line args.
+    Handle special opts: --help --version
+    Validate opts
+    Collect input paths.
+
+    Parse, filter, generate new paths, validate rps:
+
+        plan = RenamingPlan(...)
+        plan.prepare()
+
+    List the renamings, handle dryrun, confirm, log, rename:
+
+        print(plan.renaming_listing())
+        if opts.dryrun:
+            halt()
+        elif opts.yes or confirm(...):
+            if not opts.nolog:
+                log_renamings(opts, plan.as_dict())
+            plan.rename_paths()
+
+    Direct library usage would look like this:
+
+        plan = RenamingPlan(...)
+        try:
+            plan.rename_paths()
+        except Exception as e:
+            ...
+
+    Testing usage would look like this:
+        plan = RenamingPlan(...)
+        plan.rename_paths(FILE_SYSTEM)
+
+    Input path sources:
+      ARGV
+      --clipboard
+      --stdin
+      --file PATH
+    Input path structures:
+      --rename CODE
+      --paragraphs
+      --flat
+      --pairs
+      --rows
+    Listings:
+      --pager CMD
+      --limit N
+    Sequence numbers:
+      --seq N
+      --step N
+    Other:
+      --help
+      --version
+      --skip-equal
+      --dryrun, -d
+      --nolog
+      --yes
+      --indent N
+      --filter CODE
+
 '''
 
 ####
