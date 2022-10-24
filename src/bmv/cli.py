@@ -56,24 +56,60 @@ Where does nontrivial I/O occur?
         - In real usage, the code could interact with file system.
         - For my testing purposes, such scenarios need not be explored.
 
+How to execute user code for renaming and filtering:
+
+    Creating the function:
+
+        Generate code from indent and user's code str.
+        During generation, supply only constants via globs [re, Path].
+
+    Function signature:
+
+        func(o, p, seq, plan)
+            o = rp.orig
+            p = Path(rp.orig)
+            seq_val = current sequence value
+            plan = RenamingPlan
+
+            # The plan can provide access to wider state, notably a method
+            # to strip common prefixes from the rps. For example:
+            return plan.strip_prefix(o)
+
+    Executing the function:
+
+        Initialize seq.
+
+        for rp in rps:
+            seq_val = next(seq)
+            try:
+                result = func(rp.orig, Path(rp.orig), seq_val, self)
+            except Exception as e:
+                ...
+            Either retain rp (filtering) or set rp.new (renaming).
+
 ===============
 
 RenamingPlan()
-    inputs: tuple[str]
-    rename: str[CODE]
-    structure: enum[para,flat,pairs,rows,rename]
-    seq: int
-    step: int
+    inputs: collection[str]
+    rename: func or str[CODE]
+    structure: None or enum[para,flat,pairs,rows]
+    seq_start: int
+    seq_step: int
     skip_equal: bool
-    dry_run: bool
-    filter: str[CODE]
+    filter: func or str[CODE]
     indent: int
+    file_sys: collection[str]
 
 main()
     Parse command-line args.
     Handle special opts: --help --version
     Validate opts
+
+        opts = handle_exit(parse_command_line_args(...))         # Test separately.
+
     Collect input paths.
+
+        inputs = handle_exit(parse_inputs(opts))                 # Test separately.
 
     Parse, filter, generate new paths, validate rps:
 
@@ -82,25 +118,30 @@ main()
 
     List the renamings, handle dryrun, confirm, log, rename:
 
-        print(plan.renaming_listing())
+        listing = plan.renaming_listing()                         # Test separately.
+        print(listing)
         if opts.dryrun:
             halt()
         elif opts.yes or confirm(...):
             if not opts.nolog:
-                log_renamings(opts, plan.as_dict())
+                plan_data = plan.as_dict()                        # Test separately.
+                log_data = collect_logging_data(opts, plan_data)  # Test separately.
+                write_to_logfile(opts, log_data)
             plan.rename_paths()
 
-    Direct library usage would look like this:
+    RenamingPlan: testing usage:
+
+        plan = RenamingPlan(..., file_sys = FILE_SYSTEM)          # Inject file system dependency.
+        plan.rename_paths()
+        assert ...                                                # Assert against plan state.
+
+    RenamingPlan: direct library usage:
 
         plan = RenamingPlan(...)
         try:
             plan.rename_paths()
         except Exception as e:
             ...
-
-    Testing usage would look like this:
-        plan = RenamingPlan(...)
-        plan.rename_paths(FILE_SYSTEM)
 
     Input path sources:
       ARGV
