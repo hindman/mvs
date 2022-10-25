@@ -112,7 +112,7 @@ main()
 
     Collect input paths.
 
-        inputs = handle_exit(parse_inputs(opts))                 # Test separately.
+        inputs = handle_exit(get_input_paths(opts))              # Test separately.
 
     Parse, filter, generate new paths, validate rps:
 
