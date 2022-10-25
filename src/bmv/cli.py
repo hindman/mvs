@@ -98,7 +98,10 @@ RenamingPlan()
     skip_equal: bool
     filter: func or str[CODE]
     indent: int
+    ----
     file_sys: collection[str]
+    ----
+    dryrun: bool                  # Not needed: plan.prepare() does everything except the renaming.
 
 main()
     Parse command-line args.
@@ -178,10 +181,16 @@ main()
 
 def main(args = None):
 
+    # # Parse and validate command-line arguments.
+    # ap, opts = parse_args(sys.argv[1:] if args is None else args)
+    # exit_if_help_requested(ap, opts)
+    # catch_failure(validate_options(opts))
+
     # Parse and validate command-line arguments.
-    ap, opts = parse_args(sys.argv[1:] if args is None else args)
-    exit_if_help_requested(ap, opts)
-    catch_failure(validate_options(opts))
+    opts = handle_exit(parse_command_line_args(sys.argv[1:] if args is None else args))
+
+    print(opts)
+    return
 
     # Get the input paths and parse them to get RenamePair instances.
     inputs = get_input_paths(opts)
@@ -242,6 +251,16 @@ def main(args = None):
 # Command-line argument handling.
 ####
 
+def parse_command_line_args(args):
+    ap, opts = parse_args(args)
+    if opts.help:
+        text = 'U' + ap.format_help()[1:]
+        return ExitCondition(text)
+    elif opts.version:
+        return ExitCondition(f'{CON.app_name} v{__version__}')
+    else:
+        return validated_options(opts)
+
 def parse_args(args):
     ap = argparse.ArgumentParser(
         description = CON.description,
@@ -258,7 +277,7 @@ def parse_args(args):
     opts = ap.parse_args(args)
     return (ap, opts)
 
-def validate_options(opts):
+def validated_options(opts):
     # Define the option checks.
     checks = (
         # Exactly one source for input paths.
@@ -271,7 +290,23 @@ def validate_options(opts):
         result = check_opts_require_one(opts, opt_names, zero_ok)
         if result:
             return result
-    return None
+    # Success.
+    return opts
+
+# def validate_options(opts):
+#     # Define the option checks.
+#     checks = (
+#         # Exactly one source for input paths.
+#         (CON.opts_sources, False),
+#         # Zero or one option specifying an input structure.
+#         (CON.opts_structures, True),
+#     )
+#     # Run the checks, all of which return OptsFailure or None.
+#     for opt_names, zero_ok in checks:
+#         result = check_opts_require_one(opts, opt_names, zero_ok)
+#         if result:
+#             return result
+#     return None
 
 def check_opts_require_one(opts, opt_names, zero_ok):
     used = tuple(
@@ -295,13 +330,13 @@ def create_opts_failure(opt_names, base_msg):
     )
     return OptsFailure(f'{base_msg}: {joined}')
 
-def exit_if_help_requested(ap, opts):
-    if opts.help:
-        text = ap.format_help()
-        halt(CON.exit_ok, 'U' + text[1:])
-    elif opts.version:
-        text = f'{CON.app_name} v{__version__}'
-        halt(CON.exit_ok, text)
+# def exit_if_help_requested(ap, opts):
+#     if opts.help:
+#         text = ap.format_help()
+#         halt(CON.exit_ok, 'U' + text[1:])
+#     elif opts.version:
+#         text = f'{CON.app_name} v{__version__}'
+#         halt(CON.exit_ok, text)
 
 ####
 # Collecting input paths.
@@ -542,9 +577,21 @@ class RenamePairFailure(Failure):
     def formatted(self):
         return f'{self.msg}:\n{self.rp.formatted}'
 
-def catch_failure(x):
+@dataclass
+class ExitCondition:
+    msg: str
+
+# def catch_failure(x):
+#     if isinstance(x, Failure):
+#         halt(CON.exit_fail, x.msg)
+#     else:
+#         return x
+
+def handle_exit(x):
     if isinstance(x, Failure):
         halt(CON.exit_fail, x.msg)
+    elif isinstance(x, ExitCondition):
+        halt(CON.exit_ok, x.msg)
     else:
         return x
 

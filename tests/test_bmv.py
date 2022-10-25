@@ -10,7 +10,7 @@ from bmv.cli import (
     RenamePair,
     RenamePairFailure,
     validate_rename_pairs,
-    validate_options,
+    validated_options,
     parse_inputs,
     OptsFailure,
     ParseFailure,
@@ -102,15 +102,15 @@ def test_validate_options(tr):
 
     # Scenario: zero sources: invalid.
     opts = SimpleNamespace()
-    of = validate_options(opts)
+    of = validated_options(opts)
     assert isinstance(of, OptsFailure)
     assert of.msg.startswith(CON.fail_opts_require_one)
 
     # Scenario: zero structures: valid.
     opts = SimpleNamespace()
     setattr(opts, choice(CON.opts_sources), True)
-    of = validate_options(opts)
-    assert of is None
+    of = validated_options(opts)
+    assert isinstance(of, SimpleNamespace)
 
     # Scenario: exactly one source or one structure: valid.
     for opt_names, set_source in OPT_NAME_GROUPS:
@@ -119,8 +119,8 @@ def test_validate_options(tr):
             setattr(opts, nm, True)
             if set_source:
                 setattr(opts, choice(CON.opts_sources), True)
-            of = validate_options(opts)
-            assert of is None
+            of = validated_options(opts)
+            assert isinstance(of, SimpleNamespace)
 
     # Scenario: multiple sources or multiple structure: invalid.
     for opt_names, set_source in OPT_NAME_GROUPS:
@@ -131,7 +131,7 @@ def test_validate_options(tr):
                 setattr(opts, nm, True)
             if set_source:
                 setattr(opts, choice(CON.opts_sources), True)
-            of = validate_options(opts)
+            of = validated_options(opts)
             assert isinstance(of, OptsFailure)
             assert of.msg.startswith(CON.fail_opts_mutex)
 
