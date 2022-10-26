@@ -13,7 +13,9 @@ from os.path import commonprefix
 from pathlib import Path
 from textwrap import dedent
 
-from . import __version__
+from .version import __version__
+from .constants import CON, CLI, FAIL, STRUCTURES
+from .plan import RenamingPlan
 
 '''
 
@@ -179,21 +181,39 @@ main()
 # Entry point.
 ####
 
+def get_structure(opts):
+    gen = (s for s in STRUCTURES.keys() if getattr(opts, s))
+    return next(gen, None)
+
 def main(args = None):
-
-    # # Parse and validate command-line arguments.
-    # ap, opts = parse_args(sys.argv[1:] if args is None else args)
-    # exit_if_help_requested(ap, opts)
-    # catch_failure(validate_options(opts))
-
     # Parse and validate command-line arguments.
-    opts = handle_exit(parse_command_line_args(sys.argv[1:] if args is None else args))
+    args = sys.argv[1:] if args is None else args
+    opts = handle_exit(parse_command_line_args(args))
+
+    # Collect the input paths.
+    inputs = get_input_paths(opts)
+
+    # Initialize RenamingPlan and then prepare for renaming: parse inputs,
+    # filter inputs, generate new paths, validate RenamePair instances.
+    plan = RenamingPlan(
+        inputs = inputs,
+        rename_code = opts.rename,
+        structure = get_structure(opts),
+        seq_start = opts.seq,
+        seq_step = opts.step,
+        skip_equal = opts.skip_equal,
+        filter_code = opts.filter,
+        indent = opts.indent,
+    )
+    plan.prepare()
 
     print(opts)
     return
 
+    #=======================
+
     # Get the input paths and parse them to get RenamePair instances.
-    inputs = get_input_paths(opts)
+    # inputs = get_input_paths(opts)
     rps = catch_failure(parse_inputs(opts, inputs))
 
     # If user supplied filtering code, use it to filter the paths.
@@ -221,6 +241,8 @@ def main(args = None):
     else:
         msg = 'No paths to be renamed.'
         halt(CON.exit_fail, msg)
+
+    #=======================
 
     # List the renamings.
     if opts.dryrun or not opts.yes:
@@ -263,16 +285,16 @@ def parse_command_line_args(args):
 
 def parse_args(args):
     ap = argparse.ArgumentParser(
-        description = CON.description,
-        epilog = CON.epilog,
+        description = CLI.description,
+        epilog = CLI.epilog,
         add_help = False,
     )
     g = None
-    for oc in CON.opts_config:
+    for oc in CLI.opts_config:
         kws = dict(oc)
-        if CON.group in kws:
-            g = ap.add_argument_group(kws.pop(CON.group))
-        xs = kws.pop(CON.names).split()
+        if CLI.group in kws:
+            g = ap.add_argument_group(kws.pop(CLI.group))
+        xs = kws.pop(CLI.names).split()
         g.add_argument(*xs, **kws)
     opts = ap.parse_args(args)
     return (ap, opts)
@@ -281,9 +303,9 @@ def validated_options(opts):
     # Define the option checks.
     checks = (
         # Exactly one source for input paths.
-        (CON.opts_sources, False),
+        (CLI.sources.keys(), False),
         # Zero or one option specifying an input structure.
-        (CON.opts_structures, True),
+        (CLI.structures.keys(), True),
     )
     # Run the checks, all of which return OptsFailure or None.
     for opt_names, zero_ok in checks:
@@ -292,21 +314,6 @@ def validated_options(opts):
             return result
     # Success.
     return opts
-
-# def validate_options(opts):
-#     # Define the option checks.
-#     checks = (
-#         # Exactly one source for input paths.
-#         (CON.opts_sources, False),
-#         # Zero or one option specifying an input structure.
-#         (CON.opts_structures, True),
-#     )
-#     # Run the checks, all of which return OptsFailure or None.
-#     for opt_names, zero_ok in checks:
-#         result = check_opts_require_one(opts, opt_names, zero_ok)
-#         if result:
-#             return result
-#     return None
 
 def check_opts_require_one(opts, opt_names, zero_ok):
     used = tuple(
@@ -317,15 +324,15 @@ def check_opts_require_one(opts, opt_names, zero_ok):
     if n == 0 and zero_ok:
         return None
     elif n == 0:
-        return create_opts_failure(opt_names, CON.fail_opts_require_one)
+        return create_opts_failure(opt_names, FAIL.opts_require_one)
     elif n == 1:
         return None
     else:
-        return create_opts_failure(opt_names, CON.fail_opts_mutex)
+        return create_opts_failure(opt_names, FAIL.opts_mutex)
 
 def create_opts_failure(opt_names, base_msg):
     joined = ', '.join(
-        ('' if nm == CON.opts_paths else '--') + nm
+        ('' if nm == CLI.sources.paths else '--') + nm
         for nm in opt_names
     )
     return OptsFailure(f'{base_msg}: {joined}')
@@ -375,7 +382,7 @@ def parse_inputs(opts, inputs):
         if len(groups) == 2:
             origs, news = groups
         else:
-            return ParseFailure(CON.fail_parsing_paragraphs)
+            return ParseFailure(FAIL.parsing_paragraphs)
     elif opts.flat:
         # Flat: like paragraphs without the blank-line delimiter.
         paths = [line for line in inputs if line]
@@ -401,13 +408,13 @@ def parse_inputs(opts, inputs):
                     origs.append(cells[0])
                     news.append(cells[1])
                 else:
-                    return ParseFailure(CON.fail_parsing_row.format(row = row))
+                    return ParseFailure(FAIL.parsing_row.format(row = row))
     else:
-        return ParseFailure(CON.fail_parsing_opts)
+        return ParseFailure(FAIL.parsing_opts)
 
     # Stop if we got unqual numbers of paths.
     if len(origs) != len(news):
-        return ParseFailure(CON.fail_parsing_inequality)
+        return ParseFailure(FAIL.parsing_inequality)
 
     # Return the RenamePair instances.
     return tuple(
@@ -482,7 +489,7 @@ def validate_rename_pairs(rps):
 
     # Original paths should exist.
     fails.extend(
-        RenamePairFailure(CON.fail_orig_missing, rp)
+        RenamePairFailure(FAIL.orig_missing, rp)
         for rp in rps
         if not Path(rp.orig).exists()
     )
@@ -491,28 +498,28 @@ def validate_rename_pairs(rps):
     # The failure is conditional on ORIG and NEW being different
     # to avoid pointless reporting of multiple failures in such cases.
     fails.extend(
-        RenamePairFailure(CON.fail_new_exists, rp)
+        RenamePairFailure(FAIL.new_exists, rp)
         for rp in rps
         if rp.orig != rp.new and Path(rp.new).exists()
     )
 
     # Parent of new path should exist.
     fails.extend(
-        RenamePairFailure(CON.fail_new_parent_missing, rp)
+        RenamePairFailure(FAIL.new_parent_missing, rp)
         for rp in rps
         if not Path(rp.new).parent.exists()
     )
 
     # Original path and new path should differ.
     fails.extend(
-        RenamePairFailure(CON.fail_orig_new_same, rp)
+        RenamePairFailure(FAIL.orig_new_same, rp)
         for rp in rps
         if rp.orig == rp.new
     )
 
     # New paths should not collide among themselves.
     fails.extend(
-        RenamePairFailure(CON.fail_new_collision, rp)
+        RenamePairFailure(FAIL.new_collision, rp)
         for group in grouped_by_new.values()
         for rp in group
         if len(group) > 1
@@ -685,194 +692,4 @@ def halt(code = None, msg = None):
 
 def sequence_iterator(start, step):
     return iter(range(start, sys.maxsize, step))
-
-####
-# Constants.
-####
-
-class CON:
-    newline = '\n'
-    tab = '\t'
-    exit_ok = 0
-    exit_fail = 1
-    renamer_name = 'do_rename'
-    filterer_name = 'do_filter'
-    default_pager_cmd = 'less'
-    encoding = 'utf-8'
-
-    # CLI configuration.
-    app_name = 'bmv'
-    description = '''
-        Renames or moves files in bulk, via user-supplied Python
-        code or a data source mapping old paths to new paths.
-    '''
-    epilog = '''
-        The user-supplied renaming and filtering code has access to the
-        original file path as a str [variable: o], its pathlib.Path
-        representation [variable: p], the current sequence value [variable:
-        seq], some Python libraries or classes [re, Path], and some utility
-        functions [strip_prefix]. The functions should explicitly return a
-        value: for renaming code, the desired new path, either as a str or a
-        Path; for filtering code, any true value to retain the original path or
-        any false value to reject it. The code should omit indentation on its
-        first line, but must provide it for subsequent lines. For reference,
-        some useful Path components: p.parent, p.name, p.stem, p.suffix.
-    '''
-    names = 'names'
-    group = 'group'
-    opts_config = (
-        # Sources for input paths.
-        {
-            group: 'Input path sources',
-            names: 'paths',
-            'nargs': '*',
-            'metavar': 'PATH',
-            'help': 'Input file paths',
-        },
-        {
-            names: '--clipboard',
-            'action': 'store_true',
-            'help': 'Input paths via the clipboard',
-        },
-        {
-            names: '--stdin',
-            'action': 'store_true',
-            'help': 'Input paths via STDIN',
-        },
-        {
-            names: '--file',
-            'metavar': 'PATH',
-            'help': 'Input paths via a text file',
-        },
-        # Options defining the structure of the input path data.
-        {
-            group: 'Input path structures',
-            names: '--rename -r',
-            'metavar': 'CODE',
-            'help': 'Code to convert original path to new path',
-        },
-        {
-            names: '--paragraphs',
-            'action': 'store_true',
-            'help': 'Input paths in paragraphs: original paths, blank line, new paths',
-        },
-        {
-            names: '--flat',
-            'action': 'store_true',
-            'help': 'Input paths in non-delimited paragraphs: original paths, then new',
-        },
-        {
-            names: '--pairs',
-            'action': 'store_true',
-            'help': 'Input paths in line pairs: original, new, original, new, etc.',
-        },
-        {
-            names: '--rows',
-            'action': 'store_true',
-            'help': 'Input paths in tab-delimited rows: original, tab, new',
-        },
-        # Pagination options.
-        {
-            group: 'Listings',
-            names: '--pager',
-            'metavar': 'CMD',
-            'default': default_pager_cmd,
-            'help': (
-                'Command string for paginating listings [default: '
-                f'`{default_pager_cmd}`; empty string to disable]'
-            ),
-        },
-        {
-            names: '--limit',
-            'metavar': 'N',
-            'type': int,
-            'help': 'Upper limit on the number of items to display in listings [default: none]',
-        },
-        # Sequence numbers.
-        {
-            group: 'Sequence numbers',
-            names: '--seq',
-            'metavar': 'N',
-            'type': int,
-            'default': 1,
-            'help': 'Sequence start value [default: 1]',
-        },
-        {
-            names: '--step',
-            'metavar': 'N',
-            'type': int,
-            'default': 1,
-            'help': 'Sequence step value [default: 1]',
-        },
-        # Other options.
-        {
-            group: 'Other',
-            names: '--help -h',
-            'action': 'store_true',
-            'help': 'Display this help message and exit',
-        },
-        {
-            names: '--version',
-            'action': 'store_true',
-            'help': 'Display the version number and exit',
-        },
-        {
-            names: '--skip-equal',
-            'action': 'store_true',
-            'help': 'Skip renamings with equal paths rather than reporting as errors',
-        },
-        {
-            names: '--dryrun -d',
-            'action': 'store_true',
-            'help': 'List renamings without performing them',
-        },
-        {
-            names: '--nolog',
-            'action': 'store_true',
-            'help': 'Suppress logging',
-        },
-        {
-            names: '--yes',
-            'action': 'store_true',
-            'help': 'Rename files without a user confirmation step',
-        },
-        {
-            names: '--indent',
-            'type': int,
-            'metavar': 'N',
-            'default': 4,
-            'help': 'Number of spaces for indentation in user-supplied code',
-        },
-        {
-            names: '--filter',
-            'metavar': 'CODE',
-            'help': 'Code to filter input paths',
-        },
-    )
-
-    # Format for user-supplied renaming code.
-    user_code_fmt = dedent('''
-        def {func_name}(o, p, seq):
-        {indent}{user_code}
-    ''').lstrip()
-
-    fail_orig_missing = 'Original path does not exist'
-    fail_new_exists = 'New path exists'
-    fail_new_parent_missing = 'Parent directory of new path does not exist'
-    fail_orig_new_same = 'Original path and new path are the same'
-    fail_new_collision = 'New path collides with another new path'
-    fail_parsing_opts = 'Unexpected options during parsing: no paths or structures given'
-    fail_parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}'
-    fail_parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs'
-    fail_parsing_inequality = 'Got an unequal number of original paths and new paths'
-    fail_opts_require_one = 'One of these options is required'
-    fail_opts_mutex = 'No more than one of these options should be used'
-
-    no_action_msg = '\nNo action taken.'
-
-    listing_batch_size = 10
-
-    opts_paths = 'paths'
-    opts_sources = (opts_paths, 'stdin', 'file', 'clipboard')
-    opts_structures = ('rename', 'paragraphs', 'flat', 'pairs', 'rows')
 

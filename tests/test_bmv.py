@@ -14,7 +14,12 @@ from bmv.cli import (
     parse_inputs,
     OptsFailure,
     ParseFailure,
+)
+
+from bmv.constants import (
     CON,
+    FAIL,
+    CLI,
 )
 
 ####
@@ -34,8 +39,8 @@ def test_validation_orig_existence(tr):
     assert len(fails) == 2
     assert fails[-2].rp is rps[-2]
     assert fails[-1].rp is rps[-1]
-    assert fails[-2].msg == CON.fail_orig_missing
-    assert fails[-1].msg == CON.fail_orig_missing
+    assert fails[-2].msg == FAIL.orig_missing
+    assert fails[-1].msg == FAIL.orig_missing
 
 def test_validation_new_nonexistence(tr):
     # New should not exist.
@@ -47,7 +52,7 @@ def test_validation_new_nonexistence(tr):
     fails = validate_rename_pairs(rps)
     assert len(fails) == 1
     assert fails[0].rp is rps[1]
-    assert fails[0].msg == CON.fail_new_exists
+    assert fails[0].msg == FAIL.new_exists
 
 def test_validation_new_parent_existence(tr):
     # Parent of new should exist.
@@ -59,7 +64,7 @@ def test_validation_new_parent_existence(tr):
     fails = validate_rename_pairs(rps)
     assert len(fails) == 1
     assert fails[0].rp is rps[0]
-    assert fails[0].msg == CON.fail_new_parent_missing
+    assert fails[0].msg == FAIL.new_parent_missing
 
 def test_validation_orig_and_new_difference(tr):
     # Original and new should differ.
@@ -71,7 +76,7 @@ def test_validation_orig_and_new_difference(tr):
     rps = tuples_to_rename_pairs(tups, root = tr.WORK_AREA_ROOT)
     fails = validate_rename_pairs(rps)
     assert len(fails) == 1
-    assert fails[0].msg == CON.fail_orig_new_same
+    assert fails[0].msg == FAIL.orig_new_same
 
 def test_validation_new_uniqueness(tr):
     # News should not collide among themselves.
@@ -85,8 +90,8 @@ def test_validation_new_uniqueness(tr):
     assert len(fails) == 2
     assert fails[0].rp is rps[1]
     assert fails[1].rp is rps[2]
-    assert fails[0].msg == CON.fail_new_collision
-    assert fails[1].msg == CON.fail_new_collision
+    assert fails[0].msg == FAIL.new_collision
+    assert fails[1].msg == FAIL.new_collision
 
 ####
 # Options validation.
@@ -96,19 +101,19 @@ def test_validate_options(tr):
     # Define the two groups of options we are testing.
     # Note: to test opts_structures, we need to set at least one of opts_sources.
     OPT_NAME_GROUPS = (
-        (CON.opts_sources, False),
-        (CON.opts_structures, True),
+        (CLI.sources.keys(), False),
+        (CLI.structures.keys(), True),
     )
 
     # Scenario: zero sources: invalid.
     opts = SimpleNamespace()
     of = validated_options(opts)
     assert isinstance(of, OptsFailure)
-    assert of.msg.startswith(CON.fail_opts_require_one)
+    assert of.msg.startswith(FAIL.opts_require_one)
 
     # Scenario: zero structures: valid.
     opts = SimpleNamespace()
-    setattr(opts, choice(CON.opts_sources), True)
+    setattr(opts, choice(CLI.sources.keys()), True)
     of = validated_options(opts)
     assert isinstance(of, SimpleNamespace)
 
@@ -118,7 +123,7 @@ def test_validate_options(tr):
             opts = SimpleNamespace()
             setattr(opts, nm, True)
             if set_source:
-                setattr(opts, choice(CON.opts_sources), True)
+                setattr(opts, choice(CLI.sources.keys()), True)
             of = validated_options(opts)
             assert isinstance(of, SimpleNamespace)
 
@@ -130,10 +135,10 @@ def test_validate_options(tr):
             for nm in sample(opt_names, choice(size_rng)):
                 setattr(opts, nm, True)
             if set_source:
-                setattr(opts, choice(CON.opts_sources), True)
+                setattr(opts, choice(CLI.sources.keys()), True)
             of = validated_options(opts)
             assert isinstance(of, OptsFailure)
-            assert of.msg.startswith(CON.fail_opts_mutex)
+            assert of.msg.startswith(FAIL.opts_mutex)
 
 ####
 # Parsing inputs.
@@ -168,7 +173,7 @@ def test_parse_inputs(tr):
     def make_opts(**kws):
         d = {
             k : False
-            for k in CON.opts_structures
+            for k in CLI.structures.keys()
         }
         d.update(kws)
         return SimpleNamespace(**d)
@@ -191,7 +196,7 @@ def test_parse_inputs(tr):
     inputs = ('', *ORIGS, '', '', *NEWS, '', *OTHER, '')
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg == CON.fail_parsing_paragraphs
+    assert of.msg == FAIL.parsing_paragraphs
 
     # Scenario: --flat.
     opts = make_opts(flat = True)
@@ -204,7 +209,7 @@ def test_parse_inputs(tr):
     inputs = ('', *ORIGS, '', '', *NEWS, *OTHER, '')
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg == CON.fail_parsing_inequality
+    assert of.msg == FAIL.parsing_inequality
 
     # Scenario: --pairs.
     opts = make_opts(pairs = True)
@@ -221,7 +226,7 @@ def test_parse_inputs(tr):
     inputs = inputs + tuple(OTHER)
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg == CON.fail_parsing_inequality
+    assert of.msg == FAIL.parsing_inequality
 
     # Scenario: --rows.
     opts = make_opts(rows = True)
@@ -238,21 +243,21 @@ def test_parse_inputs(tr):
     inputs = ROWS + ['just-one-cell']
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
+    assert of.msg.startswith(FAIL.parsing_row.split(':')[0])
 
     # Scenario: --rows: more than two cells.
     opts = make_opts(rows = True)
     inputs = ROWS + ['x\ty\tz']
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg.startswith(CON.fail_parsing_row.split(':')[0])
+    assert of.msg.startswith(FAIL.parsing_row.split(':')[0])
 
     # Scenario: opts with neither paths nor structures.
     inputs = ()
     opts = make_opts()
     of = parse_inputs(opts, inputs)
     assert isinstance(of, ParseFailure)
-    assert of.msg == CON.fail_parsing_opts
+    assert of.msg == FAIL.parsing_opts
 
 ####
 # Other tests.

@@ -28,6 +28,10 @@ Testing: assess current status; add end-to-end tests
 
 Renaming via library use case.
 
+Dependencies: drop attrs; re-create virtualenvs.
+
+Project name: bmv is claimed. Possibilities: mvs, mvpy.
+
 Validation overrides:
     - skip-equal [exists but done via a hack]
     - create-parents
@@ -44,8 +48,6 @@ Logging: prune.
 Logging: undo operation.
 
 Other operations: copy, backup, link, chmod, touch, timestamps.
-
-Project name: bmv is claimed. Possibilities: mvs, mvpy.
 
 Option: --row-delimiter [default: tab]
 Option: --path-delimiter [default: newline]
