@@ -114,7 +114,7 @@ main()
 
     Collect input paths.
 
-        inputs = handle_exit(get_input_paths(opts))              # Test separately.
+        inputs = handle_exit(collect_input_paths(opts))          # Test separately.
 
     Parse, filter, generate new paths, validate rps:
 
@@ -137,7 +137,7 @@ main()
     RenamingPlan: testing usage:
 
         plan = RenamingPlan(..., file_sys = FILE_SYSTEM)          # Inject file system dependency.
-        plan.rename_paths()
+        plan.prepare()
         assert ...                                                # Assert against plan state.
 
     RenamingPlan: direct library usage:
@@ -181,20 +181,15 @@ main()
 # Entry point.
 ####
 
-def get_structure(opts):
-    gen = (s for s in STRUCTURES.keys() if getattr(opts, s))
-    return next(gen, None)
-
 def main(args = None):
     # Parse and validate command-line arguments.
     args = sys.argv[1:] if args is None else args
     opts = handle_exit(parse_command_line_args(args))
 
     # Collect the input paths.
-    inputs = get_input_paths(opts)
+    inputs = collect_input_paths(opts)
 
-    # Initialize RenamingPlan and then prepare for renaming: parse inputs,
-    # filter inputs, generate new paths, validate RenamePair instances.
+    # Initialize RenamingPlan.
     plan = RenamingPlan(
         inputs = inputs,
         rename_code = opts.rename,
@@ -205,7 +200,32 @@ def main(args = None):
         filter_code = opts.filter,
         indent = opts.indent,
     )
-    plan.prepare()
+
+    # Prepare: parse inputs; filter inputs; compute new paths; validate plan.
+    try:
+        plan.prepare()
+    except Exception as e:
+        # parsing: ParseFailure
+        # filtering: FilterFailure
+        # renaming: RenameFailure
+        # validation: RenamePairFailure
+        #
+        # If all of the steps currently return a Failure rather than raising,
+        # we could do this:
+        #
+        #   handle_exit(plan.prepare())
+        #
+        # But that seems inconsistent with how one would expect a library to work.
+        #
+        # How to reconcile things.
+        #
+        #   # Preparing never raises. It merely computes, validates, and returns
+        #   # either None or a Failure instance.
+        #   result = plan.prepare()
+        #
+        #   # But renaming can raise if the preparations resulted in a Failure.
+        #
+        pass
 
     print(opts)
     return
@@ -213,7 +233,6 @@ def main(args = None):
     #=======================
 
     # Get the input paths and parse them to get RenamePair instances.
-    # inputs = get_input_paths(opts)
     rps = catch_failure(parse_inputs(opts, inputs))
 
     # If user supplied filtering code, use it to filter the paths.
@@ -349,7 +368,11 @@ def create_opts_failure(opt_names, base_msg):
 # Collecting input paths.
 ####
 
-def get_input_paths(opts):
+def get_structure(opts):
+    gen = (s for s in STRUCTURES.keys() if getattr(opts, s))
+    return next(gen, None)
+
+def collect_input_paths(opts):
     # Get the input path text from the source.
     # Returns a tuple of stripped lines.
     if opts.paths:
