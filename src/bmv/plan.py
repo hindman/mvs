@@ -1,4 +1,25 @@
 
+import re
+import sys
+
+from itertools import groupby
+from pathlib import Path
+
+from .constants import (
+    CON,
+    FAIL,
+)
+from .data_objects import (
+    RenamePair,
+    Failure,
+    OptsFailure,
+    ParseFailure,
+    RenameFailure,
+    FilterFailure,
+    RenamePairFailure,
+    ExitCondition,
+)
+
 class RenamingPlan:
 
     def __init__(self,
@@ -23,6 +44,223 @@ class RenamingPlan:
         self.indent = indent
         self.file_sys = file_sys
 
+        # Other stuff.
+        self.prefix_len = 0
+        self.failures = []
+
+    @property
+    def failed(self):
+        return bool(self.failures)
+
     def prepare(self):
-        pass
+
+        # Get the input paths and parse them to get RenamePair instances.
+        result = self.parse_inputs()
+        if isinstance(result, Failure):
+            self.failures.append(result)
+            return
+        else:
+            self.rps = result
+
+        # If user supplied filtering code, use it to filter the paths.
+        if self.filter_code:
+            func = self.make_user_defined_func('filter', self.filter_code)
+            seq = self.compute_sequence_iterator()
+            filters = []
+            for rp in self.rps:
+                seq_val = next(seq)
+                result = self.execute_user_filter_code(func, rp.orig, seq_val)
+                if isinstance(result, Failure):
+                    self.failures.append(result)
+                    return
+                else:
+                    filters.append(bool(result))
+            self.rps = tuple(
+                rp
+                for rp, keep in zip(self.rps, filters)
+                if keep
+            )
+
+        # If user supplied renaming code, use it to generate new paths.
+        if self.rename_code:
+            func = self.make_user_defined_func('rename', self.rename_code)
+            seq = self.compute_sequence_iterator()
+            for rp in self.rps:
+                seq_val = next(seq)
+                result = self.execute_user_rename_code(func, rp.orig, seq_val)
+                if isinstance(result, Failure):
+                    self.failures.append(result)
+                    return
+                else:
+                    rp.new = result
+
+        # Skip RenamePair instances with equal paths.
+        if self.skip_equal:
+            self.rps = [rp for rp in self.rps if rp.orig != rp.new]
+
+        # Validate the renaming plan.
+        self.validate_rename_pairs()
+
+    def parse_inputs(self):
+        # If we have rename_code, inputs are just original paths.
+        if self.rename_code:
+            return tuple(
+                RenamePair(orig, None)
+                for orig in self.inputs
+                if orig
+            )
+
+        # Otherwise, organize inputs into original paths and new paths.
+        if self.structure == STRUCTURES.paragraphs:
+            # Paragraphs: first original paths, then new paths.
+            groups = [
+                list(lines)
+                for g, lines in groupby(self.inputs, key = bool)
+                if g
+            ]
+            if len(groups) == 2:
+                origs, news = groups
+            else:
+                return ParseFailure(FAIL.parsing_paragraphs)
+        elif self.structure == STRUCTURES.flat:
+            # Flat: like paragraphs without the blank-line delimiter.
+            paths = [line for line in self.inputs if line]
+            i = len(paths) // 2
+            origs, news = (paths[0:i], paths[i:])
+        elif self.structure == STRUCTURES.pairs:
+            # Pairs: original path, new path, original path, etc.
+            origs = []
+            news = []
+            current = origs
+            for line in self.inputs:
+                if line:
+                    current.append(line)
+                    current = news if current is origs else origs
+        elif self.structure == STRUCTURES.rows:
+            # Rows: original-new path pairs, as tab-delimited rows.
+            origs = []
+            news = []
+            for row in self.inputs:
+                if row:
+                    cells = row.split(CON.tab)
+                    if len(cells) == 2:
+                        origs.append(cells[0])
+                        news.append(cells[1])
+                    else:
+                        return ParseFailure(FAIL.parsing_row.format(row = row))
+        else:
+            return ParseFailure(FAIL.parsing_opts)
+
+        # Stop if we got unqual numbers of paths.
+        if len(origs) != len(news):
+            return ParseFailure(FAIL.parsing_inequality)
+
+        # Return the RenamePair instances.
+        return tuple(
+            RenamePair(orig, new)
+            for orig, new in zip(origs, news)
+        )
+
+    def make_user_defined_func(self, action, user_code):
+        # Define the text of the code.
+        func_name = f'do_{action}'
+        code = CON.user_code_fmt.format(
+            func_name = func_name,
+            user_code = user_code,
+            indent = ' ' * self.indent,
+        )
+        # Create the function via exec() in the context of:
+        # - Globals that we want to make available to the user's code.
+        # - A locals dict that we can use to return the generated function.
+        globs = dict(
+            re = re,
+            Path = Path,
+        )
+        locs = {}
+        exec(code, globs, locs)
+        return locs[func_name]
+
+    def strip_prefix(self, orig):
+        i = self.prefix_len
+        return orig[i:] if i else orig
+
+    def compute_prefix_len(self):
+        origs = tuple(rp.orig for rp in self.rps)
+        self.prefix_len = len(commonprefix(origs))
+
+    def compute_sequence_iterator(self):
+        return iter(range(self.seq_start, sys.maxsize, self.seq_step))
+
+    def execute_user_filter_code(self, func, orig, seq_val):
+        # Run the user-supplied filtering code.
+        try:
+            return bool(func(orig, Path(orig), seq_val, self))
+        except Exception as e:
+            msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
+            return FilterFailure(msg)
+
+    def execute_user_rename_code(self, func, orig, seq_val):
+        # Run the user-supplied code to get the new path.
+        try:
+            new = func(orig, Path(orig), seq_val, self)
+        except Exception as e:
+            msg = f'Error in user-supplied renaming code: {e} [original path: {orig}]'
+            return RenameFailure(msg)
+
+        # Validate its type and return.
+        if isinstance(new, str):
+            return new
+        elif isinstance(new, Path):
+            return str(new)
+        else:
+            typ = type(new).__name__
+            msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
+            return RenameFailure(msg)
+
+    def validate_rename_pairs(self):
+        if not self.rps:
+            self.failures.append(NoPathsFailure(FAIL.no_paths))
+
+        # Organize rps into dict-of-list, keyed by new.
+        grouped_by_new = {}
+        for rp in self.rps:
+            grouped_by_new.setdefault(str(rp.new), []).append(rp)
+
+        # Original paths should exist.
+        self.failures.extend(
+            RenamePairFailure(FAIL.orig_missing, rp)
+            for rp in self.rps
+            if not Path(rp.orig).exists()
+        )
+
+        # New paths should not exist.
+        # The failure is conditional on ORIG and NEW being different
+        # to avoid pointless reporting of multiple failures in such cases.
+        self.failures.extend(
+            RenamePairFailure(FAIL.new_exists, rp)
+            for rp in self.rps
+            if rp.orig != rp.new and Path(rp.new).exists()
+        )
+
+        # Parent of new path should exist.
+        self.failures.extend(
+            RenamePairFailure(FAIL.new_parent_missing, rp)
+            for rp in self.rps
+            if not Path(rp.new).parent.exists()
+        )
+
+        # Original path and new path should differ.
+        self.failures.extend(
+            RenamePairFailure(FAIL.orig_new_same, rp)
+            for rp in self.rps
+            if rp.orig == rp.new
+        )
+
+        # New paths should not collide among themselves.
+        self.failures.extend(
+            RenamePairFailure(FAIL.new_collision, rp)
+            for group in grouped_by_new.values()
+            for rp in group
+            if len(group) > 1
+        )
 

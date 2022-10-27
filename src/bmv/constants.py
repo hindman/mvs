@@ -15,7 +15,7 @@ class CON:
     listing_batch_size = 10
 
     user_code_fmt = dedent('''
-        def {func_name}(o, p, seq):
+        def {func_name}(o, p, seq, plan):
         {indent}{user_code}
     ''').lstrip()
 
@@ -25,6 +25,7 @@ FAIL = cons('Fails',
     new_parent_missing = 'Parent directory of new path does not exist',
     orig_new_same = 'Original path and new path are the same',
     new_collision = 'New path collides with another new path',
+    no_paths = 'No paths to be renamed',
     parsing_opts = 'Unexpected options during parsing: no paths or structures given',
     parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}',
     parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs',

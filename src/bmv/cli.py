@@ -5,10 +5,9 @@ import string
 import subprocess
 import sys
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from datetime import datetime
 from itertools import cycle
-from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
 from textwrap import dedent
@@ -16,6 +15,17 @@ from textwrap import dedent
 from .version import __version__
 from .constants import CON, CLI, FAIL, STRUCTURES
 from .plan import RenamingPlan
+from .data_objects import (
+    RenamePair,
+    Failure,
+    OptsFailure,
+    ParseFailure,
+    RenameFailure,
+    FilterFailure,
+    RenamePairFailure,
+    ExitCondition,
+)
+
 
 '''
 
@@ -120,6 +130,13 @@ main()
 
         plan = RenamingPlan(...)
         plan.prepare()
+        if plan.failed:
+            # Report and halt.
+
+        # Notes:
+        #   - The plan.prepare() call does not raise.
+        #   - Rather, it computes and validates.
+        #   - Assemble as much Failure information as possible.
 
     List the renamings, handle dryrun, confirm, log, rename:
 
@@ -132,7 +149,10 @@ main()
                 plan_data = plan.as_dict()                        # Test separately.
                 log_data = collect_logging_data(opts, plan_data)  # Test separately.
                 write_to_logfile(opts, log_data)
-            plan.rename_paths()
+            try:
+                plan.rename_paths()
+            except Exception as e:
+                ...
 
     RenamingPlan: testing usage:
 
@@ -201,33 +221,15 @@ def main(args = None):
         indent = opts.indent,
     )
 
-    # Prepare: parse inputs; filter inputs; compute new paths; validate plan.
-    try:
-        plan.prepare()
-    except Exception as e:
+    plan.prepare()
+    if plan.failed:
         # parsing: ParseFailure
         # filtering: FilterFailure
         # renaming: RenameFailure
         # validation: RenamePairFailure
-        #
-        # If all of the steps currently return a Failure rather than raising,
-        # we could do this:
-        #
-        #   handle_exit(plan.prepare())
-        #
-        # But that seems inconsistent with how one would expect a library to work.
-        #
-        # How to reconcile things.
-        #
-        #   # Preparing never raises. It merely computes, validates, and returns
-        #   # either None or a Failure instance.
-        #   result = plan.prepare()
-        #
-        #   # But renaming can raise if the preparations resulted in a Failure.
-        #
         pass
 
-    print(opts)
+    print('PLAN failed?', plan.failed)
     return
 
     #=======================
@@ -386,230 +388,220 @@ def collect_input_paths(opts):
         paths = text.split(CON.newline)
     return tuple(path.strip() for path in paths)
 
-def parse_inputs(opts, inputs):
-    # Handle --rename option: just original paths.
-    if opts.rename:
-        return tuple(
-            RenamePair(orig, None)
-            for orig in inputs
-        )
+# def parse_inputs(opts, inputs):
+#     # Handle --rename option: just original paths.
+#     if opts.rename:
+#         return tuple(
+#             RenamePair(orig, None)
+#             for orig in inputs
+#         )
 
-    # Otherwise, organize inputs into original paths and new paths.
-    if opts.paragraphs:
-        # Paragraphs: first original paths, then new paths.
-        groups = [
-            list(lines)
-            for g, lines in groupby(inputs, key = bool)
-            if g
-        ]
-        if len(groups) == 2:
-            origs, news = groups
-        else:
-            return ParseFailure(FAIL.parsing_paragraphs)
-    elif opts.flat:
-        # Flat: like paragraphs without the blank-line delimiter.
-        paths = [line for line in inputs if line]
-        i = len(paths) // 2
-        origs, news = (paths[0:i], paths[i:])
-    elif opts.pairs:
-        # Pairs: original path, new path, original path, etc.
-        origs = []
-        news = []
-        current = origs
-        for line in inputs:
-            if line:
-                current.append(line)
-                current = news if current is origs else origs
-    elif opts.rows:
-        # Rows: original-new path pairs, as tab-delimited rows.
-        origs = []
-        news = []
-        for row in inputs:
-            if row:
-                cells = row.split(CON.tab)
-                if len(cells) == 2:
-                    origs.append(cells[0])
-                    news.append(cells[1])
-                else:
-                    return ParseFailure(FAIL.parsing_row.format(row = row))
-    else:
-        return ParseFailure(FAIL.parsing_opts)
+#     # Otherwise, organize inputs into original paths and new paths.
+#     if opts.paragraphs:
+#         # Paragraphs: first original paths, then new paths.
+#         groups = [
+#             list(lines)
+#             for g, lines in groupby(inputs, key = bool)
+#             if g
+#         ]
+#         if len(groups) == 2:
+#             origs, news = groups
+#         else:
+#             return ParseFailure(FAIL.parsing_paragraphs)
+#     elif opts.flat:
+#         # Flat: like paragraphs without the blank-line delimiter.
+#         paths = [line for line in inputs if line]
+#         i = len(paths) // 2
+#         origs, news = (paths[0:i], paths[i:])
+#     elif opts.pairs:
+#         # Pairs: original path, new path, original path, etc.
+#         origs = []
+#         news = []
+#         current = origs
+#         for line in inputs:
+#             if line:
+#                 current.append(line)
+#                 current = news if current is origs else origs
+#     elif opts.rows:
+#         # Rows: original-new path pairs, as tab-delimited rows.
+#         origs = []
+#         news = []
+#         for row in inputs:
+#             if row:
+#                 cells = row.split(CON.tab)
+#                 if len(cells) == 2:
+#                     origs.append(cells[0])
+#                     news.append(cells[1])
+#                 else:
+#                     return ParseFailure(FAIL.parsing_row.format(row = row))
+#     else:
+#         return ParseFailure(FAIL.parsing_opts)
 
-    # Stop if we got unqual numbers of paths.
-    if len(origs) != len(news):
-        return ParseFailure(FAIL.parsing_inequality)
+#     # Stop if we got unqual numbers of paths.
+#     if len(origs) != len(news):
+#         return ParseFailure(FAIL.parsing_inequality)
 
-    # Return the RenamePair instances.
-    return tuple(
-        RenamePair(orig, new)
-        for orig, new in zip(origs, news)
-    )
+#     # Return the RenamePair instances.
+#     return tuple(
+#         RenamePair(orig, new)
+#         for orig, new in zip(origs, news)
+#     )
 
 ####
 # Path filtering.
 ####
 
-def filtered_rename_pairs(rps, opts):
-    func = make_user_defined_func('filter', opts, rps)
-    seq = sequence_iterator(opts.seq, opts.step)
-    filtered = []
-    for rp in rps:
-        seq_val = next(seq)
-        result = filter_path(func, rp.orig, seq_val)
-        if isinstance(result, FilterFailure):
-            return result
-        elif result:
-            filtered.append(rp)
-    return filtered
+# def filtered_rename_pairs(rps, opts):
+#     func = make_user_defined_func('filter', opts, rps)
+#     seq = sequence_iterator(opts.seq, opts.step)
+#     filtered = []
+#     for rp in rps:
+#         seq_val = next(seq)
+#         result = filter_path(func, rp.orig, seq_val)
+#         if isinstance(result, FilterFailure):
+#             return result
+#         elif result:
+#             filtered.append(rp)
+#     return filtered
 
-def filter_path(filterer, orig, seq_val):
-    # Run the user-supplied filtering code.
-    try:
-        return bool(filterer(orig, Path(orig), seq_val))
-    except Exception as e:
-        msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
-        return FilterFailure(msg)
+# def filter_path(filterer, orig, seq_val):
+#     # Run the user-supplied filtering code.
+#     try:
+#         return bool(filterer(orig, Path(orig), seq_val))
+#     except Exception as e:
+#         msg = f'Error in user-supplied filtering code: {e} [original path: {orig}]'
+#         return FilterFailure(msg)
 
 ####
 # Path renaming.
 ####
 
-@dataclass
-class RenamePair:
-    # A data object to hold an original path and the corresponding new path.
-    orig: str
-    new: str
+# def compute_new_path(renamer, orig, seq_val):
+#     # Run the user-supplied code to get the new path.
+#     try:
+#         new = renamer(orig, Path(orig), seq_val)
+#     except Exception as e:
+#         msg = f'Error in user-supplied renaming code: {e} [original path: {orig}]'
+#         return RenameFailure(msg)
 
-    @property
-    def formatted(self):
-        return f'{self.orig}\n{self.new}\n'
+#     # Validate its type and return.
+#     if isinstance(new, str):
+#         return new
+#     elif isinstance(new, Path):
+#         return str(new)
+#     else:
+#         typ = type(new).__name__
+#         msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
+#         return RenameFailure(msg)
 
-def compute_new_path(renamer, orig, seq_val):
-    # Run the user-supplied code to get the new path.
-    try:
-        new = renamer(orig, Path(orig), seq_val)
-    except Exception as e:
-        msg = f'Error in user-supplied renaming code: {e} [original path: {orig}]'
-        return RenameFailure(msg)
+# def validate_rename_pairs(rps):
+#     fails = []
 
-    # Validate its type and return.
-    if isinstance(new, str):
-        return new
-    elif isinstance(new, Path):
-        return str(new)
-    else:
-        typ = type(new).__name__
-        msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {orig}]'
-        return RenameFailure(msg)
+#     # Organize rps into dict-of-list, keyed by new.
+#     grouped_by_new = {}
+#     for rp in rps:
+#         grouped_by_new.setdefault(str(rp.new), []).append(rp)
 
-def validate_rename_pairs(rps):
-    fails = []
+#     # Original paths should exist.
+#     fails.extend(
+#         RenamePairFailure(FAIL.orig_missing, rp)
+#         for rp in rps
+#         if not Path(rp.orig).exists()
+#     )
 
-    # Organize rps into dict-of-list, keyed by new.
-    grouped_by_new = {}
-    for rp in rps:
-        grouped_by_new.setdefault(str(rp.new), []).append(rp)
+#     # New paths should not exist.
+#     # The failure is conditional on ORIG and NEW being different
+#     # to avoid pointless reporting of multiple failures in such cases.
+#     fails.extend(
+#         RenamePairFailure(FAIL.new_exists, rp)
+#         for rp in rps
+#         if rp.orig != rp.new and Path(rp.new).exists()
+#     )
 
-    # Original paths should exist.
-    fails.extend(
-        RenamePairFailure(FAIL.orig_missing, rp)
-        for rp in rps
-        if not Path(rp.orig).exists()
-    )
+#     # Parent of new path should exist.
+#     fails.extend(
+#         RenamePairFailure(FAIL.new_parent_missing, rp)
+#         for rp in rps
+#         if not Path(rp.new).parent.exists()
+#     )
 
-    # New paths should not exist.
-    # The failure is conditional on ORIG and NEW being different
-    # to avoid pointless reporting of multiple failures in such cases.
-    fails.extend(
-        RenamePairFailure(FAIL.new_exists, rp)
-        for rp in rps
-        if rp.orig != rp.new and Path(rp.new).exists()
-    )
+#     # Original path and new path should differ.
+#     fails.extend(
+#         RenamePairFailure(FAIL.orig_new_same, rp)
+#         for rp in rps
+#         if rp.orig == rp.new
+#     )
 
-    # Parent of new path should exist.
-    fails.extend(
-        RenamePairFailure(FAIL.new_parent_missing, rp)
-        for rp in rps
-        if not Path(rp.new).parent.exists()
-    )
+#     # New paths should not collide among themselves.
+#     fails.extend(
+#         RenamePairFailure(FAIL.new_collision, rp)
+#         for group in grouped_by_new.values()
+#         for rp in group
+#         if len(group) > 1
+#     )
 
-    # Original path and new path should differ.
-    fails.extend(
-        RenamePairFailure(FAIL.orig_new_same, rp)
-        for rp in rps
-        if rp.orig == rp.new
-    )
+#     return fails
 
-    # New paths should not collide among themselves.
-    fails.extend(
-        RenamePairFailure(FAIL.new_collision, rp)
-        for group in grouped_by_new.values()
-        for rp in group
-        if len(group) > 1
-    )
+# def make_user_defined_func(action, opts, rps):
+#     # Define the text of the code.
+#     func_name = f'do_{action}'
+#     code = CON.user_code_fmt.format(
+#         func_name = func_name,
+#         user_code = getattr(opts, action),
+#         indent = ' ' * opts.indent,
+#     )
+#     # Create the function via exec() in the context of:
+#     # - Globals that we want to make available to the user's code.
+#     # - A locals dict that we can use to return the generated function.
+#     globs = dict(
+#         re = re,
+#         Path = Path,
+#         strip_prefix = make_prefix_stripper(rps),
+#     )
+#     locs = {}
+#     exec(code, globs, locs)
+#     return locs[func_name]
 
-    return fails
-
-def make_user_defined_func(action, opts, rps):
-    # Define the text of the code.
-    func_name = f'do_{action}'
-    code = CON.user_code_fmt.format(
-        func_name = func_name,
-        user_code = getattr(opts, action),
-        indent = ' ' * opts.indent,
-    )
-    # Create the function via exec() in the context of:
-    # - Globals that we want to make available to the user's code.
-    # - A locals dict that we can use to return the generated function.
-    globs = dict(
-        re = re,
-        Path = Path,
-        strip_prefix = make_prefix_stripper(rps),
-    )
-    locs = {}
-    exec(code, globs, locs)
-    return locs[func_name]
-
-def make_prefix_stripper(rps):
-    origs = tuple(rp.orig for rp in rps)
-    i = len(commonprefix(origs))
-    return lambda x: x[i:] if i else x
+# def make_prefix_stripper(rps):
+#     origs = tuple(rp.orig for rp in rps)
+#     i = len(commonprefix(origs))
+#     return lambda x: x[i:] if i else x
 
 ####
 # Failure handling.
 ####
 
-@dataclass
-class Failure:
-    msg: str
+# @dataclass
+# class Failure:
+#     msg: str
 
-@dataclass
-class OptsFailure(Failure):
-    pass
+# @dataclass
+# class OptsFailure(Failure):
+#     pass
 
-@dataclass
-class ParseFailure(Failure):
-    pass
+# @dataclass
+# class ParseFailure(Failure):
+#     pass
 
-@dataclass
-class RenameFailure(Failure):
-    pass
+# @dataclass
+# class RenameFailure(Failure):
+#     pass
 
-@dataclass
-class FilterFailure(Failure):
-    pass
+# @dataclass
+# class FilterFailure(Failure):
+#     pass
 
-@dataclass
-class RenamePairFailure(Failure):
-    rp: RenamePair
+# @dataclass
+# class RenamePairFailure(Failure):
+#     rp: RenamePair
 
-    @property
-    def formatted(self):
-        return f'{self.msg}:\n{self.rp.formatted}'
+#     @property
+#     def formatted(self):
+#         return f'{self.msg}:\n{self.rp.formatted}'
 
-@dataclass
-class ExitCondition:
-    msg: str
+# @dataclass
+# class ExitCondition:
+#     msg: str
 
 # def catch_failure(x):
 #     if isinstance(x, Failure):
@@ -713,6 +705,6 @@ def halt(code = None, msg = None):
         fh.write(msg)
     sys.exit(code)
 
-def sequence_iterator(start, step):
-    return iter(range(start, sys.maxsize, step))
+# def sequence_iterator(start, step):
+#     return iter(range(start, sys.maxsize, step))
 
