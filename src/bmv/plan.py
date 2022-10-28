@@ -53,23 +53,78 @@ class RenamingPlan:
         return bool(self.failures)
 
     def prepare(self):
+        # parsing:
+        #   1 ParseFailure
+        #   fatal
+        #
+        # create user functions:
+        #   1 filtering
+        #   1 renaming
+        #   fatal
+        #
+        # execute user code:
+        #   N FilterFailure
+        #   skip-failed-filter [not compelling]
+        #
+        #   N RenameFailure
+        #   skip-failed-rename [not compelling]
+        #
+        # validation:
+        #
+        #   holistic checks:
+        #       1 NoPathsFailure
+        #       noop
+        #
+        #       N* RenamePairFailure: new paths should not collide among themselves
+        #       allow-new-collision
+        #
+        #   individual rp checks:
+        #       N RenamePairFailure: orig should exist
+        #       skip-missing-orig [not compelling]
+        #
+        #       N RenamePairFailure: new should not exist
+        #       allow-clobber
+        #
+        #       N RenamePairFailure: parent of new should exist
+        #       create-new-parent
+        #
+        #       N RenamePairFailure: new and orig should differ
+        #       skip-equal
 
         # Get the input paths and parse them to get RenamePair instances.
-        result = self.parse_inputs()
-        if isinstance(result, Failure):
-            self.failures.append(result)
+        self.rps = self.catch_failure(self.parse_inputs())
+        if self.failed:
             return
-        else:
-            self.rps = result
 
-        # If user supplied filtering code, use it to filter the paths.
+        # # Get the input paths and parse them to get RenamePair instances.
+        # result = self.parse_inputs()
+        # if isinstance(result, Failure):
+        #     self.failures.append(result)
+        #     return
+        # else:
+        #     self.rps = result
+
+        # Create filtering function from user code.
         if self.filter_code:
-            func = self.make_user_defined_func('filter', self.filter_code)
+            # TODO: need to return UserCodeFailure.
+            filter_func = self.catch_failure(self.make_user_defined_func('filter'))
+            if self.failed:
+                return
+
+        # Create renaming function from user code.
+        if self.rename_code:
+            # TODO: need to return UserCodeFailure.
+            rename_func = self.catch_failure(self.make_user_defined_func('rename'))
+            if self.failed:
+                return
+
+        # Filter the paths.
+        if self.filter_code:
             seq = self.compute_sequence_iterator()
             filters = []
             for rp in self.rps:
                 seq_val = next(seq)
-                result = self.execute_user_filter_code(func, rp.orig, seq_val)
+                result = self.execute_user_filter_code(filter_func, rp.orig, seq_val)
                 if isinstance(result, Failure):
                     self.failures.append(result)
                     return
@@ -81,18 +136,72 @@ class RenamingPlan:
                 if keep
             )
 
-        # If user supplied renaming code, use it to generate new paths.
+            # filters = self.execute_user_func(self.execute_user_filter_code, filter_func)
+            # retained = []
+            # for rp, f in zip(self.rps, filters):
+            #     if isinstance(f, Failure):
+            #         if self.skip_failed_filter:
+            #             pass
+            #         else:
+            #             self.failures.append(f)
+            #     else:
+            #         if f:
+            #             retained.append(rp)
+            #         else:
+            #             pass
+            # self.rps = tuple(retained)
+
+        # Generate new paths.
         if self.rename_code:
-            func = self.make_user_defined_func('rename', self.rename_code)
             seq = self.compute_sequence_iterator()
             for rp in self.rps:
                 seq_val = next(seq)
-                result = self.execute_user_rename_code(func, rp.orig, seq_val)
+                result = self.execute_user_rename_code(rename_func, rp.orig, seq_val)
                 if isinstance(result, Failure):
                     self.failures.append(result)
                     return
                 else:
                     rp.new = result
+
+        def execute_user_func(self, executor, func):
+            seq = self.compute_sequence_iterator()
+            return tuple(
+                executor(func, rp.orig, next(seq))
+                for rp in self.rps
+            )
+
+        # # If user supplied filtering code, use it to filter the paths.
+        # if self.filter_code:
+        #     # This call could fail.
+        #     func = self.make_user_defined_func('filter', self.filter_code)
+        #     seq = self.compute_sequence_iterator()
+        #     filters = []
+        #     for rp in self.rps:
+        #         seq_val = next(seq)
+        #         result = self.execute_user_filter_code(func, rp.orig, seq_val)
+        #         if isinstance(result, Failure):
+        #             self.failures.append(result)
+        #             return
+        #         else:
+        #             filters.append(bool(result))
+        #     self.rps = tuple(
+        #         rp
+        #         for rp, keep in zip(self.rps, filters)
+        #         if keep
+        #     )
+
+        # # If user supplied renaming code, use it to generate new paths.
+        # if self.rename_code:
+        #     func = self.make_user_defined_func('rename', self.rename_code)
+        #     seq = self.compute_sequence_iterator()
+        #     for rp in self.rps:
+        #         seq_val = next(seq)
+        #         result = self.execute_user_rename_code(func, rp.orig, seq_val)
+        #         if isinstance(result, Failure):
+        #             self.failures.append(result)
+        #             return
+        #         else:
+        #             rp.new = result
 
         # Skip RenamePair instances with equal paths.
         if self.skip_equal:
@@ -161,12 +270,12 @@ class RenamingPlan:
             for orig, new in zip(origs, news)
         )
 
-    def make_user_defined_func(self, action, user_code):
+    def make_user_defined_func(self, action):
         # Define the text of the code.
         func_name = f'do_{action}'
         code = CON.user_code_fmt.format(
             func_name = func_name,
-            user_code = user_code,
+            user_code = getattr(self, f'{action}_code'),
             indent = ' ' * self.indent,
         )
         # Create the function via exec() in the context of:
@@ -230,7 +339,7 @@ class RenamingPlan:
         self.failures.extend(
             RenamePairFailure(FAIL.orig_missing, rp)
             for rp in self.rps
-            if not Path(rp.orig).exists()
+            if not self.path_exists(Path(rp.orig))
         )
 
         # New paths should not exist.
@@ -239,21 +348,21 @@ class RenamingPlan:
         self.failures.extend(
             RenamePairFailure(FAIL.new_exists, rp)
             for rp in self.rps
-            if rp.orig != rp.new and Path(rp.new).exists()
+            if self.path_exists(Path(rp.new)) and not rp.equal
         )
 
         # Parent of new path should exist.
         self.failures.extend(
             RenamePairFailure(FAIL.new_parent_missing, rp)
             for rp in self.rps
-            if not Path(rp.new).parent.exists()
+            if not self.path_exists(Path(rp.new).parent)
         )
 
         # Original path and new path should differ.
         self.failures.extend(
             RenamePairFailure(FAIL.orig_new_same, rp)
             for rp in self.rps
-            if rp.orig == rp.new
+            if rp.equal
         )
 
         # New paths should not collide among themselves.
@@ -263,4 +372,16 @@ class RenamingPlan:
             for rp in group
             if len(group) > 1
         )
+
+
+    def path_exists(self, p):
+        if self.file_sys is None:
+            return p.exists()
+        else:
+            return p in self.file_sys
+
+    def catch_failure(self, x):
+        if isinstance(x, Failure):
+            self.failures.append(x)
+        return x
 

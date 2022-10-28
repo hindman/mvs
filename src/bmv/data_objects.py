@@ -10,6 +10,10 @@ class RenamePair:
     def formatted(self):
         return f'{self.orig}\n{self.new}\n'
 
+    @property
+    def equal(self):
+        return self.orig == self.new
+
 @dataclass
 class Failure:
     msg: str

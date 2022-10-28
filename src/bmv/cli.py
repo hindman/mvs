@@ -223,10 +223,6 @@ def main(args = None):
 
     plan.prepare()
     if plan.failed:
-        # parsing: ParseFailure
-        # filtering: FilterFailure
-        # renaming: RenameFailure
-        # validation: RenamePairFailure
         pass
 
     print('PLAN failed?', plan.failed)
