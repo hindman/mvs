@@ -82,6 +82,8 @@ class RenamingPlan:
         #       N RenamePairFailure: orig should exist
         #       skip-missing-orig [not compelling]
         #
+        #       1 NoPathsFailure
+        #
         #       N RenamePairFailure: new should not exist
         #       allow-clobber
         #
@@ -90,6 +92,18 @@ class RenamingPlan:
         #
         #       N RenamePairFailure: new and orig should differ
         #       skip-equal
+        #
+        #       1 NoPathsFailure
+        #
+        # Failure classification, based on failure-type and current opts:
+        #   fatal   : the problem cannot be ignored or skipped
+        #   serious : any failure that user did not want to ignore/skip
+        #   ignore  : user wants to ignore
+        #   skip    : user wants to skip the offending RenamePair
+        # 
+        # def catch_failure(self, x):
+        #     ftyp = self.get_failure_type(x)
+        #     ...
 
         # Get the input paths and parse them to get RenamePair instances.
         self.rps = self.catch_failure(self.parse_inputs())
@@ -213,11 +227,12 @@ class RenamingPlan:
     def parse_inputs(self):
         # If we have rename_code, inputs are just original paths.
         if self.rename_code:
-            return tuple(
+            rps = tuple(
                 RenamePair(orig, None)
                 for orig in self.inputs
                 if orig
             )
+            return rps if rps else return ParseFailure(FAIL.no_input_paths)
 
         # Otherwise, organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.paragraphs:
@@ -260,8 +275,10 @@ class RenamingPlan:
         else:
             return ParseFailure(FAIL.parsing_opts)
 
-        # Stop if we got unqual numbers of paths.
-        if len(origs) != len(news):
+        # Fail if we got no paths or unqual numbers of original vs new paths.
+        if not origs:
+            return ParseFailure(FAIL.no_input_paths)
+        elif len(origs) != len(news):
             return ParseFailure(FAIL.parsing_inequality)
 
         # Return the RenamePair instances.

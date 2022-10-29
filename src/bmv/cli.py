@@ -208,6 +208,7 @@ def main(args = None):
 
     # Collect the input paths.
     inputs = collect_input_paths(opts)
+    # TODO: Failure if no inputs (eg input-text with all blank lines).
 
     # Initialize RenamingPlan.
     plan = RenamingPlan(
