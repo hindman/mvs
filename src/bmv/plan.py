@@ -63,11 +63,12 @@ class RenamingPlan:
         #   fatal
         #
         # execute user code:
+        #
         #   N FilterFailure
-        #   skip-failed-filter [not compelling]
+        #   failed-filter: FAIL, skip, keep
         #
         #   N RenameFailure
-        #   skip-failed-rename [not compelling]
+        #   failed-rename: FAIL, skip
         #
         # validation:
         #
@@ -75,35 +76,35 @@ class RenamingPlan:
         #       1 NoPathsFailure
         #       noop
         #
-        #       N* RenamePairFailure: new paths should not collide among themselves
-        #       allow-new-collision
-        #
         #   individual rp checks:
+        #
         #       N RenamePairFailure: orig should exist
-        #       skip-missing-orig [not compelling]
-        #
-        #       1 NoPathsFailure
-        #
-        #       N RenamePairFailure: new should not exist
-        #       allow-clobber
-        #
-        #       N RenamePairFailure: parent of new should exist
-        #       create-new-parent
+        #       missing: FAIL, skip
         #
         #       N RenamePairFailure: new and orig should differ
-        #       skip-equal
+        #       equal: FAIL, skip
         #
+        #       N RenamePairFailure: parent of new should exist
+        #       missing-parent: FAIL, skip, create
+        #
+        #       N RenamePairFailure: new should not exist
+        #       existing-new: FAIL, skip, clobber
+        #
+        #       N* RenamePairFailure: new paths should not collide among themselves
+        #       colliding-new: FAIL, skip, clobber
+        #
+        #   holistic checks:
         #       1 NoPathsFailure
+        #       noop
         #
-        # Failure classification, based on failure-type and current opts:
-        #   fatal   : the problem cannot be ignored or skipped
-        #   serious : any failure that user did not want to ignore/skip
-        #   ignore  : user wants to ignore
-        #   skip    : user wants to skip the offending RenamePair
-        # 
-        # def catch_failure(self, x):
-        #     ftyp = self.get_failure_type(x)
-        #     ...
+        # Special handling for failures:
+        #   filter-error   : fail, skip, keep
+        #   rename-error   : fail, skip
+        #   equal          : fail, skip
+        #   missing        : fail, skip
+        #   missing-parent : fail, skip, create
+        #   existing-new   : fail, skip, clobber
+        #   colliding-new  : fail, skip, clobber
 
         # Get the input paths and parse them to get RenamePair instances.
         self.rps = self.catch_failure(self.parse_inputs())
