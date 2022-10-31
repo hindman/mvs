@@ -4,10 +4,13 @@ import sys
 
 from itertools import groupby
 from pathlib import Path
+from dataclasses import replace
 
 from .constants import (
     CON,
     FAIL,
+    FAIL_NAMES,
+    FAIL_CONTROLS as FC,
 )
 from .data_objects import (
     RenamePair,
@@ -22,102 +25,106 @@ from .data_objects import (
 
 class RenamingPlan:
 
+    # Mapping from the user-facing failure names to their:
+    # (1) Failure type, and (2) supported failure-control mechanisms.
+    #
+    #   None   : Failure is not controlled, so the RenamingPlan will fail.
+    #   skip   : The affected RenamePair will be skipped.
+    #   keep   : The affected RenamePair will be kept [rather than filtered out].
+    #   create : The missing path will be created [parent of RenamePair.new].
+    #   clobber: The affected path will be clobbered [existing or colliding RenamePair.new].
+    #
+    SUPPORTED_CONTROLS = {
+        # FAIL_NAMES                Failure type             Supported FAILURE_CONTROLS.
+        FAIL_NAMES.filter_error   : (UserFilterFailure,      (FC.skip, FC.keep)),
+        FAIL_NAMES.rename_error   : (UserRenameFailure,      (FC.skip,)),
+        FAIL_NAMES.equal          : (RpEqualFailure,         (FC.skip,)),
+        FAIL_NAMES.missing        : (RpMissingFailure,       (FC.skip,)),
+        FAIL_NAMES.missing_parent : (RpMissingParentFailure, (FC.skip, FC.create)),
+        FAIL_NAMES.existing_new   : (RpExistsFailure,        (FC.skip, FC.clobber)),
+        FAIL_NAMES.colliding_new  : (RpCollsionFailure,      (FC.skip, FC.clobber)),
+    }
+
     def __init__(self,
+                 # Path inputs and their structure.
                  inputs,
-                 rename_code,
                  structure = None,
-                 seq_start = 1,
-                 seq_step = 1,
-                 skip_equal = False,
+                 # User code for renaming and filtering.
+                 rename_code = None,
                  filter_code = None,
                  indent = 4,
-                 file_sys = None):
+                 # Sequence numbering.
+                 seq_start = 1,
+                 seq_step = 1,
+                 # File system via dependency injection.
+                 file_sys = None,
+                 # Failure controls.
+                 skip = None,
+                 keep = None,
+                 create = None,
+                 clobber = None,
+                 ):
 
         # Add validation. Convert to attrs.
         self.inputs = tuple(inputs)
-        self.rename_code = rename_code
         self.structure = structure
-        self.seq_start = seq_start
-        self.seq_step = seq_step
-        self.skip_equal = skip_equal
+        self.rename_code = rename_code
         self.filter_code = filter_code
         self.indent = indent
+        self.seq_start = seq_start
+        self.seq_step = seq_step
         self.file_sys = file_sys
+
+        # In fail_config, we get a dict mapping each controlled Failure type
+        # to the user's requested control mechanism (skip, keep, create, clobber).
+        # This call validates and builds the dict.
+        self.fail_config = self.build_failure_control_config({
+            FC.skip: skip,
+            FC.keep: keep,
+            FC.create: create,
+            FC.clobber: clobber,
+        })
 
         # Other stuff.
         self.prefix_len = 0
         self.failures = []
 
-    @property
-    def failed(self):
-        return bool(self.failures)
+    def build_failure_control_config(self, config):
+        fc = {}
+        for control, failure_names in config.items():
+            for fnm in (failure_names or []):
+                ftype, supported = self.SUPPORTED_CONTROLS.get(fnm, (None, []))
+                if control in supported:
+                    fc[ftype] = control
+                else:
+                    msg = f'RenamingPlan received an invalid failure-control: {control} {fnm}'
+                    raise ValueError(msg)
+        return fc
 
     def prepare(self):
         # parsing:
-        #   1 ParseFailure
-        #   fatal
+        #   1 ParseFailure [fatal]
         #
         # create user functions:
-        #   1 filtering
-        #   1 renaming
-        #   fatal
+        #   1 filtering [fatal]
+        #   1 renaming [fatal]
         #
         # execute user code:
-        #
         #   N FilterFailure
-        #   failed-filter: FAIL, skip, keep
-        #
         #   N RenameFailure
-        #   failed-rename: FAIL, skip
         #
         # validation:
-        #
-        #   holistic checks:
-        #       1 NoPathsFailure
-        #       noop
-        #
-        #   individual rp checks:
-        #
-        #       N RenamePairFailure: orig should exist
-        #       missing: FAIL, skip
-        #
-        #       N RenamePairFailure: new and orig should differ
-        #       equal: FAIL, skip
-        #
-        #       N RenamePairFailure: parent of new should exist
-        #       missing-parent: FAIL, skip, create
-        #
-        #       N RenamePairFailure: new should not exist
-        #       existing-new: FAIL, skip, clobber
-        #
-        #       N* RenamePairFailure: new paths should not collide among themselves
-        #       colliding-new: FAIL, skip, clobber
-        #
-        #   holistic checks:
-        #       1 NoPathsFailure
-        #       noop
-        #
-        # Special handling for failures:
-        #   filter-error   : fail, skip, keep
-        #   rename-error   : fail, skip
-        #   equal          : fail, skip
-        #   missing        : fail, skip
-        #   missing-parent : fail, skip, create
-        #   existing-new   : fail, skip, clobber
-        #   colliding-new  : fail, skip, clobber
+        #   N RenamePairFailure: orig should exist
+        #   N RenamePairFailure: new and orig should differ
+        #   N RenamePairFailure: parent of new should exist
+        #   N RenamePairFailure: new should not exist
+        #   N* RenamePairFailure: new paths should not collide among themselves
+        #   1 NoPathsFailure
 
         # Get the input paths and parse them to get RenamePair instances.
         self.rps = self.catch_failure(self.parse_inputs())
         if self.failed:
             return
-
-        # # Get the input paths and parse them to get RenamePair instances.
-        # result = self.parse_inputs()
-        # if isinstance(result, Failure):
-        #     self.failures.append(result)
-        #     return
-        # else:
-        #     self.rps = result
 
         # Create filtering function from user code.
         if self.filter_code:
@@ -133,6 +140,45 @@ class RenamingPlan:
             if self.failed:
                 return
 
+        rp_steps = (
+            self.execute_user_filter,
+            self.execute_user_rename,
+            self.check_orig_exists,
+            self.check_orig_new_differ,
+            self.check_new_not_exists,
+            self.check_new_parent_exists,
+            self.check_new_collisions,
+        )
+
+        for step in rp_steps:
+            self.rps = tuple(self.processed_rps(step))
+            if not self.rps:
+                self.add_failure(NoPathsFailure)
+
+        def processed_rps(self, step):
+            for rp in self.rps:
+                result = step(rp)
+                if isinstance(result, Failure):
+                    control = self.fail_config.get(failure, None)
+                    if control == FC.skip:
+                        # Skip RenamePair.
+                        pass
+                    elif control == FC.keep:
+                        # Retain RenamePair that might have been filtered.
+                        yield rp
+                    elif control == FC.create:
+                        # Before renaming we will create parent of rp.new.
+                        yield replace(rp, create_parent = True)
+                    elif control == FC.clobber:
+                        # We will rename even if rp.new exists.
+                        yield replace(rp, clobber = True)
+                    else:
+                        # Fail.
+                        self.add_failure(result)
+                else:
+                    # No failure.
+                    yield rp
+
         # Filter the paths.
         if self.filter_code:
             seq = self.compute_sequence_iterator()
@@ -140,6 +186,7 @@ class RenamingPlan:
             for rp in self.rps:
                 seq_val = next(seq)
                 result = self.execute_user_filter_code(filter_func, rp.orig, seq_val)
+                # ok, fail, skip
                 if isinstance(result, Failure):
                     self.failures.append(result)
                     return
@@ -151,27 +198,13 @@ class RenamingPlan:
                 if keep
             )
 
-            # filters = self.execute_user_func(self.execute_user_filter_code, filter_func)
-            # retained = []
-            # for rp, f in zip(self.rps, filters):
-            #     if isinstance(f, Failure):
-            #         if self.skip_failed_filter:
-            #             pass
-            #         else:
-            #             self.failures.append(f)
-            #     else:
-            #         if f:
-            #             retained.append(rp)
-            #         else:
-            #             pass
-            # self.rps = tuple(retained)
-
         # Generate new paths.
         if self.rename_code:
             seq = self.compute_sequence_iterator()
             for rp in self.rps:
                 seq_val = next(seq)
                 result = self.execute_user_rename_code(rename_func, rp.orig, seq_val)
+                # ok, fail, skip
                 if isinstance(result, Failure):
                     self.failures.append(result)
                     return
@@ -402,4 +435,8 @@ class RenamingPlan:
         if isinstance(x, Failure):
             self.failures.append(x)
         return x
+
+    @property
+    def failed(self):
+        return bool(self.failures)
 

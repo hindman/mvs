@@ -5,6 +5,8 @@ class RenamePair:
     # A data object to hold an original path and the corresponding new path.
     orig: str
     new: str
+    create_parent: bool = False
+    clobber: bool = False
 
     @property
     def formatted(self):

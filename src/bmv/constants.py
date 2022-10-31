@@ -35,6 +35,23 @@ FAIL = cons('Fails',
     opts_mutex = 'No more than one of these options should be used',
 )
 
+FAIL_NAMES = constants('FailNames', (
+    'filter_error',
+    'rename_error',
+    'equal_paths',
+    'missing_orig',
+    'missing_parent',
+    'existing_new',
+    'colliding_new',
+)
+
+FAIL_CONTROLS = constants('FailControls', (
+    'skip',
+    'keep',
+    'create',
+    'clobber',
+)
+
 # Helper for argparse configuration to check for positive integers.
 def positive_int(x):
     if x.isdigit():
