@@ -36,8 +36,8 @@ class RenamingPlan:
     #
     SUPPORTED_CONTROLS = {
         # FAIL_NAMES                Failure type             Supported FAILURE_CONTROLS.
-        FAIL_NAMES.filter_error   : (UserFilterFailure,      (FC.skip, FC.keep)),
-        FAIL_NAMES.rename_error   : (UserRenameFailure,      (FC.skip,)),
+        FAIL_NAMES.filter_error   : (RpFilterFailure,        (FC.skip, FC.keep)),
+        FAIL_NAMES.rename_error   : (RpRenameFailure,        (FC.skip,)),
         FAIL_NAMES.equal          : (RpEqualFailure,         (FC.skip,)),
         FAIL_NAMES.missing        : (RpMissingFailure,       (FC.skip,)),
         FAIL_NAMES.missing_parent : (RpMissingParentFailure, (FC.skip, FC.create)),
@@ -85,9 +85,17 @@ class RenamingPlan:
             FC.clobber: clobber,
         })
 
+        # The failures dict stores all failures that occurred during the
+        # prepare() phase. A failure can be either controlled (as requested by
+        # the user) or not. The dict maps each control mechanism (skip, keep,
+        # etc) to the failures that were controlled by the mechanism. If the
+        # dict ends up having any uncontrollec failures (under the None key),
+        # the RenamingPlan will have failed.
+        self.failures = {control : [] for control in FC}
+        self.failures[None] = []
+
         # Other stuff.
         self.prefix_len = 0
-        self.failures = []
 
     def build_failure_control_config(self, config):
         fc = {}
@@ -102,82 +110,23 @@ class RenamingPlan:
         return fc
 
     def prepare(self):
-        # parsing:
-        #   1 ParseFailure [fatal]
-        #
-        # create user functions:
-        #   1 filtering [fatal]
-        #   1 renaming [fatal]
-        #
-        # execute user code:
-        #   N FilterFailure
-        #   N RenameFailure
-        #
-        # validation:
-        #   N RenamePairFailure: orig should exist
-        #   N RenamePairFailure: new and orig should differ
-        #   N RenamePairFailure: parent of new should exist
-        #   N RenamePairFailure: new should not exist
-        #   N* RenamePairFailure: new paths should not collide among themselves
-        #   1 NoPathsFailure
 
         # Get the input paths and parse them to get RenamePair instances.
-        self.rps = self.catch_failure(self.parse_inputs())
+        self.rps, _ = self.catch_failure(self.parse_inputs())
         if self.failed:
             return
 
         # Create filtering function from user code.
         if self.filter_code:
-            # TODO: need to return UserCodeFailure.
-            filter_func = self.catch_failure(self.make_user_defined_func('filter'))
+            self.filter_func, _ = self.catch_failure(self.make_user_defined_func('filter'))
             if self.failed:
                 return
 
         # Create renaming function from user code.
         if self.rename_code:
-            # TODO: need to return UserCodeFailure.
-            rename_func = self.catch_failure(self.make_user_defined_func('rename'))
+            self.rename_func, _ = self.catch_failure(self.make_user_defined_func('rename'))
             if self.failed:
                 return
-
-        rp_steps = (
-            self.execute_user_filter,
-            self.execute_user_rename,
-            self.check_orig_exists,
-            self.check_orig_new_differ,
-            self.check_new_not_exists,
-            self.check_new_parent_exists,
-            self.check_new_collisions,
-        )
-
-        for step in rp_steps:
-            self.rps = tuple(self.processed_rps(step))
-            if not self.rps:
-                self.add_failure(NoPathsFailure)
-
-        def processed_rps(self, step):
-            for rp in self.rps:
-                result = step(rp)
-                if isinstance(result, Failure):
-                    control = self.fail_config.get(failure, None)
-                    if control == FC.skip:
-                        # Skip RenamePair.
-                        pass
-                    elif control == FC.keep:
-                        # Retain RenamePair that might have been filtered.
-                        yield rp
-                    elif control == FC.create:
-                        # Before renaming we will create parent of rp.new.
-                        yield replace(rp, create_parent = True)
-                    elif control == FC.clobber:
-                        # We will rename even if rp.new exists.
-                        yield replace(rp, clobber = True)
-                    else:
-                        # Fail.
-                        self.add_failure(result)
-                else:
-                    # No failure.
-                    yield rp
 
         # Filter the paths.
         if self.filter_code:
@@ -211,52 +160,44 @@ class RenamingPlan:
                 else:
                     rp.new = result
 
+        rp_steps = (
+            self.execute_user_filter,
+            self.execute_user_rename,
+            self.check_orig_exists,
+            self.check_orig_new_differ,
+            self.check_new_not_exists,
+            self.check_new_parent_exists,
+            self.check_new_collisions,
+        )
+
+        for step in rp_steps:
+            self.rps = tuple(self.processed_rps(step))
+            if not self.rps:
+                f = NoPathsFailure(FAIL.no_paths_after_processing)
+                self.catch_failure(f)
+            if self.failed:
+                break
+
+        def processed_rps(self, step):
+            for rp in self.rps:
+                ok, control = self.catch_failure(step(rp))
+                if control == FC.skip:
+                    pass
+                elif control == FC.keep:
+                    yield rp
+                elif control == FC.create:
+                    yield replace(rp, create_parent = True)
+                elif control == FC.clobber:
+                    yield replace(rp, clobber = True)
+                else:
+                    yield rp
+
         def execute_user_func(self, executor, func):
             seq = self.compute_sequence_iterator()
             return tuple(
                 executor(func, rp.orig, next(seq))
                 for rp in self.rps
             )
-
-        # # If user supplied filtering code, use it to filter the paths.
-        # if self.filter_code:
-        #     # This call could fail.
-        #     func = self.make_user_defined_func('filter', self.filter_code)
-        #     seq = self.compute_sequence_iterator()
-        #     filters = []
-        #     for rp in self.rps:
-        #         seq_val = next(seq)
-        #         result = self.execute_user_filter_code(func, rp.orig, seq_val)
-        #         if isinstance(result, Failure):
-        #             self.failures.append(result)
-        #             return
-        #         else:
-        #             filters.append(bool(result))
-        #     self.rps = tuple(
-        #         rp
-        #         for rp, keep in zip(self.rps, filters)
-        #         if keep
-        #     )
-
-        # # If user supplied renaming code, use it to generate new paths.
-        # if self.rename_code:
-        #     func = self.make_user_defined_func('rename', self.rename_code)
-        #     seq = self.compute_sequence_iterator()
-        #     for rp in self.rps:
-        #         seq_val = next(seq)
-        #         result = self.execute_user_rename_code(func, rp.orig, seq_val)
-        #         if isinstance(result, Failure):
-        #             self.failures.append(result)
-        #             return
-        #         else:
-        #             rp.new = result
-
-        # Skip RenamePair instances with equal paths.
-        if self.skip_equal:
-            self.rps = [rp for rp in self.rps if rp.orig != rp.new]
-
-        # Validate the renaming plan.
-        self.validate_rename_pairs()
 
     def parse_inputs(self):
         # If we have rename_code, inputs are just original paths.
@@ -337,8 +278,12 @@ class RenamingPlan:
             Path = Path,
         )
         locs = {}
-        exec(code, globs, locs)
-        return locs[func_name]
+        try:
+            exec(code, globs, locs)
+            return locs[func_name]
+        except Exception as e:
+            msg = f''
+            return UserCodeExecFailure(msg)
 
     def strip_prefix(self, orig):
         i = self.prefix_len
@@ -427,16 +372,25 @@ class RenamingPlan:
 
     def path_exists(self, p):
         if self.file_sys is None:
+            # Check the real file system.
             return p.exists()
         else:
+            # Or check a fake file system added for testing purposes.
             return p in self.file_sys
 
     def catch_failure(self, x):
+        # Used when calling other methods to (1) catch a Failure instance, (2)
+        # store it in self.failures under the appropriate failure-control key,
+        # and (3) forward the value along with the control in a 2-tuple.
         if isinstance(x, Failure):
+            control = self.fail_config.get(failure, None)
             self.failures.append(x)
-        return x
+            return (x, control)
+        else:
+            return (x, None)
 
     @property
     def failed(self):
-        return bool(self.failures)
+        # The RenamingPlan has failed if there are any uncontrolled failures.
+        return bool(self.failures[None])
 

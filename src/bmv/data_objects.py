@@ -29,11 +29,7 @@ class ParseFailure(Failure):
     pass
 
 @dataclass
-class RenameFailure(Failure):
-    pass
-
-@dataclass
-class FilterFailure(Failure):
+class UserCodeExecFailure(Failure):
     pass
 
 @dataclass
@@ -47,6 +43,34 @@ class RenamePairFailure(Failure):
     @property
     def formatted(self):
         return f'{self.msg}:\n{self.rp.formatted}'
+
+@dataclass
+class RpFilterFailure(RPFailure):
+    pass
+
+@dataclass
+class RpRenameFailure(RPFailure):
+    pass
+
+@dataclass
+class RpEqualFailure(RPFailure):
+    pass
+
+@dataclass
+class RpMissingFailure(RPFailure):
+    pass
+
+@dataclass
+class RpMissingParentFailure(RPFailure):
+    pass
+
+@dataclass
+class RpExistsFailure(RPFailure):
+    pass
+
+@dataclass
+class RpCollsionFailure(RPFailure):
+    pass
 
 @dataclass
 class ExitCondition:
