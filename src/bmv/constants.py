@@ -39,19 +39,19 @@ FAIL = cons('Fails',
 FAIL_NAMES = constants('FailNames', (
     'filter_error',
     'rename_error',
-    'equal_paths',
-    'missing_orig',
+    'equal',
+    'missing',
     'missing_parent',
     'existing_new',
     'colliding_new',
-)
+))
 
 FAIL_CONTROLS = constants('FailControls', (
     'skip',
     'keep',
     'create',
     'clobber',
-)
+))
 
 # Helper for argparse configuration to check for positive integers.
 def positive_int(x):

@@ -6,15 +6,15 @@ from bmv import (
     __version__,
 )
 
-from bmv.cli import (
-    RenamePair,
-    RenamePairFailure,
-    validate_rename_pairs,
-    validated_options,
-    parse_inputs,
-    OptsFailure,
-    ParseFailure,
-)
+# from bmv.cli import (
+#     RenamePair,
+#     RenamePairFailure,
+#     validate_rename_pairs,
+#     validated_options,
+#     parse_inputs,
+#     OptsFailure,
+#     ParseFailure,
+# )
 
 from bmv.constants import (
     CON,

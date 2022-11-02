@@ -45,31 +45,31 @@ class RenamePairFailure(Failure):
         return f'{self.msg}:\n{self.rp.formatted}'
 
 @dataclass
-class RpFilterFailure(RPFailure):
+class RpFilterFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpRenameFailure(RPFailure):
+class RpRenameFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpEqualFailure(RPFailure):
+class RpEqualFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpMissingFailure(RPFailure):
+class RpMissingFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpMissingParentFailure(RPFailure):
+class RpMissingParentFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpExistsFailure(RPFailure):
+class RpExistsFailure(RenamePairFailure):
     pass
 
 @dataclass
-class RpCollsionFailure(RPFailure):
+class RpCollsionFailure(RenamePairFailure):
     pass
 
 @dataclass

@@ -30,7 +30,7 @@ Renaming via library use case.
 
 Dependencies: drop attrs; re-create virtualenvs.
 
-Project name: bmv is claimed. Possibilities: mvs, mvpy.
+Project name: bmv is claimed [emailed maintainer: Nov 2]. Possibilities: mvs, mvpy.
 
 Validation overrides:
     - skip-equal [exists but done via a hack]
