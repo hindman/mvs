@@ -1,6 +1,16 @@
 from textwrap import dedent
 from short_con import constants, cons
 
+from .data_objects import(
+    RpFilterFailure,
+    RpRenameFailure,
+    RpEqualFailure,
+    RpMissingFailure,
+    RpMissingParentFailure,
+    RpExistsFailure,
+    RpCollsionFailure,
+)
+
 class CON:
     app_name = 'bmv'
     newline = '\n'
@@ -36,22 +46,84 @@ FAIL = cons('Fails',
     opts_mutex = 'No more than one of these options should be used',
 )
 
-FAIL_NAMES = constants('FailNames', (
-    'filter_error',
-    'rename_error',
-    'equal',
-    'missing',
-    'missing_parent',
-    'existing_new',
-    'colliding_new',
-))
-
-FAIL_CONTROLS = constants('FailControls', (
+# Failure control mechanisms.
+CONTROLS = constants('Controls', (
     'skip',
     'keep',
     'create',
     'clobber',
 ))
+
+# Mapping from the user-facing failure control options to their:
+# (1) failure-control mechanisms and (2) Failure type.
+#
+#   skip   : The affected RenamePair will be skipped.
+#   keep   : The affected RenamePair will be kept [rather than filtered out].
+#   create : The missing path will be created [parent of RenamePair.new].
+#   clobber: The affected path will be clobbered [existing or colliding RenamePair.new].
+#
+CONTROLLABLES = cons('Controllables',
+    skip_failed_filter    = (CONTROLS.skip, RpFilterFailure),
+    skip_failed_rename    = (CONTROLS.skip, RpRenameFailure),
+    skip_equal            = (CONTROLS.skip, RpEqualFailure),
+    skip_missing          = (CONTROLS.skip, RpMissingFailure),
+    skip_missing_parent   = (CONTROLS.skip, RpMissingParentFailure),
+    skip_existing_new     = (CONTROLS.skip, RpExistsFailure),
+    skip_colliding_new    = (CONTROLS.skip, RpCollsionFailure),
+    clobber_existing_new  = (CONTROLS.clobber, RpExistsFailure),
+    clobber_colliding_new = (CONTROLS.clobber, RpCollsionFailure),
+    keep_failed_filter    = (CONTROLS.keep, RpFilterFailure),
+    create_missing_parent = (CONTROLS.create, RpMissingParentFailure),
+ )
+
+'''
+
+Validating opts:
+
+    For each key from CONTROLLABLES, if the corresponding opts flag is True,
+    add a key-value pair to a dict mapping the Failure class to the
+    failure-control mechanism.
+
+    During construction, if encounter the same Failure class more than once,
+    raise a usage error.
+
+        {
+            RpFilterFailure: CONTROLS.skip    # From skip_failed_filter
+            RpCollsionFailure: CONTROLS.skip  # From skip_colliding_new,
+            ...
+            RpFilterFailure: CONTROLS.keep    # From keep_failed_filter. But raise: RpFilterFailure was repeated.
+        }
+
+    def build_fail_config(obj):
+        # obj can be either opts or a RenamingPlan instance.
+        config = {}
+        for k, (control, fail_cls) in CONTROLLABLES:
+            if getattr(obj, k):
+                if fail_cls in config:
+                    msg = 'Multiple controls specified for a failure type: {...} {...}'
+                    raise ValueError(msg)
+                else:
+                    config[fail_cls] = control
+        return config
+
+Constructing RenamingPlan:
+
+    Pass those boolean flag options directly into the constructor.
+
+Validating the constructor arguments:
+
+    Similar to validating the opts, but check for True attributes against the
+    RenamingPlan instance rather than against opts.
+
+Creating the failure-control config:
+
+    Build a dict, just like we did when validating opts.
+
+Failure control during prepare():
+
+    Just use the dict desribed above.
+
+'''
 
 # Helper for argparse configuration to check for positive integers.
 def positive_int(x):
@@ -188,6 +260,63 @@ class CLI:
             'default': 1,
             'help': 'Sequence step value [default: 1]',
         },
+        # Failure control.
+        {
+            group: 'Failure control',
+            names: '--skip-failed-filter',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-failed-rename',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-equal',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-missing',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-missing-parent',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-existing-new',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--skip-colliding-new',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--clobber-existing-new',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--clobber-colliding-new',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--keep-failed-filter',
+            'action': 'store_true',
+            'help': '...',
+        },
+        {
+            names: '--create-missing-parent',
+            'action': 'store_true',
+            'help': '...',
+        },
         # Other options.
         {
             group: 'Other',
@@ -199,11 +328,6 @@ class CLI:
             names: '--version',
             'action': 'store_true',
             'help': 'Display the version number and exit',
-        },
-        {
-            names: '--skip-equal',
-            'action': 'store_true',
-            'help': 'Skip renamings with equal paths rather than reporting as errors',
         },
         {
             names: '--dryrun -d',

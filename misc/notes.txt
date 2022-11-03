@@ -20,23 +20,22 @@ See cli.py.
 road-map: Road map
 --------
 
-Assess design:
-    - the boundaries are stretching
-    - would a RenamingPlan class help?
+Rework code to use a RenamingPlan:
 
-Testing: assess current status; add end-to-end tests
+    Add failure-control options.
 
-Renaming via library use case.
+        In the middle of reworking the failure-control stuff.
+        See "Validating opts" in constants.py
+
+    Testing: plan.prepare()
+
+    Testing: other core methods/functions.
+
+    Testing: command-line usages [based on remaining testing gaps].
 
 Dependencies: drop attrs; re-create virtualenvs.
 
 Project name: bmv is claimed [emailed maintainer: Nov 2]. Possibilities: mvs, mvpy.
-
-Validation overrides:
-    - skip-equal [exists but done via a hack]
-    - create-parents
-    - clobber-old
-    - clobber-new
 
 Case-change-only renamings.
     - Path(orig).rename(new): works

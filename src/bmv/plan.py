@@ -10,8 +10,8 @@ from pathlib import Path
 from .constants import (
     CON,
     FAIL,
-    FAIL_NAMES,
-    FAIL_CONTROLS as FC,
+    CONTROLS,
+    CONTROLLABLES,
     STRUCTURES,
 )
 from .data_objects import (
@@ -30,24 +30,6 @@ from .data_objects import (
 )
 
 class RenamingPlan:
-
-    # Mapping from the user-facing failure names to their:
-    # (1) Failure type, and (2) supported failure-control mechanisms.
-    #
-    #   skip   : The affected RenamePair will be skipped.
-    #   keep   : The affected RenamePair will be kept [rather than filtered out].
-    #   create : The missing path will be created [parent of RenamePair.new].
-    #   clobber: The affected path will be clobbered [existing or colliding RenamePair.new].
-    #
-    SUPPORTED_CONTROLS = {
-        FAIL_NAMES.filter_error   : (RpFilterFailure,        (FC.skip, FC.keep)),
-        FAIL_NAMES.rename_error   : (RpRenameFailure,        (FC.skip,)),
-        FAIL_NAMES.equal          : (RpEqualFailure,         (FC.skip,)),
-        FAIL_NAMES.missing        : (RpMissingFailure,       (FC.skip,)),
-        FAIL_NAMES.missing_parent : (RpMissingParentFailure, (FC.skip, FC.create)),
-        FAIL_NAMES.existing_new   : (RpExistsFailure,        (FC.skip, FC.clobber)),
-        FAIL_NAMES.colliding_new  : (RpCollsionFailure,      (FC.skip, FC.clobber)),
-    }
 
     def __init__(self,
                  # Path inputs and their structure.
