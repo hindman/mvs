@@ -11,6 +11,7 @@
 #   inv tags
 #   inv test [--cov]
 #   inv tox
+#   inv workareas
 #   inv bump [--kind <major|minor|patch>] [--local]
 #   # inv dist [--publish] [--test]
 #

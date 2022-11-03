@@ -5,7 +5,6 @@ import string
 import subprocess
 import sys
 
-from dataclasses import asdict
 from datetime import datetime
 from itertools import cycle
 from pathlib import Path
@@ -20,177 +19,6 @@ from .data_objects import (
     ExitCondition,
 )
 
-
-'''
-
-# GET ARGS.
-# Flow: take input; compute. Might halt intentionally or due to error: usage, I/O.
-Parse command-line args.
-Handle special opts: --help --version [can quit]
-Validate opts [can error]
-
-# INPUT PATHS => VALID, FILTERED RPS.
-# Flow: compute. Might halt due to error: usage, user-code, I/O.
-Collect input paths.
-Parse input paths. [can fail or error; produces full or partial rps]
-Filter rps [can fail]
-Execute user's renaming code [can fail; at this point rps are full]
-Validate rps, contingent on opts [can fail or error; can further filter rps]
-
-# LIST, CONFIRM, LOG.
-# Flow: I/O. Might halt intentionally or due to error: I/O.
-List the renamings, unless suppressed by opts.
-Stop if dryrun mode.
-Get user confirmation, unless suppressed by opts.
-Log the renamings [can fail]
-
-# RENAME.
-# Flow: I/O. Might halt due to error: I/O.
-Rename paths [can fail]
-
-===============
-
-Where does nontrivial I/O occur?
-
-    Read inputs: can handle outside of RenamingPlan.
-    Filter paths: user code [see below].
-    Generate new paths: user code [see below].
-    Validate rps: various existence checks for ORIG and NEW paths.
-    Rename paths: would be bypassed during testing.
-
-    Note on user code:
-        - In real usage, the code could interact with file system.
-        - For my testing purposes, such scenarios need not be explored.
-
-How to execute user code for renaming and filtering:
-
-    Creating the function:
-
-        Generate code from indent and user's code str.
-        During generation, supply only constants via globs [re, Path].
-
-    Function signature:
-
-        func(o, p, seq, plan)
-            o = rp.orig
-            p = Path(rp.orig)
-            seq_val = current sequence value
-            plan = RenamingPlan
-
-            # The plan can provide access to wider state, notably a method
-            # to strip common prefixes from the rps. For example:
-            return plan.strip_prefix(o)
-
-    Executing the function:
-
-        Initialize seq.
-
-        for rp in rps:
-            seq_val = next(seq)
-            try:
-                result = func(rp.orig, Path(rp.orig), seq_val, self)
-            except Exception as e:
-                ...
-            Either retain rp (filtering) or set rp.new (renaming).
-
-===============
-
-RenamingPlan()
-    inputs: collection[str]
-    rename: func or str[CODE]
-    structure: None or enum[para,flat,pairs,rows]
-    seq_start: int
-    seq_step: int
-    skip_equal: bool
-    filter: func or str[CODE]
-    indent: int
-    ----
-    file_sys: collection[str]
-    ----
-    dryrun: bool                  # Not needed: plan.prepare() does everything except the renaming.
-
-main()
-    Parse command-line args.
-    Handle special opts: --help --version
-    Validate opts
-
-        opts = handle_exit(parse_command_line_args(...))         # Test separately.
-
-    Collect input paths.
-
-        inputs = handle_exit(collect_input_paths(opts))          # Test separately.
-
-    Parse, filter, generate new paths, validate rps:
-
-        plan = RenamingPlan(...)
-        plan.prepare()
-        if plan.failed:
-            # Report and halt.
-
-        # Notes:
-        #   - The plan.prepare() call does not raise.
-        #   - Rather, it computes and validates.
-        #   - Assemble as much Failure information as possible.
-
-    List the renamings, handle dryrun, confirm, log, rename:
-
-        listing = plan.renaming_listing()                         # Test separately.
-        print(listing)
-        if opts.dryrun:
-            halt()
-        elif opts.yes or confirm(...):
-            if not opts.nolog:
-                plan_data = plan.as_dict()                        # Test separately.
-                log_data = collect_logging_data(opts, plan_data)  # Test separately.
-                write_to_logfile(opts, log_data)
-            try:
-                plan.rename_paths()
-            except Exception as e:
-                ...
-
-    RenamingPlan: testing usage:
-
-        plan = RenamingPlan(..., file_sys = FILE_SYSTEM)          # Inject file system dependency.
-        plan.prepare()
-        assert ...                                                # Assert against plan state.
-
-    RenamingPlan: direct library usage:
-
-        plan = RenamingPlan(...)
-        try:
-            plan.rename_paths()
-        except Exception as e:
-            ...
-
-    Input path sources:
-      ARGV
-      --clipboard
-      --stdin
-      --file PATH
-    Input path structures:
-      --rename CODE
-      --paragraphs
-      --flat
-      --pairs
-      --rows
-    Listings:
-      --pager CMD
-      --limit N
-    Sequence numbers:
-      --seq N
-      --step N
-    Other:
-      --help
-      --version
-      --skip-equal
-      --dryrun, -d
-      --nolog
-      --yes
-      --indent N
-      --filter CODE
-
-'''
-
 ####
 # Entry point.
 ####
@@ -202,7 +30,6 @@ def main(args = None):
 
     # Collect the input paths.
     inputs = collect_input_paths(opts)
-    # TODO: Failure if no inputs (eg input-text with all blank lines).
 
     # Initialize RenamingPlan.
     plan = RenamingPlan(
@@ -216,50 +43,18 @@ def main(args = None):
         indent = opts.indent,
     )
 
+    # Prepare the RenamingPlan and halt if it failed.
     plan.prepare()
     if plan.failed:
-        pass
-
-    print('PLAN failed?', plan.failed)
-    return
-
-    #=======================
-
-    # Get the input paths and parse them to get RenamePair instances.
-    rps = catch_failure(parse_inputs(opts, inputs))
-
-    # If user supplied filtering code, use it to filter the paths.
-    if opts.filter:
-        rps = catch_failure(filtered_rename_pairs(rps, opts))
-
-    # If user supplied renaming code, use it to generate new paths.
-    if opts.rename:
-        renamer = make_user_defined_func('rename', opts, rps)
-        seq = sequence_iterator(opts.seq, opts.step)
-        for rp in rps:
-            rp.new = catch_failure(compute_new_path(renamer, rp.orig, next(seq)))
-
-    # Skip RenamePair instances with equal paths.
-    if opts.skip_equal:
-        rps = [rp for rp in rps if rp.orig != rp.new]
-
-    # Validate the renaming plan.
-    if rps:
-        fails = validate_rename_pairs(rps)
-        if fails:
-            msg = items_to_text(fails, opts.limit, 'Renaming validation failures{}.\n')
-            paginate(msg, opts.pager)
-            halt(CON.exit_fail, CON.no_action_msg)
-    else:
-        msg = 'No paths to be renamed.'
+        # TODO: implement this for real.
+        msg = 'RenamingPlan failed'
+        for f in plan.failures[None]:
+            print(f)
         halt(CON.exit_fail, msg)
 
-    #=======================
-
-    # List the renamings.
-    if opts.dryrun or not opts.yes:
-        msg = items_to_text(rps, opts.limit, 'Paths to be renamed{}.\n')
-        paginate(msg, opts.pager)
+    # Print the renaming listing.
+    listing = listing_msg(plan.rps, opts.limit, 'Paths to be renamed{}.\n')
+    paginate(listing, opts.pager)
 
     # Stop if dryrun mode.
     if opts.dryrun:
@@ -267,7 +62,7 @@ def main(args = None):
 
     # User confirmation.
     if not opts.yes:
-        msg = listing_msg(rps, opts.limit, '\nRename paths{}')
+        msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
         if get_confirmation(msg, expected = 'yes'):
             print()
         else:
@@ -275,11 +70,16 @@ def main(args = None):
 
     # Log the renamings.
     if not opts.nolog:
-        log_renamings(logging_metadata(opts, rps))
+        log_data = collect_logging_data(opts, plan)
+        write_to_json_file(log_file_path(), log_data)
+
 
     # Rename.
-    for rp in rps:
-        Path(rp.orig).rename(rp.new)
+    try:
+        plan.rename_paths()
+    except Exception as e:
+        # TODO
+        raise e
 
 ####
 # Command-line argument handling.
@@ -391,31 +191,31 @@ def paginate(text, pager_cmd):
     else:
         print(text)
 
-def items_to_text(xs, limit, msg_fmt):
-    prefix = listing_msg(xs, limit, msg_fmt)
-    limited = xs if limit is None else xs[0:limit]
-    if limited:
-        msg = CON.newline.join(x.formatted for x in limited)
-        return f'{prefix}\n{msg}'
+def listing_msg(xs, limit, msg_fmt):
+    tallies = tallies_msg(xs, limit, msg_fmt)
+    xs_limited = xs if limit is None else xs[0:limit]
+    if xs_limited:
+        items = CON.newline.join(x.formatted for x in xs_limited)
+        return f'{tallies}\n{items}'
     else:
-        return prefix
+        return tallies_msg
 
-def listing_msg(items, limit, msg_fmt):
-    n = len(items)
+def tallies_msg(xs, limit, msg_fmt):
+    n = len(xs)
     lim = n if limit is None else limit
-    counts_msg = f' (total {n}, listed {lim})'
-    return msg_fmt.format(counts_msg)
+    tallies = f' (total {n}, listed {lim})'
+    return msg_fmt.format(tallies)
 
-def logging_metadata(opts, rps):
-    return dict(
+def collect_logging_data(opts, plan):
+    d = dict(
         version = __version__,
         current_directory = str(Path.cwd()),
         opts = vars(opts),
-        rename_pairs = [asdict(rp) for rp in rps],
     )
+    d.update(**plan.as_dict)
+    return d
 
-def log_renamings(d):
-    path = log_file_path()
+def write_to_json_file(path, d):
     with open(path, 'w') as fh:
         json.dump(d, fh, indent = 4)
 

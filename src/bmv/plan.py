@@ -1,7 +1,8 @@
 import re
 import sys
 
-from dataclasses import replace as clone
+from copy import deepcopy
+from dataclasses import asdict, replace as clone
 from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
@@ -68,7 +69,7 @@ class RenamingPlan:
                  clobber = None,
                  ):
 
-        # Add validation. Convert to attrs.
+        # Basic attributes passed as arguments into the constructor.
         self.inputs = tuple(inputs)
         self.structure = structure
         self.rename_code = rename_code
@@ -76,11 +77,11 @@ class RenamingPlan:
         self.indent = indent
         self.seq_start = seq_start
         self.seq_step = seq_step
-        self.file_sys = file_sys
+        self.file_sys = self.initialize_file_sys(file_sys)
 
-        # In fail_config, we get a dict mapping each controlled Failure type
-        # to the user's requested control mechanism (skip, keep, create, clobber).
-        # This call validates and builds the dict.
+        # Convert the failure-control arguments to a dict mapping each
+        # controlled Failure type to the user's requested control mechanism
+        # (skip, keep, create, clobber).
         self.fail_config = self.build_failure_control_config({
             FC.skip: skip,
             FC.keep: keep,
@@ -88,16 +89,19 @@ class RenamingPlan:
             FC.clobber: clobber,
         })
 
-        # The failures dict stores all failures that occurred during the
-        # prepare() phase. A failure can be either controlled (as requested by
-        # the user) or not. The dict maps each control mechanism (skip, keep,
-        # create, clobber) to the failures that were controlled by the
-        # mechanism. If the dict ends up having any uncontrollec failures
-        # (under the None key), the RenamingPlan will have failed.
-        self.failures = {control : [] for control in FC}
+        # Failures that occur during the prepare() phase are stored in a dict.
+        # A failure can be either controlled (as requested by the user) or not.
+        # The dict maps each control mechanism to the failures that were
+        # controlled by that mechanism. If the dict ends up having any
+        # uncontrollec failures (under the None key), the RenamingPlan will
+        # have failed.
+        self.failures = {control : [] for control in FC.keys()}
         self.failures[None] = []
 
-        # Other stuff.
+        # The paths to be renamed will be stored as RenamePair instances.
+        self.rps = tuple()
+
+        # Lenth of the longest common prefix string on the original paths.
         self.prefix_len = 0
 
     ####
@@ -394,7 +398,7 @@ class RenamingPlan:
         return bool(self.failures[None])
 
     ####
-    # Utilities.
+    # Sequence number and common prefix.
     ####
 
     def compute_sequence_iterator(self):
@@ -408,11 +412,60 @@ class RenamingPlan:
         i = self.prefix_len
         return orig[i:] if i else orig
 
+    ####
+    # Files system operations.
+    ####
+
+    def initialize_file_sys(self, file_sys):
+        # Currently the file system is stored as a dict mapping each
+        # existing path to True. Later, we might need the dict values
+        # to hold additional information.
+        #
+        # We build an independent copy of the file system because
+        # the rename_paths() method will modify the dict.
+        if file_sys is None:
+            return None
+        elif isinstance(file_sys, dict):
+            return deepcopy(file_sys)
+        else:
+            return {path : True for path in file_sys}
+
     def path_exists(self, p):
         if self.file_sys is None:
             # Check the real file system.
             return Path(p).exists()
         else:
-            # Or check a fake file system added for testing purposes.
+            # Or check the fake file system added for testing purposes.
             return p in self.file_sys
+
+    def rename_paths(self):
+        if self.file_sys is None:
+            # Rename the paths.
+            for rp in self.rps:
+                Path(rp.orig).rename(rp.new)
+        else:
+            # Move the paths around in the fake file system.
+            for rp in self.rps:
+                self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
+
+    ####
+    # The RenamingPlan as a dict.
+    ####
+
+    @property
+    def as_dict(self):
+        return dict(
+            inputs = self.inputs,
+            structure = self.structure,
+            rename_code = self.rename_code,
+            filter_code = self.filter_code,
+            indent = self.indent,
+            seq_start = self.seq_start,
+            seq_step = self.seq_step,
+            file_sys = self.file_sys,
+            fail_config = self.fail_config,
+            failures = self.failures,
+            prefix_len = self.prefix_len,
+            rename_pairs = [asdict(rp) for rp in self.rps],
+        )
 
