@@ -24,8 +24,19 @@ Rework code to use a RenamingPlan:
 
     Add failure-control options.
 
-        In the middle of reworking the failure-control stuff.
-        See "Validating opts" in constants.py
+        Done except for argparse help text: draft it here; then add to constants.py.
+
+            --skip-equal            | If original path equals new, skip it
+            --skip-missing          | If original path does not exist, skip it
+            --skip-missing-parent   | If parent of new path does not exist, skip it
+            --skip-existing-new     | If new path already exists, skip it
+            --clobber-existing-new  | If new path already exists, overwrite during renaming
+            --create-missing-parent | If parent of new path does not exist, create parent
+            --skip-failed-rename    | If user renaming code fails when handling path, skip it
+            --skip-failed-filter    | If user filtering code fails when handling path, skip it
+            --keep-failed-filter    | If user filtering code fails when handling path, retain it
+            --skip-colliding-new    | If new paths collide, skip them
+            --clobber-colliding-new | If new paths collide, overwrite during renaming
 
     Testing: plan.prepare()
 

@@ -13,6 +13,7 @@ from .constants import (
     CONTROLS,
     CONTROLLABLES,
     STRUCTURES,
+    validated_failure_controls,
 )
 from .data_objects import (
     RenamePair,
@@ -45,10 +46,17 @@ class RenamingPlan:
                  # File system via dependency injection.
                  file_sys = None,
                  # Failure controls.
-                 skip = None,
-                 keep = None,
-                 create = None,
-                 clobber = None,
+                 skip_failed_filter = False,
+                 skip_failed_rename = False,
+                 skip_equal = False,
+                 skip_missing = False,
+                 skip_missing_parent = False,
+                 skip_existing_new = False,
+                 skip_colliding_new = False,
+                 clobber_existing_new = False,
+                 clobber_colliding_new = False,
+                 keep_failed_filter = False,
+                 create_missing_parent = False,
                  ):
 
         # Basic attributes passed as arguments into the constructor.
@@ -61,15 +69,25 @@ class RenamingPlan:
         self.seq_step = seq_step
         self.file_sys = self.initialize_file_sys(file_sys)
 
-        # Convert the failure-control arguments to a dict mapping each
-        # controlled Failure type to the user's requested control mechanism
-        # (skip, keep, create, clobber).
-        self.fail_config = self.build_failure_control_config({
-            FC.skip: skip,
-            FC.keep: keep,
-            FC.create: create,
-            FC.clobber: clobber,
-        })
+        self.skip_failed_filter = skip_failed_filter
+        self.skip_failed_rename = skip_failed_rename
+        self.skip_equal = skip_equal
+        self.skip_missing = skip_missing
+        self.skip_missing_parent = skip_missing_parent
+        self.skip_existing_new = skip_existing_new
+        self.skip_colliding_new = skip_colliding_new
+        self.clobber_existing_new = clobber_existing_new
+        self.clobber_colliding_new = clobber_colliding_new
+        self.keep_failed_filter = keep_failed_filter
+        self.create_missing_parent = create_missing_parent
+
+        # Get a dict mapping each Failure type to the user's requested control
+        # mechanism (skip, keep, create, clobber).
+        result = validated_failure_controls(self)
+        if isinstance(result, Failure):
+            raise ValueError(result.msg)
+        else:
+            self.fail_config = result
 
         # Failures that occur during the prepare() phase are stored in a dict.
         # A failure can be either controlled (as requested by the user) or not.
@@ -77,7 +95,10 @@ class RenamingPlan:
         # controlled by that mechanism. If the dict ends up having any
         # uncontrollec failures (under the None key), the RenamingPlan will
         # have failed.
-        self.failures = {control : [] for control in FC.keys()}
+        self.failures = {
+            control : []
+            for control, _ in CONTROLLABLES.values()
+        }
         self.failures[None] = []
 
         # The paths to be renamed will be stored as RenamePair instances.
@@ -263,13 +284,13 @@ class RenamingPlan:
             # it determined that the RenamePair should be filtered out.
             #
             result, control = self.catch_failure(step(rp, next(seq)))
-            if control == FC.skip:
+            if control == CONTROLS.skip:
                 pass
-            elif control == FC.keep:
+            elif control == CONTROLS.keep:
                 yield rp
-            elif control == FC.create:
+            elif control == CONTROLS.create:
                 yield clone(rp, create_parent = True)
-            elif control == FC.clobber:
+            elif control == CONTROLS.clobber:
                 yield clone(rp, clobber = True)
             elif result is None:
                 pass
@@ -351,17 +372,17 @@ class RenamingPlan:
     # Methods related to failure control.
     ####
 
-    def build_failure_control_config(self, config):
-        fc = {}
-        for control, failure_names in config.items():
-            for fnm in (failure_names or []):
-                ftype, supported = self.SUPPORTED_CONTROLS.get(fnm, (None, []))
-                if control in supported:
-                    fc[ftype] = control
-                else:
-                    msg = f'RenamingPlan received an invalid failure-control: {control} {fnm}'
-                    raise ValueError(msg)
-        return fc
+    # def build_failure_control_config(self, config):
+    #     fc = {}
+    #     for control, failure_names in config.items():
+    #         for fnm in (failure_names or []):
+    #             ftype, supported = self.SUPPORTED_CONTROLS.get(fnm, (None, []))
+    #             if control in supported:
+    #                 fc[ftype] = control
+    #             else:
+    #                 msg = f'RenamingPlan received an invalid failure-control: {control} {fnm}'
+    #                 raise ValueError(msg)
+    #     return fc
 
     def catch_failure(self, x):
         # Used when calling other methods to (1) catch a Failure instance, (2)
@@ -445,7 +466,17 @@ class RenamingPlan:
             seq_start = self.seq_start,
             seq_step = self.seq_step,
             file_sys = self.file_sys,
-            fail_config = self.fail_config,
+            skip_failed_filter = self.skip_failed_filter,
+            skip_failed_rename = self.skip_failed_rename,
+            skip_equal = self.skip_equal,
+            skip_missing = self.skip_missing,
+            skip_missing_parent = self.skip_missing_parent,
+            skip_existing_new = self.skip_existing_new,
+            skip_colliding_new = self.skip_colliding_new,
+            clobber_existing_new = self.clobber_existing_new,
+            clobber_colliding_new = self.clobber_colliding_new,
+            keep_failed_filter = self.keep_failed_filter,
+            create_missing_parent = self.create_missing_parent,
             failures = self.failures,
             prefix_len = self.prefix_len,
             rename_pairs = [asdict(rp) for rp in self.rps],

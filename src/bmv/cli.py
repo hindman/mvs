@@ -11,8 +11,14 @@ from pathlib import Path
 from textwrap import dedent
 
 from .version import __version__
-from .constants import CON, CLI, FAIL, STRUCTURES
 from .plan import RenamingPlan
+from .constants import (
+    CON,
+    CLI,
+    FAIL,
+    STRUCTURES,
+    validated_failure_controls,
+)
 from .data_objects import (
     Failure,
     OptsFailure,
@@ -38,9 +44,19 @@ def main(args = None):
         structure = get_structure(opts),
         seq_start = opts.seq,
         seq_step = opts.step,
-        # skip_equal = opts.skip_equal,
         filter_code = opts.filter,
         indent = opts.indent,
+        skip_failed_filter = opts.skip_failed_filter,
+        skip_failed_rename = opts.skip_failed_rename,
+        skip_equal = opts.skip_equal,
+        skip_missing = opts.skip_missing,
+        skip_missing_parent = opts.skip_missing_parent,
+        skip_existing_new = opts.skip_existing_new,
+        skip_colliding_new = opts.skip_colliding_new,
+        clobber_existing_new = opts.clobber_existing_new,
+        clobber_colliding_new = opts.clobber_colliding_new,
+        keep_failed_filter = opts.keep_failed_filter,
+        create_missing_parent = opts.create_missing_parent,
     )
 
     # Prepare the RenamingPlan and halt if it failed.
@@ -93,7 +109,10 @@ def parse_command_line_args(args):
     elif opts.version:
         return ExitCondition(f'{CON.app_name} v{__version__}')
     else:
-        return validated_options(opts)
+        return validated_failure_controls(
+            validated_options(opts),
+            opts_mode = True,
+        )
 
 def parse_args(args):
     ap = argparse.ArgumentParser(

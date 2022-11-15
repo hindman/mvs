@@ -18,6 +18,7 @@
 ####
 
 from invoke import task
+from pathlib import Path
 
 LIB = 'bmv'
 
@@ -65,6 +66,14 @@ def workareas(c):
                 f = f'{w}/{sd}/{i}'
                 c.run(f'touch {f}.txt')
                 c.run(f'touch {f}.mp3')
+
+@task
+def clearlogs(c):
+    '''
+    Clear log files.
+    '''
+    home = Path.home()
+    c.run(f'rm -f {home}/.{LIB}/2*.json')
 
 @task
 def bump(c, kind = 'minor', local = False):

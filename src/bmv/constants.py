@@ -9,12 +9,15 @@ from .data_objects import(
     RpMissingParentFailure,
     RpExistsFailure,
     RpCollsionFailure,
+    OptsFailure,
 )
 
 class CON:
     app_name = 'bmv'
     newline = '\n'
     tab = '\t'
+    underscore = '_'
+    hyphen = '-'
     exit_ok = 0
     exit_fail = 1
     renamer_name = 'do_rename'
@@ -75,55 +78,6 @@ CONTROLLABLES = cons('Controllables',
     keep_failed_filter    = (CONTROLS.keep, RpFilterFailure),
     create_missing_parent = (CONTROLS.create, RpMissingParentFailure),
  )
-
-'''
-
-Validating opts:
-
-    For each key from CONTROLLABLES, if the corresponding opts flag is True,
-    add a key-value pair to a dict mapping the Failure class to the
-    failure-control mechanism.
-
-    During construction, if encounter the same Failure class more than once,
-    raise a usage error.
-
-        {
-            RpFilterFailure: CONTROLS.skip    # From skip_failed_filter
-            RpCollsionFailure: CONTROLS.skip  # From skip_colliding_new,
-            ...
-            RpFilterFailure: CONTROLS.keep    # From keep_failed_filter. But raise: RpFilterFailure was repeated.
-        }
-
-    def build_fail_config(obj):
-        # obj can be either opts or a RenamingPlan instance.
-        config = {}
-        for k, (control, fail_cls) in CONTROLLABLES:
-            if getattr(obj, k):
-                if fail_cls in config:
-                    msg = 'Multiple controls specified for a failure type: {...} {...}'
-                    raise ValueError(msg)
-                else:
-                    config[fail_cls] = control
-        return config
-
-Constructing RenamingPlan:
-
-    Pass those boolean flag options directly into the constructor.
-
-Validating the constructor arguments:
-
-    Similar to validating the opts, but check for True attributes against the
-    RenamingPlan instance rather than against opts.
-
-Creating the failure-control config:
-
-    Build a dict, just like we did when validating opts.
-
-Failure control during prepare():
-
-    Just use the dict desribed above.
-
-'''
 
 # Helper for argparse configuration to check for positive integers.
 def positive_int(x):
@@ -357,4 +311,34 @@ class CLI:
             'help': 'Code to filter input paths',
         },
     )
+
+def validated_failure_controls(x, opts_mode = False):
+    # Takes either the parsed command-line options (opts) or a RenamingPlan
+    # instance. Checks the failure-control attributes of that object.
+    #
+    # If invalid, returns an OptsFailure.
+    #
+    # Otherwise, returns either a dict mapping the RenamePairFailure to the
+    # requested control mechanism or the original object (opts_mode = True).
+    #
+    config = {}
+    name_to_opt = lambda nm: '--' + nm.replace(CON.underscore, CON.hyphen)
+    for k2, (control, fail_cls) in CONTROLLABLES:
+        if getattr(x, k2):
+            if fail_cls in config:
+                (_, k1) = config[fail_cls]
+                if opts_mode:
+                    k1, k2 = (name_to_opt(k1), name_to_opt(k2))
+                msg = f'Multiple controls specified for a failure type: {k1} and {k2}'
+                return OptsFailure(msg)
+            else:
+                config[fail_cls] = (control, k2)
+    if opts_mode:
+        return x
+    else:
+        d = {
+            fail_cls : control
+            for fail_cls, (control, _) in config.items()
+        }
+        return d
 
