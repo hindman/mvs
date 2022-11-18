@@ -14,43 +14,38 @@ toc: Table of contents
 todos: TODOs
 --------
 
-See cli.py.
+Testing rework:
 
---------
-road-map: Road map
---------
+    - Status:
+        - Core logic was reworked.
+        - All non-trivial tests now fail.
+        - And they are no longer appropriately designed.
 
-Rework code to use a RenamingPlan:
+    - Implement a new set of tests.
 
-    Add failure-control options.
+        - Whenever possible, test behaviors via a RenamingPlan instance.
 
-        Done except for argparse help text: draft it here; then add to constants.py.
+        - Test core behaviors in a mostly-end-to-end fashion:
 
-            --skip-equal            | If original path equals new, skip it
-            --skip-missing          | If original path does not exist, skip it
-            --skip-missing-parent   | If parent of new path does not exist, skip it
-            --skip-existing-new     | If new path already exists, skip it
-            --clobber-existing-new  | If new path already exists, overwrite during renaming
-            --create-missing-parent | If parent of new path does not exist, create parent
-            --skip-failed-rename    | If user renaming code fails when handling path, skip it
-            --skip-failed-filter    | If user filtering code fails when handling path, skip it
-            --keep-failed-filter    | If user filtering code fails when handling path, retain it
-            --skip-colliding-new    | If new paths collide, skip them
-            --clobber-colliding-new | If new paths collide, overwrite during renaming
+            - Call plan.prepare() and check object state.
+            - If needed, also call plan.rename_paths() and check state.
+            - As needed, inject a fake file_sys into the RenamingPlan.
 
-    Testing: plan.prepare()
+    - Then assess testing coverage and fill in any gaps, notably the behaviors
+      applicable only to command-line usage.
 
-    Testing: other core methods/functions.
-
-    Testing: command-line usages [based on remaining testing gaps].
-
-Dependencies: drop attrs; re-create virtualenvs.
-
-Project name: bmv is claimed [emailed maintainer: Nov 2]. Possibilities: mvs, mvpy.
+Project name change:
+    - bmv is claimed [emailed maintainer: Nov 2; no reply].
+    - Rename to mvs
+    - Dependencies: drop attrs; re-create virtualenvs.
 
 Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
+
+--------
+road-map: Road map
+--------
 
 Logging: bootstrap (create $HOME/.bmv).
 Logging: list.

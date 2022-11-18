@@ -131,7 +131,8 @@ class CLI:
     names = 'names'
     group = 'group'
     opts_config = (
-        # Sources for input paths.
+
+        # Input path sources.
         {
             group: 'Input path sources',
             names: 'paths',
@@ -154,14 +155,10 @@ class CLI:
             'metavar': 'PATH',
             'help': 'Input paths via a text file',
         },
+
         # Options defining the structure of the input path data.
         {
             group: 'Input path structures',
-            names: '--rename -r',
-            'metavar': 'CODE',
-            'help': 'Code to convert original path to new path',
-        },
-        {
             names: '--paragraphs',
             'action': 'store_true',
             'help': 'Input paths in paragraphs: original paths, blank line, new paths',
@@ -181,7 +178,46 @@ class CLI:
             'action': 'store_true',
             'help': 'Input paths in tab-delimited rows: original, tab, new',
         },
-        # Pagination options.
+
+        # User code for renaming and filtering.
+        {
+            group: 'User code',
+            names: '--rename -r',
+            'metavar': 'CODE',
+            'help': 'Code to convert original path to new path [implies inputs are just original paths]',
+        },
+        {
+            names: '--filter',
+            'metavar': 'CODE',
+            'help': 'Code to filter input paths',
+        },
+        {
+            names: '--indent',
+            'type': positive_int,
+            'metavar': 'N',
+            'default': 4,
+            'help': 'Number of spaces for indentation in user-supplied code',
+        },
+
+        # Renaming behaviors.
+        {
+            group: 'Renaming behaviors',
+            names: '--dryrun -d',
+            'action': 'store_true',
+            'help': 'List renamings without performing them',
+        },
+        {
+            names: '--yes',
+            'action': 'store_true',
+            'help': 'Rename files without a user confirmation step',
+        },
+        {
+            names: '--nolog',
+            'action': 'store_true',
+            'help': 'Suppress logging',
+        },
+
+        # Listing/pagination.
         {
             group: 'Listings',
             names: '--pager',
@@ -198,6 +234,7 @@ class CLI:
             'type': positive_int,
             'help': 'Upper limit on the number of items to display in listings [default: none]',
         },
+
         # Sequence numbers.
         {
             group: 'Sequence numbers',
@@ -214,66 +251,68 @@ class CLI:
             'default': 1,
             'help': 'Sequence step value [default: 1]',
         },
+
         # Failure control.
         {
             group: 'Failure control',
-            names: '--skip-failed-filter',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--skip-failed-rename',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
             names: '--skip-equal',
             'action': 'store_true',
-            'help': '...',
+            'help': 'If original path equals new, skip rename',
         },
         {
             names: '--skip-missing',
             'action': 'store_true',
-            'help': '...',
+            'help': 'If original path does not exist, skip rename',
         },
         {
             names: '--skip-missing-parent',
             'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--skip-existing-new',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--skip-colliding-new',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--clobber-existing-new',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--clobber-colliding-new',
-            'action': 'store_true',
-            'help': '...',
-        },
-        {
-            names: '--keep-failed-filter',
-            'action': 'store_true',
-            'help': '...',
+            'help': 'If parent of new path does not exist, skip rename',
         },
         {
             names: '--create-missing-parent',
             'action': 'store_true',
-            'help': '...',
+            'help': 'If parent of new path does not exist, create parent before renaming',
         },
-        # Other options.
         {
-            group: 'Other',
+            names: '--skip-existing-new',
+            'action': 'store_true',
+            'help': 'If new path already exists, skip rename',
+        },
+        {
+            names: '--clobber-existing-new',
+            'action': 'store_true',
+            'help': 'If new path already exists, overwrite during renaming',
+        },
+        {
+            names: '--skip-colliding-new',
+            'action': 'store_true',
+            'help': 'If new paths collide, skip renames',
+        },
+        {
+            names: '--clobber-colliding-new',
+            'action': 'store_true',
+            'help': 'If new paths collide, overwrite during renaming',
+        },
+        {
+            names: '--skip-failed-rename',
+            'action': 'store_true',
+            'help': 'If user renaming code fails when handling path, skip rename',
+        },
+        {
+            names: '--skip-failed-filter',
+            'action': 'store_true',
+            'help': 'If user filtering code fails when handling path, skip rename',
+        },
+        {
+            names: '--keep-failed-filter',
+            'action': 'store_true',
+            'help': 'If user filtering code fails when handling path, retain path',
+        },
+
+        # Program information.
+        {
+            group: 'Program information',
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
@@ -283,33 +322,7 @@ class CLI:
             'action': 'store_true',
             'help': 'Display the version number and exit',
         },
-        {
-            names: '--dryrun -d',
-            'action': 'store_true',
-            'help': 'List renamings without performing them',
-        },
-        {
-            names: '--nolog',
-            'action': 'store_true',
-            'help': 'Suppress logging',
-        },
-        {
-            names: '--yes',
-            'action': 'store_true',
-            'help': 'Rename files without a user confirmation step',
-        },
-        {
-            names: '--indent',
-            'type': positive_int,
-            'metavar': 'N',
-            'default': 4,
-            'help': 'Number of spaces for indentation in user-supplied code',
-        },
-        {
-            names: '--filter',
-            'metavar': 'CODE',
-            'help': 'Code to filter input paths',
-        },
+
     )
 
 def validated_failure_controls(x, opts_mode = False):

@@ -46,17 +46,17 @@ class RenamingPlan:
                  # File system via dependency injection.
                  file_sys = None,
                  # Failure controls.
-                 skip_failed_filter = False,
-                 skip_failed_rename = False,
                  skip_equal = False,
                  skip_missing = False,
                  skip_missing_parent = False,
-                 skip_existing_new = False,
-                 skip_colliding_new = False,
-                 clobber_existing_new = False,
-                 clobber_colliding_new = False,
-                 keep_failed_filter = False,
                  create_missing_parent = False,
+                 skip_existing_new = False,
+                 clobber_existing_new = False,
+                 skip_colliding_new = False,
+                 clobber_colliding_new = False,
+                 skip_failed_rename = False,
+                 skip_failed_filter = False,
+                 keep_failed_filter = False,
                  ):
 
         # Basic attributes passed as arguments into the constructor.
