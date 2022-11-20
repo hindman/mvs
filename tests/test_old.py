@@ -26,6 +26,7 @@ from bmv.constants import (
 # Renaming validation.
 ####
 
+@pytest.mark.skip(reason = 'old')
 def test_validation_orig_existence(tr):
     # Original path should exist.
     tups = (
@@ -42,6 +43,7 @@ def test_validation_orig_existence(tr):
     assert fails[-2].msg == FAIL.orig_missing
     assert fails[-1].msg == FAIL.orig_missing
 
+@pytest.mark.skip(reason = 'old')
 def test_validation_new_nonexistence(tr):
     # New should not exist.
     tups = (
@@ -54,6 +56,7 @@ def test_validation_new_nonexistence(tr):
     assert fails[0].rp is rps[1]
     assert fails[0].msg == FAIL.new_exists
 
+@pytest.mark.skip(reason = 'old')
 def test_validation_new_parent_existence(tr):
     # Parent of new should exist.
     tups = (
@@ -66,6 +69,7 @@ def test_validation_new_parent_existence(tr):
     assert fails[0].rp is rps[0]
     assert fails[0].msg == FAIL.new_parent_missing
 
+@pytest.mark.skip(reason = 'old')
 def test_validation_orig_and_new_difference(tr):
     # Original and new should differ.
     tups = (
@@ -78,6 +82,7 @@ def test_validation_orig_and_new_difference(tr):
     assert len(fails) == 1
     assert fails[0].msg == FAIL.orig_new_same
 
+@pytest.mark.skip(reason = 'old')
 def test_validation_new_uniqueness(tr):
     # News should not collide among themselves.
     tups = (
@@ -97,6 +102,7 @@ def test_validation_new_uniqueness(tr):
 # Options validation.
 ####
 
+@pytest.mark.skip(reason = 'old')
 def test_validate_options(tr):
     # Define the two groups of options we are testing.
     # Note: to test opts_structures, we need to set at least one of opts_sources.
@@ -144,6 +150,7 @@ def test_validate_options(tr):
 # Parsing inputs.
 ####
 
+@pytest.mark.skip(reason = 'old')
 def test_parse_inputs(tr):
     # Some constants.
     ORIGS = [
@@ -263,6 +270,7 @@ def test_parse_inputs(tr):
 # Other tests.
 ####
 
+@pytest.mark.skip(reason = 'old')
 def test_version(tr):
     # Most just a test that we can import __version__ from bmv package.
     assert isinstance(__version__, str)

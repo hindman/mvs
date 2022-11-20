@@ -41,12 +41,13 @@ FAIL = cons('Fails',
     no_input_paths = 'No input paths',
     no_paths = 'No paths to be renamed',
     no_paths_after_processing = 'All paths were filtered out by failure control during processing',
-    parsing_opts = 'Unexpected options during parsing: no paths or structures given',
+    parsing_no_structures = 'No input structures given',
     parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}',
     parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs',
     parsing_inequality = 'Got an unequal number of original paths and new paths',
     opts_require_one = 'One of these options is required',
     opts_mutex = 'No more than one of these options should be used',
+    prepare_failed = 'RenamingPlan cannot rename paths because failures occurred during preparation',
 )
 
 # Failure control mechanisms.

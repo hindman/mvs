@@ -17,9 +17,10 @@ todos: TODOs
 Testing rework:
 
     - Status:
-        - Core logic was reworked.
-        - All non-trivial tests now fail.
-        - And they are no longer appropriately designed.
+        - Core logic was reworked and old tests are now marked as skipped.
+        - Started preliminary work in test_plan.py.
+            - Have fixed some bugs and adjusted a few things.
+            - Starting to get working/tested calls to plan.prepare() and plan.rename_paths().
 
     - Implement a new set of tests.
 

@@ -28,6 +28,7 @@ from .data_objects import (
     RpMissingParentFailure,
     RpExistsFailure,
     RpCollsionFailure,
+    BmvError,
 )
 
 class RenamingPlan:
@@ -107,6 +108,8 @@ class RenamingPlan:
         # Lenth of the longest common prefix string on the original paths.
         self.prefix_len = 0
 
+        self.has_prepared = False
+
     ####
     #
     # Preparation before renaming.
@@ -119,6 +122,9 @@ class RenamingPlan:
     ####
 
     def prepare(self):
+        if self.has_prepared:
+            return
+
         # Get the input paths and parse them to get RenamePair instances.
         self.rps, _ = self.catch_failure(self.parse_inputs())
         if self.failed:
@@ -219,7 +225,7 @@ class RenamingPlan:
                     else:
                         return ParseFailure(FAIL.parsing_row.format(row = row))
         else:
-            return ParseFailure(FAIL.parsing_opts)
+            return ParseFailure(FAIL.parsing_no_structures)
 
         # Fail if we got no paths or unqual numbers of original vs new paths.
         if not origs:
@@ -270,31 +276,39 @@ class RenamingPlan:
         for rp in self.rps:
             # The step() call can return one of three types of values:
             #
-            # (1) A RenamePairFailure instance if there was a failure.
-            # In these cases, catch_failure() will determine the
-            # failure-control value, and we will act accordingly here.
+            #  - A RenamePairFailure instance if there was a failure.
+            #  - A RenamePair instance, possibly modified by the step call.
+            #  - None, if the RenamePair should be filtered out.
             #
-            # (2) A RenamePair instance. It might be the same as the
-            # current rp here (eg, in the case of checks that simply determine
-            # whether the rp is valid), or it might be a modified instance
-            # (eg, in the case of the step to compute the new path).
+            result = step(rp, next(seq))
+
+            # And catch_failure() will return that same result inside
+            # of a (RESULT, CONTROL) tuple.
             #
-            # (3) None, if the RenamePair should be skipped. This occurs
-            # if the filtering code ran successfully (ie no Failure) but
-            # it determined that the RenamePair should be filtered out.
+            # If the result was not a failure, the control will be None.
             #
-            result, control = self.catch_failure(step(rp, next(seq)))
+            # If the result was a failure, the control will either be a
+            # failure-contol value (skip, keep, create, clobber) or None (if
+            # the user did not request controls for that type of failure).
+            #
+            result, control = self.catch_failure(result)
             if control == CONTROLS.skip:
+                # Skip RenamePair because a failure occured, but proceed others.
                 pass
             elif control == CONTROLS.keep:
+                # Retain the RenamePair even though a failure occured during filtering.
                 yield rp
             elif control == CONTROLS.create:
+                # The RenamePair lacks a parent, but we will create it before renaming.
                 yield clone(rp, create_parent = True)
             elif control == CONTROLS.clobber:
+                # During renaming, the RenamePair will overwrite something, but that's acceptable.
                 yield clone(rp, clobber = True)
             elif result is None:
+                # The filtering step succeeded and we want to reject the RenamePair.
                 pass
             else:
+                # No failure occured and the RenamePair was not filtered out.
                 yield result
 
     ####
@@ -331,7 +345,7 @@ class RenamingPlan:
             return rp
 
     def check_orig_exists(self, rp, seq_val):
-        if self.path_exists(Path(rp.orig)):
+        if self.path_exists(rp.orig):
             return rp
         else:
             return RpMissingFailure(FAIL.orig_missing, rp)
@@ -351,7 +365,7 @@ class RenamingPlan:
             return rp
 
     def check_new_parent_exists(self, rp, seq_val):
-        if self.path_exists(Path(rp.new).parent):
+        if self.path_exists(str(Path(rp.new).parent)):
             return rp
         else:
             return RpMissingParentFailure(FAIL.new_parent_missing, rp)
@@ -359,6 +373,13 @@ class RenamingPlan:
     def check_new_collisions(self):
         # Organize rps into dict-of-list, keyed by the new path.
         groups = {}
+
+        # print()
+        # print(self.file_sys)
+        # for rp in self.rps:
+        #     print(rp)
+        # print()
+
         for rp in self.rps:
             groups.setdefault(rp.new, []).append(rp)
         # If any group contains multiple members, add them all as potential failures.
@@ -372,24 +393,19 @@ class RenamingPlan:
     # Methods related to failure control.
     ####
 
-    # def build_failure_control_config(self, config):
-    #     fc = {}
-    #     for control, failure_names in config.items():
-    #         for fnm in (failure_names or []):
-    #             ftype, supported = self.SUPPORTED_CONTROLS.get(fnm, (None, []))
-    #             if control in supported:
-    #                 fc[ftype] = control
-    #             else:
-    #                 msg = f'RenamingPlan received an invalid failure-control: {control} {fnm}'
-    #                 raise ValueError(msg)
-    #     return fc
-
     def catch_failure(self, x):
-        # Used when calling other methods to (1) catch a Failure instance, (2)
-        # store it in self.failures under the appropriate failure-control key,
-        # and (3) forward the value along with the control in a 2-tuple.
+        # Used when calling other methods to:
+        #   - catch a Failure instance,
+        #   - store it in self.failures under the appropriate failure-control key,
+        #   - forward the value along with the control in a tuple.
+        #
+        # There are three general types of return values:
+        #   - (RenamePairFailure-instance, control-key)   # Failure, controlled.
+        #   - (RenamePairFailure-instance, None)          # Failure, uncontrolled.
+        #   - (RenamePair-instance, None)                 # Not a failure.
+        #
         if isinstance(x, Failure):
-            control = self.fail_config.get(failure, None)
+            control = self.fail_config.get(type(x), None)
             self.failures[control].append(x)
             return (x, control)
         else:
@@ -398,7 +414,11 @@ class RenamingPlan:
     @property
     def failed(self):
         # The RenamingPlan has failed if there are any uncontrolled failures.
-        return bool(self.failures[None])
+        return bool(self.uncontrolled_failures)
+
+    @property
+    def uncontrolled_failures(self):
+        return self.failures[None]
 
     ####
     # Sequence number and common prefix.
@@ -439,9 +459,18 @@ class RenamingPlan:
             return Path(p).exists()
         else:
             # Or check the fake file system added for testing purposes.
-            return p in self.file_sys
+            # In this context, assume that '.' always exists so that the
+            # user/tester does not have to include explicitly.
+            p = str(p)
+            return p in self.file_sys or p == '.'
 
     def rename_paths(self):
+        if not self.has_prepared:
+            self.prepare()
+
+        if self.failed:
+            raise BmvError(FAIL.prepare_failed, failures = self.failures[None])
+
         if self.file_sys is None:
             # Rename the paths.
             for rp in self.rps:
