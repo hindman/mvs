@@ -48,6 +48,8 @@ FAIL = cons('Fails',
     opts_require_one = 'One of these options is required',
     opts_mutex = 'No more than one of these options should be used',
     prepare_failed = 'RenamingPlan cannot rename paths because failures occurred during preparation',
+    rename_done_already = 'RenamingPlan cannot rename paths because renaming has already been executed',
+    conflicting_controls = 'Conflicting controls specified for a failure type: {} and {}',
 )
 
 # Failure control mechanisms.
@@ -343,7 +345,7 @@ def validated_failure_controls(x, opts_mode = False):
                 (_, k1) = config[fail_cls]
                 if opts_mode:
                     k1, k2 = (name_to_opt(k1), name_to_opt(k2))
-                msg = f'Multiple controls specified for a failure type: {k1} and {k2}'
+                msg = FAIL.conflicting_controls.format(k1, k2)
                 return OptsFailure(msg)
             else:
                 config[fail_cls] = (control, k2)

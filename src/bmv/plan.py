@@ -109,6 +109,7 @@ class RenamingPlan:
         self.prefix_len = 0
 
         self.has_prepared = False
+        self.has_renamed = False
 
     ####
     #
@@ -122,8 +123,11 @@ class RenamingPlan:
     ####
 
     def prepare(self):
+        # Don't prepare more than once.
         if self.has_prepared:
             return
+        else:
+            self.has_prepared = True
 
         # Get the input paths and parse them to get RenamePair instances.
         self.rps, _ = self.catch_failure(self.parse_inputs())
@@ -166,7 +170,7 @@ class RenamingPlan:
                 f = NoPathsFailure(FAIL.no_paths_after_processing)
                 self.catch_failure(f)
             if self.failed:
-                break
+                return
 
         self.check_new_collisions()
         if self.failed:
@@ -465,18 +469,24 @@ class RenamingPlan:
             return p in self.file_sys or p == '.'
 
     def rename_paths(self):
-        if not self.has_prepared:
-            self.prepare()
+        # Don't rename more than once.
+        if self.has_renamed:
+            raise BmvError(FAIL.rename_done_already)
+        else:
+            self.has_renamed = True
 
+        # Ensure than we have prepare, and raise it failed.
+        self.prepare()
         if self.failed:
             raise BmvError(FAIL.prepare_failed, failures = self.failures[None])
 
+        # Rename paths.
         if self.file_sys is None:
-            # Rename the paths.
+            # On the real file system.
             for rp in self.rps:
                 Path(rp.orig).rename(rp.new)
         else:
-            # Move the paths around in the fake file system.
+            # Or in the fake file system.
             for rp in self.rps:
                 self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
 

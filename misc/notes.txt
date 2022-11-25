@@ -18,9 +18,12 @@ Testing rework:
 
     - Status:
         - Core logic was reworked and old tests are now marked as skipped.
-        - Started preliminary work in test_plan.py.
-            - Have fixed some bugs and adjusted a few things.
-            - Starting to get working/tested calls to plan.prepare() and plan.rename_paths().
+        - Have several working tests.
+        - Next testing focus:
+            - RenamePairFailure scenarios:
+                - See test_missing_orig() for one working test.
+            - Various input structures.
+            - CLI scenarios
 
     - Implement a new set of tests.
 
