@@ -17,12 +17,16 @@ todos: TODOs
 Testing rework:
 
     - Status:
+
         - Core logic was reworked and old tests are now marked as skipped.
+        - Also modified the checking process (storing Failure inside RenamePair).
         - Have several working tests.
+
         - Next testing focus:
-            - RenamePairFailure scenarios:
+            - Failure scenarios:
                 - See test_missing_orig() for one working test.
             - Various input structures.
+            - Common prefix.
             - CLI scenarios
 
     - Implement a new set of tests.

@@ -8,7 +8,6 @@ from bmv import (
 
 # from bmv.cli import (
 #     RenamePair,
-#     RenamePairFailure,
 #     validate_rename_pairs,
 #     validated_options,
 #     parse_inputs,

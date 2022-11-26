@@ -1,22 +1,6 @@
 from dataclasses import dataclass
 
 @dataclass
-class RenamePair:
-    # A data object to hold an original path and the corresponding new path.
-    orig: str
-    new: str
-    create_parent: bool = False
-    clobber: bool = False
-
-    @property
-    def formatted(self):
-        return f'{self.orig}\n{self.new}\n'
-
-    @property
-    def equal(self):
-        return self.orig == self.new
-
-@dataclass
 class Failure:
     msg: str
 
@@ -37,44 +21,62 @@ class NoPathsFailure(Failure):
     pass
 
 @dataclass
-class RenamePairFailure(Failure):
-    rp: RenamePair
-
-    @property
-    def formatted(self):
-        return f'{self.msg}:\n{self.rp.formatted}'
-
-@dataclass
-class RpFilterFailure(RenamePairFailure):
+class RpFilterFailure(Failure):
     pass
 
 @dataclass
-class RpRenameFailure(RenamePairFailure):
+class RpRenameFailure(Failure):
     pass
 
 @dataclass
-class RpEqualFailure(RenamePairFailure):
+class RpEqualFailure(Failure):
     pass
 
 @dataclass
-class RpMissingFailure(RenamePairFailure):
+class RpMissingFailure(Failure):
     pass
 
 @dataclass
-class RpMissingParentFailure(RenamePairFailure):
+class RpMissingParentFailure(Failure):
     pass
 
 @dataclass
-class RpExistsFailure(RenamePairFailure):
+class RpExistsFailure(Failure):
     pass
 
 @dataclass
-class RpCollsionFailure(RenamePairFailure):
+class RpCollsionFailure(Failure):
     pass
 
 @dataclass
 class ExitCondition:
     msg: str
+
+@dataclass
+class RenamePair:
+    # A data object to hold an original path and the corresponding new path.
+    orig: str
+    new: str
+    failure: Failure = None
+    exclude: bool = False
+    create_parent: bool = False
+    clobber: bool = False
+
+    @property
+    def equal(self):
+        return self.orig == self.new
+
+    @property
+    def failed(self):
+        return bool(self.failure)
+
+    @property
+    def formatted(self):
+        paths = f'{self.orig}\n{self.new}\n'
+        if self.failed:
+            return f'{self.failure.msg}:\n{paths}'
+        else:
+            return paths
 
 class Kwexception(Exception):
 

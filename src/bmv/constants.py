@@ -334,8 +334,8 @@ def validated_failure_controls(x, opts_mode = False):
     #
     # If invalid, returns an OptsFailure.
     #
-    # Otherwise, returns either a dict mapping the RenamePairFailure to the
-    # requested control mechanism or the original object (opts_mode = True).
+    # Otherwise, returns either a dict mapping the Failure to the requested
+    # control mechanism or the original object (opts_mode = True).
     #
     config = {}
     name_to_opt = lambda nm: '--' + nm.replace(CON.underscore, CON.hyphen)
