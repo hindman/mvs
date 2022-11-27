@@ -1,5 +1,6 @@
 import re
 import sys
+import traceback
 
 from copy import deepcopy
 from dataclasses import asdict, replace as clone
@@ -224,7 +225,7 @@ class RenamingPlan:
             news = []
             for row in self.inputs:
                 if row:
-                    cells = row.split(CON.tab)
+                    cells = list(filter(None, row.split(CON.tab)))
                     if len(cells) == 2:
                         origs.append(cells[0])
                         news.append(cells[1])
@@ -269,7 +270,7 @@ class RenamingPlan:
             exec(code, globs, locs)
             return locs[func_name]
         except Exception as e:
-            msg = f''
+            msg = traceback.format_exc(limit = 0)
             return UserCodeExecFailure(msg)
 
     ####
@@ -322,7 +323,7 @@ class RenamingPlan:
                 result = self.filter_func(rp.orig, Path(rp.orig), seq_val, self)
                 return rp if result else clone(rp, exclude = True)
             except Exception as e:
-                msg = f'Error in user-supplied filtering code: {e} [original path: {rp.orig}]'
+                msg = FAIL.filter_code_invalid.format(e, rp.orig)
                 return clone(rp, failure = RpFilterFailure(msg))
         else:
             return rp
@@ -333,14 +334,14 @@ class RenamingPlan:
             try:
                 new = self.rename_func(rp.orig, Path(rp.orig), seq_val, self)
             except Exception as e:
-                msg = f'Error in user-supplied renaming code: {e} [original path: {rp.orig}]'
+                msg = FAIL.rename_code_invalid.format(e, rp.orig)
                 return clone(rp, failure = RpRenameFailure(msg))
             # Validate its type and return a modified RenamePair instance.
             if isinstance(new, (str, Path)):
                 return clone(rp, new = str(new))
             else:
                 typ = type(new).__name__
-                msg = f'Invalid type from user-supplied renaming code: {typ} [original path: {rp.orig}]'
+                msg = FAIL.rename_code_bad_return.format(typ, rp.orig)
                 return clone(rp, failure = RpRenameFailure(msg))
         else:
             return rp
@@ -494,6 +495,7 @@ class RenamingPlan:
     @property
     def as_dict(self):
         return dict(
+            # Primary arguments from user.
             inputs = self.inputs,
             structure = self.structure,
             rename_code = self.rename_code,
@@ -502,17 +504,19 @@ class RenamingPlan:
             seq_start = self.seq_start,
             seq_step = self.seq_step,
             file_sys = self.file_sys,
-            skip_failed_filter = self.skip_failed_filter,
-            skip_failed_rename = self.skip_failed_rename,
+            # Failure controls.
             skip_equal = self.skip_equal,
             skip_missing = self.skip_missing,
             skip_missing_parent = self.skip_missing_parent,
-            skip_existing_new = self.skip_existing_new,
-            skip_colliding_new = self.skip_colliding_new,
-            clobber_existing_new = self.clobber_existing_new,
-            clobber_colliding_new = self.clobber_colliding_new,
-            keep_failed_filter = self.keep_failed_filter,
             create_missing_parent = self.create_missing_parent,
+            skip_existing_new = self.skip_existing_new,
+            clobber_existing_new = self.clobber_existing_new,
+            skip_colliding_new = self.skip_colliding_new,
+            clobber_colliding_new = self.clobber_colliding_new,
+            skip_failed_rename = self.skip_failed_rename,
+            skip_failed_filter = self.skip_failed_filter,
+            keep_failed_filter = self.keep_failed_filter,
+            # Other.
             failures = self.failures,
             prefix_len = self.prefix_len,
             rename_pairs = [asdict(rp) for rp in self.rps],

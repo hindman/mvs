@@ -80,6 +80,8 @@ class RenamePair:
 
 class Kwexception(Exception):
 
+    ALLOW_UPDATE = True
+
     def __init__(self, msg = '', **kws):
         d = {'msg': msg}
         d.update(kws)
@@ -95,13 +97,13 @@ class Kwexception(Exception):
     @classmethod
     def new(cls, error, **kws):
         # Takes an Exception and keyword arguments. If the error is already a
-        # BmvError, update its params. Otherwise, return a new error.
-        if isinstance(error, BmvError):
-            for k, v in kwargs.items():
+        # Kwexception, update its params. Otherwise, return a new error.
+        if isinstance(error, Kwexception) and error.ALLOW_UPDATE:
+            for k, v in kws.items():
                 error.params.setdefault(k, v)
             return error
         else:
-            return cls(**kwargs)
+            return cls(**kws)
 
 class BmvError(Kwexception):
     pass

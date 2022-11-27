@@ -14,38 +14,23 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Testing rework:
+Testing:
 
-    - Status:
+    test_plan.py:
+        - See docstring for remaining items to cover.
+        - Organize the code.
 
-        - Core logic was reworked and old tests are now marked as skipped.
-        - Also modified the checking process (storing Failure inside RenamePair).
-        - Have several working tests.
-
-        - Next testing focus:
-            - Failure scenarios:
-                - See test_missing_orig() for one working test.
-            - Various input structures.
-            - Common prefix.
-            - CLI scenarios
-
-    - Implement a new set of tests.
-
-        - Whenever possible, test behaviors via a RenamingPlan instance.
-
-        - Test core behaviors in a mostly-end-to-end fashion:
-
-            - Call plan.prepare() and check object state.
-            - If needed, also call plan.rename_paths() and check state.
-            - As needed, inject a fake file_sys into the RenamingPlan.
-
-    - Then assess testing coverage and fill in any gaps, notably the behaviors
-      applicable only to command-line usage.
+    test_cli.py
+        - TODO
 
 Project name change:
     - bmv is claimed [emailed maintainer: Nov 2; no reply].
     - Rename to mvs
     - Dependencies: drop attrs; re-create virtualenvs.
+
+New validation issues to consider:
+    - all paths must be non-empty
+    - create_parent values: either deduplicate them or create parents in a tolerant way
 
 Case-change-only renamings.
     - Path(orig).rename(new): works

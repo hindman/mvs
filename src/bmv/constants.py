@@ -50,6 +50,9 @@ FAIL = cons('Fails',
     prepare_failed = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     rename_done_already = 'RenamingPlan cannot rename paths because renaming has already been executed',
     conflicting_controls = 'Conflicting controls specified for a failure type: {} and {}',
+    filter_code_invalid = 'Error in user-supplied filtering code: {} [original path: {}]',
+    rename_code_invalid = 'Error in user-supplied renaming code: {} [original path: {}]',
+    rename_code_bad_return = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
 )
 
 # Failure control mechanisms.
