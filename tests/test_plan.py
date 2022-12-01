@@ -13,6 +13,34 @@ from bmv.data_objects import BmvError, UserCodeExecFailure
 
 '''
 
+Untested in plan.py:
+
+    - failures: news collide
+
+        - Problem: the failure-control handling is woven into the
+          processed_rps() loop.
+
+        - Need to organize things so that the check for new collisions can
+          still be done rp-by-rp within the the machinery of processed_rps().
+
+            - Maybe rp_steps can hold tuples, where the optional 2nd arg is a
+              prep_step, where we could create the needed groups.
+
+    - failure controls used:
+        - keep
+
+    - filter control produces no paths
+
+    - common prefix
+
+    - file_sys passed as dict
+
+    - actual renaming scenario not using a file_sys
+
+Needed implementation:
+
+    rename_paths(): create parents
+
 FAIL = cons('Fails',
     orig_missing = 'Original path does not exist',
     new_exists = 'New path exists',
@@ -35,26 +63,6 @@ FAIL = cons('Fails',
     rename_code_invalid = 'Error in user-supplied renaming code: {} [original path: {}]',
     rename_code_bad_return = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
 )
-
-Untested in plan.py:
-
-    - failures:
-        - new exists
-        - new parent does not exist
-        - news collide
-
-    - failure controls used:
-        - keep
-        - create
-        - clobber
-
-    - filter control produces no paths
-
-    - common prefix
-
-    - file_sys passed as dict
-
-    - actual renaming scenario not using a file_sys
 
 '''
 
@@ -324,17 +332,17 @@ def test_plan_as_dict(tr):
         'seq_start',
         'seq_step',
         'file_sys',
-        'skip_failed_filter',
-        'skip_failed_rename',
         'skip_equal',
         'skip_missing',
         'skip_missing_parent',
-        'skip_existing_new',
-        'skip_colliding_new',
-        'clobber_existing_new',
-        'clobber_colliding_new',
-        'keep_failed_filter',
         'create_missing_parent',
+        'skip_existing_new',
+        'clobber_existing_new',
+        'skip_colliding_new',
+        'clobber_colliding_new',
+        'skip_failed_rename',
+        'skip_failed_filter',
+        'keep_failed_filter',
         'failures',
         'prefix_len',
         'rename_pairs',
@@ -517,4 +525,146 @@ def test_missing_orig(tr):
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys
+
+def test_new_exists(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('a1', 'b1', 'c1')
+    file_sys = origs + news[1:2]
+    exp_file_sys = ('b', 'b1', 'a1', 'c1')
+
+    # Renaming plan, but file_sy is missing an original path.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+    )
+
+    # Prepare does not raise and it marks the plan as failed.
+    plan.prepare()
+    assert plan.failed
+
+    # Renaming will raise.
+    with pytest.raises(BmvError) as einfo:
+        plan.rename_paths()
+    assert_failed_because(einfo, plan, FAIL.new_exists)
+
+    # Renaming will succeed if we skip the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        skip_existing_new = True,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys
+
+    # Renaming will succeed if we clobber the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        clobber_existing_new = True,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys[1:]
+
+def test_new_parent_missing(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('tmp/a1', 'b1', 'c1')
+    file_sys = origs
+    exp_file_sys1 = ('a', 'b1', 'c1')
+    exp_file_sys2 = news   # TODO: will change when rename_paths() creates parents.
+
+    # Renaming plan, but file_sy is missing an original path.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+    )
+
+    # Prepare does not raise and it marks the plan as failed.
+    plan.prepare()
+    assert plan.failed
+
+    # Renaming will raise.
+    with pytest.raises(BmvError) as einfo:
+        plan.rename_paths()
+    assert_failed_because(einfo, plan, FAIL.new_parent_missing)
+
+    # Renaming will succeed if we skip the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        skip_missing_parent = True,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys1
+
+    # Renaming will succeed if we skip the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        create_missing_parent = True,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys2
+
+def test_news_collide(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('a1', 'b1', 'a1')
+    file_sys = origs
+    exp_file_sys1 = ('a', 'b', 'c')
+    exp_file_sys2 = news   # TODO: will change when rename_paths() creates parents.
+
+    # Renaming plan with collision among the new paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+    )
+
+    # Prepare does not raise and it marks the plan as failed.
+    plan.prepare()
+    assert plan.failed
+
+    # Renaming will raise.
+    with pytest.raises(BmvError) as einfo:
+        plan.rename_paths()
+    assert_failed_because(einfo, plan, FAIL.new_collision)
+
+    # TODO
+    return
+
+    # Renaming will succeed if we skip the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        skip_colliding_new = True,
+    )
+    plan.rename_paths()
+
+    # TODO: test in progress
+    tr.dump(plan.rps)
+    return
+
+    assert tuple(plan.file_sys) == exp_file_sys1
+
+
+    return
+
+    # Renaming will succeed if we skip the offending paths.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+        create_missing_parent = True,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys2
 

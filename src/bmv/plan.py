@@ -375,9 +375,9 @@ class RenamingPlan:
     def check_new_collisions(self):
         # Organize rps into dict-of-list, keyed by the new path.
         groups = {}
-
         for rp in self.rps:
             groups.setdefault(rp.new, []).append(rp)
+
         # If any group contains multiple members, add them all as potential failures.
         for g in groups.values():
             if len(g) > 1:
