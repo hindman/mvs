@@ -24,6 +24,7 @@ class CON:
     filterer_name = 'do_filter'
     encoding = 'utf-8'
     no_action_msg = '\nNo action taken.'
+    paths_renamed_msg = '\nPaths renamed.'
     default_pager_cmd = 'less'
     listing_batch_size = 10
 

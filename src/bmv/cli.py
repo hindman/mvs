@@ -17,6 +17,7 @@ from .constants import (
     CLI,
     FAIL,
     STRUCTURES,
+    CONTROLLABLES,
     validated_failure_controls,
 )
 from .data_objects import (
@@ -29,7 +30,7 @@ from .data_objects import (
 # Entry point.
 ####
 
-def main(args = None):
+def main(args = None, file_sys = None):
     # Parse and validate command-line arguments.
     args = sys.argv[1:] if args is None else args
     opts = handle_exit(parse_command_line_args(args))
@@ -46,17 +47,8 @@ def main(args = None):
         seq_step = opts.step,
         filter_code = opts.filter,
         indent = opts.indent,
-        skip_equal = opts.skip_equal,
-        skip_missing = opts.skip_missing,
-        skip_missing_parent = opts.skip_missing_parent,
-        create_missing_parent = opts.create_missing_parent,
-        skip_existing_new = opts.skip_existing_new,
-        clobber_existing_new = opts.clobber_existing_new,
-        skip_colliding_new = opts.skip_colliding_new,
-        clobber_colliding_new = opts.clobber_colliding_new,
-        skip_failed_rename = opts.skip_failed_rename,
-        skip_failed_filter = opts.skip_failed_filter,
-        keep_failed_filter = opts.keep_failed_filter,
+        file_sys = file_sys,
+        **fail_controls_kws(opts),
     )
 
     # Prepare the RenamingPlan and halt if it failed.
@@ -80,7 +72,7 @@ def main(args = None):
     if not opts.yes:
         msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
         if get_confirmation(msg, expected = 'yes'):
-            print()
+            print(CON.paths_renamed_msg)
         else:
             halt(CON.exit_ok, CON.no_action_msg)
 
@@ -89,10 +81,10 @@ def main(args = None):
         log_data = collect_logging_data(opts, plan)
         write_to_json_file(log_file_path(), log_data)
 
-
     # Rename.
     try:
         plan.rename_paths()
+        return CON.exit_ok if file_sys is None else plan
     except Exception as e:
         # TODO
         raise e
@@ -116,6 +108,7 @@ def parse_command_line_args(args):
 
 def parse_args(args):
     ap = argparse.ArgumentParser(
+        prog = CON.app_name,
         description = CLI.description,
         epilog = CLI.epilog,
         add_help = False,
@@ -182,11 +175,12 @@ def collect_input_paths(opts):
     if opts.paths:
         paths = opts.paths
     else:
-        text = (
-            read_from_clipboard() if opts.clipboard else
-            read_from_file(opts.file) if opts.file else
-            sys.stdin.read()
-        )
+        if opts.clipboard:
+            text = read_from_clipboard()
+        elif opts.file:
+            text = read_from_file(opts.file)
+        else:
+            text = sys.stdin.read()
         paths = text.split(CON.newline)
     return tuple(path.strip() for path in paths)
 
@@ -270,7 +264,7 @@ def write_to_clipboard(text):
     )
 
 ####
-# Utilities: user confirmation, quitting, etc.
+# Utilities: other.
 ####
 
 def get_confirmation(prompt, expected = 'y'):
@@ -285,4 +279,10 @@ def halt(code = None, msg = None):
         msg = msg if msg.endswith(nl) else msg + nl
         fh.write(msg)
     sys.exit(code)
+
+def fail_controls_kws(opts):
+    return {
+        k : getattr(opts, k)
+        for k in CONTROLLABLES.keys()
+    }
 

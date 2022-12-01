@@ -17,6 +17,7 @@ todos: TODOs
 Testing:
 
     test_cli.py
+        See docstring
 
     test_plan.py:
         - Code organization.
