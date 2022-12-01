@@ -34,6 +34,8 @@ from .data_objects import (
 
 class RenamingPlan:
 
+    DEFAULT_FILE_SYS_VAL = True
+
     def __init__(self,
                  # Path inputs and their structure.
                  inputs,
@@ -111,6 +113,7 @@ class RenamingPlan:
 
         self.has_prepared = False
         self.has_renamed = False
+        self.new_groups = None
 
     ####
     #
@@ -153,31 +156,29 @@ class RenamingPlan:
         # We use the processed_rps() method to execute the step, handle
         # failures appropriately, and yield a potentially filtered collection
         # of potentially modified RenamePair instances.
-        #
-        # Since filtering can occur at each step (depending on failure-control
-        # settings) we check for NoPathsFailure after each step.
-        #
         rp_steps = (
-            self.execute_user_filter,
-            self.execute_user_rename,
-            self.check_orig_exists,
-            self.check_orig_new_differ,
-            self.check_new_not_exists,
-            self.check_new_parent_exists,
+            (None, self.execute_user_filter),
+            (None, self.execute_user_rename),
+            (None, self.check_orig_exists),
+            (None, self.check_orig_new_differ),
+            (None, self.check_new_not_exists),
+            (None, self.check_new_parent_exists),
+            (self.prepare_new_groups, self.check_new_collisions),
         )
-        for step in rp_steps:
+        for prep_step, step in rp_steps:
+            # Run any needed preparations and then the step.
+            if prep_step:
+                prep_step()
             self.rps = tuple(self.processed_rps(step))
+
+            # Register failure if the step & failure-control filtered out everything.
             if not self.rps:
                 f = NoPathsFailure(FAIL.no_paths_after_processing)
                 self.catch_failure(f)
+
+            # Stop if the plan has failed either directly or via filtering.
             if self.failed:
                 return
-
-        # Holistic checks of the RenamePair instances. Currently, there is
-        # only one; if more are needed, we can mimic the implementation above.
-        self.check_new_collisions()
-        if self.failed:
-            return
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -372,18 +373,25 @@ class RenamingPlan:
         else:
             return clone(rp, failure = RpMissingParentFailure(FAIL.new_parent_missing))
 
-    def check_new_collisions(self):
+    def prepare_new_groups(self):
         # Organize rps into dict-of-list, keyed by the new path.
-        groups = {}
+        self.new_groups = {}
         for rp in self.rps:
-            groups.setdefault(rp.new, []).append(rp)
+            self.new_groups.setdefault(rp.new, []).append(rp)
 
-        # If any group contains multiple members, add them all as potential failures.
-        for g in groups.values():
-            if len(g) > 1:
-                for rp in g:
-                    rp = clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
-                    self.catch_failure(rp)
+    def check_new_collisions(self, rp, seq_val):
+        g = self.new_groups[rp.new]
+        if len(g) == 1:
+            return rp
+        else:
+            return clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
+
+        # # If any group contains multiple members, add them all as potential failures.
+        # for g in groups.values():
+        #     if len(g) > 1:
+        #         for rp in g:
+        #             rp = clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
+        #             self.catch_failure(rp)
 
     ####
     # Methods related to failure control.
@@ -453,7 +461,10 @@ class RenamingPlan:
         elif isinstance(file_sys, dict):
             return deepcopy(file_sys)
         else:
-            return {path : True for path in file_sys}
+            return {
+                path : self.DEFAULT_FILE_SYS_VAL
+                for path in file_sys
+            }
 
     def path_exists(self, p):
         if self.file_sys is None:
@@ -482,10 +493,16 @@ class RenamingPlan:
         if self.file_sys is None:
             # On the real file system.
             for rp in self.rps:
+                if rp.create_parent:
+                    par = Path(rp.new).parent
+                    Path.mkdir(par, parents = True, exists_ok = True)
                 Path(rp.orig).rename(rp.new)
         else:
             # Or in the fake file system.
             for rp in self.rps:
+                if rp.create_parent:
+                    for par in Path(rp.new).parents:
+                        self.file_sys[str(par)] = self.DEFAULT_FILE_SYS_VAL
                 self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
 
     ####

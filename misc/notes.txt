@@ -16,29 +16,28 @@ todos: TODOs
 
 Testing:
 
-    test_plan.py:
-        - See docstring for remaining items to cover.
-        - Organize the code.
-
     test_cli.py
-        - TODO
+
+    test_plan.py:
+        - Code organization.
+        - Find a way to reduce code repetition.
+        - Not covered: actual renaming scenario not using an injected file_sys.
 
 Project name change:
     - bmv is claimed [emailed maintainer: Nov 2; no reply].
     - Rename to mvs
     - Dependencies: drop attrs; re-create virtualenvs.
 
+--------
+road-map: Road map
+--------
+
 New validation issues to consider:
     - all paths must be non-empty
-    - create_parent values: either deduplicate them or create parents in a tolerant way
 
 Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
-
---------
-road-map: Road map
---------
 
 Logging: bootstrap (create $HOME/.bmv).
 Logging: list.

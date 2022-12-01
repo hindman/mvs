@@ -11,61 +11,6 @@ from bmv.constants import (
 
 from bmv.data_objects import BmvError, UserCodeExecFailure
 
-'''
-
-Untested in plan.py:
-
-    - failures: news collide
-
-        - Problem: the failure-control handling is woven into the
-          processed_rps() loop.
-
-        - Need to organize things so that the check for new collisions can
-          still be done rp-by-rp within the the machinery of processed_rps().
-
-            - Maybe rp_steps can hold tuples, where the optional 2nd arg is a
-              prep_step, where we could create the needed groups.
-
-    - failure controls used:
-        - keep
-
-    - filter control produces no paths
-
-    - common prefix
-
-    - file_sys passed as dict
-
-    - actual renaming scenario not using a file_sys
-
-Needed implementation:
-
-    rename_paths(): create parents
-
-FAIL = cons('Fails',
-    orig_missing = 'Original path does not exist',
-    new_exists = 'New path exists',
-    new_parent_missing = 'Parent directory of new path does not exist',
-    orig_new_same = 'Original path and new path are the same',
-    new_collision = 'New path collides with another new path',
-    no_input_paths = 'No input paths',
-    no_paths = 'No paths to be renamed',
-    no_paths_after_processing = 'All paths were filtered out by failure control during processing',
-    parsing_no_structures = 'No input structures given',
-    parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}',
-    parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs',
-    parsing_inequality = 'Got an unequal number of original paths and new paths',
-    opts_require_one = 'One of these options is required',
-    opts_mutex = 'No more than one of these options should be used',
-    prepare_failed = 'RenamingPlan cannot rename paths because failures occurred during preparation',
-    rename_done_already = 'RenamingPlan cannot rename paths because renaming has already been executed',
-    conflicting_controls = 'Conflicting controls specified for a failure type: {} and {}',
-    filter_code_invalid = 'Error in user-supplied filtering code: {} [original path: {}]',
-    rename_code_invalid = 'Error in user-supplied renaming code: {} [original path: {}]',
-    rename_code_bad_return = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
-)
-
-'''
-
 def assert_failed_because(einfo, plan, msg, i = None):
     fmsgs = tuple(
         f.msg[0 : i]
@@ -281,6 +226,19 @@ def test_code_execution_fails(tr):
     rp_fails = [rp.failed for rp in plan.rps]
     assert rp_fails == exp_rp_fails
 
+    # Run the other scenario for renaming: return bad data type.
+    plan = RenamingPlan(
+        inputs = origs,
+        rename_code = rename_code2,
+        file_sys = origs,
+    )
+    plan.prepare()
+    with pytest.raises(BmvError) as einfo:
+        plan.rename_paths()
+    assert_failed_because(einfo, plan, FAIL.rename_code_bad_return, i = 45)
+    rp_fails = [rp.failed for rp in plan.rps]
+    assert rp_fails == exp_rp_fails
+
     # Run the scenario for filtering.
     plan = RenamingPlan(
         inputs = origs + news,
@@ -295,18 +253,17 @@ def test_code_execution_fails(tr):
     rp_fails = [rp.failed for rp in plan.rps]
     assert rp_fails == exp_rp_fails
 
-    # Run the other scenario for renaming: return bad data type.
+    # Run the scenario for filtering, keeping those that fail during filtering.
     plan = RenamingPlan(
-        inputs = origs,
-        rename_code = rename_code2,
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        filter_code = filter_code,
         file_sys = origs,
+        keep_failed_filter = True,
     )
     plan.prepare()
-    with pytest.raises(BmvError) as einfo:
-        plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.rename_code_bad_return, i = 45)
-    rp_fails = [rp.failed for rp in plan.rps]
-    assert rp_fails == exp_rp_fails
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == news
 
 def test_seq(tr):
     origs = ('a', 'b', 'c')
@@ -572,10 +529,11 @@ def test_new_exists(tr):
 def test_new_parent_missing(tr):
     # Paths.
     origs = ('a', 'b', 'c')
-    news = ('tmp/a1', 'b1', 'c1')
+    news = ('xy/tmp/a1', 'b1', 'c1')
+    parents = ('xy/tmp', 'xy', '.')
     file_sys = origs
     exp_file_sys1 = ('a', 'b1', 'c1')
-    exp_file_sys2 = news   # TODO: will change when rename_paths() creates parents.
+    exp_file_sys2 = parents + news
 
     # Renaming plan, but file_sy is missing an original path.
     plan = RenamingPlan(
@@ -618,8 +576,8 @@ def test_news_collide(tr):
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'a1')
     file_sys = origs
-    exp_file_sys1 = ('a', 'b', 'c')
-    exp_file_sys2 = news   # TODO: will change when rename_paths() creates parents.
+    exp_file_sys1 = ('a', 'c', 'b1')
+    exp_file_sys2 = ('a1', 'b1')
 
     # Renaming plan with collision among the new paths.
     plan = RenamingPlan(
@@ -637,9 +595,6 @@ def test_news_collide(tr):
         plan.rename_paths()
     assert_failed_because(einfo, plan, FAIL.new_collision)
 
-    # TODO
-    return
-
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
         inputs = origs + news,
@@ -648,23 +603,80 @@ def test_news_collide(tr):
         skip_colliding_new = True,
     )
     plan.rename_paths()
-
-    # TODO: test in progress
-    tr.dump(plan.rps)
-    return
-
     assert tuple(plan.file_sys) == exp_file_sys1
-
-
-    return
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        create_missing_parent = True,
+        clobber_colliding_new = True,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys2
+
+def test_failures_skip_all(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('Z', 'Z', 'Z')
+
+    # Renaming plan, but where all news collide.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = origs,
+        skip_colliding_new = True,
+    )
+
+    # Renaming will raise.
+    plan.prepare()
+    with pytest.raises(BmvError) as einfo:
+        plan.rename_paths()
+    assert_failed_because(einfo, plan, FAIL.no_paths_after_processing)
+
+def test_file_sys_arg(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('a1', 'b1', 'a1')
+
+    # Pass file_sys as a sequence. We do this to generate the
+    # expected file_sys for an ensuing test.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = origs,
+    )
+    file_sys = plan.file_sys
+
+    # Pass file_sys as None: works fine.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = None,
+    )
+    assert plan.file_sys is None
+
+    # Pass file_sys as a dict: we expect an
+    # indepentent dict equal to the original.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+    )
+    assert plan.file_sys == file_sys
+    assert plan.file_sys is not file_sys
+
+def test_common_prefix(tr):
+    # Paths.
+    origs = ('blah-a', 'blah-b', 'blah-c')
+    exp_file_sys = ('a', 'b', 'c')
+
+    # Basic.
+    plan = RenamingPlan(
+        inputs = origs,
+        rename_code = 'return plan.strip_prefix(o)',
+        file_sys = origs,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys
 
