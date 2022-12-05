@@ -55,7 +55,7 @@ def main(args = None, file_sys = None):
     plan.prepare()
     if plan.failed:
         # TODO: implement this for real.
-        msg = 'RenamingPlan failed'
+        msg = 'RenamingPlan failed [TODO]'
         for f in plan.failures[None]:
             print(f)
         halt(CON.exit_fail, msg)
@@ -166,7 +166,7 @@ def create_opts_failure(opt_names, base_msg):
 ####
 
 def get_structure(opts):
-    gen = (s for s in STRUCTURES.keys() if getattr(opts, s))
+    gen = (s for s in STRUCTURES.keys() if getattr(opts, s, None))
     return next(gen, None)
 
 def collect_input_paths(opts):

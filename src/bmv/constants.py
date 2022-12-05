@@ -166,14 +166,14 @@ class CLI:
         # Options defining the structure of the input path data.
         {
             group: 'Input path structures',
+            names: '--flat',
+            'action': 'store_true',
+            'help': 'Input paths as a list: original paths, then equal number of new paths [default]',
+        },
+        {
             names: '--paragraphs',
             'action': 'store_true',
             'help': 'Input paths in paragraphs: original paths, blank line, new paths',
-        },
-        {
-            names: '--flat',
-            'action': 'store_true',
-            'help': 'Input paths in non-delimited paragraphs: original paths, then new',
         },
         {
             names: '--pairs',
@@ -344,7 +344,7 @@ def validated_failure_controls(x, opts_mode = False):
     config = {}
     name_to_opt = lambda nm: '--' + nm.replace(CON.underscore, CON.hyphen)
     for k2, (control, fail_cls) in CONTROLLABLES:
-        if getattr(x, k2):
+        if getattr(x, k2, None):
             if fail_cls in config:
                 (_, k1) = config[fail_cls]
                 if opts_mode:

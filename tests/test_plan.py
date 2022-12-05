@@ -26,9 +26,9 @@ def test_structure_none(tr):
         inputs = origs + news,
         file_sys = origs,
     )
-    with pytest.raises(BmvError) as einfo:
-        plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.parsing_no_structures)
+    assert plan.structure == STRUCTURES.flat
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == news
 
 def test_no_inputs(tr):
     plan = RenamingPlan(

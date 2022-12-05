@@ -65,7 +65,7 @@ class RenamingPlan:
 
         # Basic attributes passed as arguments into the constructor.
         self.inputs = tuple(inputs)
-        self.structure = structure
+        self.structure = structure or STRUCTURES.flat
         self.rename_code = rename_code
         self.filter_code = filter_code
         self.indent = indent
@@ -136,6 +136,7 @@ class RenamingPlan:
         # Get the input paths and parse them to get RenamePair instances.
         self.rps, _ = self.catch_failure(self.parse_inputs())
         if self.failed:
+            self.rps = tuple()
             return
 
         # Create filtering function from user code.
@@ -206,11 +207,6 @@ class RenamingPlan:
                 origs, news = groups
             else:
                 return ParseFailure(FAIL.parsing_paragraphs)
-        elif self.structure == STRUCTURES.flat:
-            # Flat: like paragraphs without the blank-line delimiter.
-            paths = [line for line in self.inputs if line]
-            i = len(paths) // 2
-            origs, news = (paths[0:i], paths[i:])
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
             origs = []
@@ -233,13 +229,16 @@ class RenamingPlan:
                     else:
                         return ParseFailure(FAIL.parsing_row.format(row = row))
         else:
-            return ParseFailure(FAIL.parsing_no_structures)
+            # Flat: like paragraphs without the blank-line delimiter.
+            paths = [line for line in self.inputs if line]
+            i = len(paths) // 2
+            origs, news = (paths[0:i], paths[i:])
 
-        # Fail if we got no paths or unqual numbers of original vs new paths.
-        if not origs:
-            return ParseFailure(FAIL.no_input_paths)
-        elif len(origs) != len(news):
+        # Fail if we got unqual numbers of original vs new paths, or no paths at all.
+        if len(origs) != len(news):
             return ParseFailure(FAIL.parsing_inequality)
+        elif not origs:
+            return ParseFailure(FAIL.no_input_paths)
 
         # Return the RenamePair instances.
         return tuple(
