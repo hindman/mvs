@@ -54,6 +54,8 @@ FAIL = cons('Fails',
     filter_code_invalid = 'Error in user-supplied filtering code: {} [original path: {}]',
     rename_code_invalid = 'Error in user-supplied renaming code: {} [original path: {}]',
     rename_code_bad_return = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
+    prepare_failed_cli = 'Renaming preparation failed: {}.',
+    renaming_raised = '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',
 )
 
 # Failure control mechanisms.

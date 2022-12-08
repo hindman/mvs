@@ -429,6 +429,11 @@ class RenamingPlan:
     def uncontrolled_failures(self):
         return self.failures[None]
 
+    @property
+    def first_failure(self):
+        fs = self.uncontrolled_failures
+        return fs[0] if fs else None
+
     ####
     # Sequence number and common prefix.
     ####

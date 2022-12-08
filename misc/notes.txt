@@ -45,6 +45,11 @@ Logging: list.
 Logging: prune.
 Logging: undo operation.
 
+Error handling:
+    - If plan.rename_paths() raises, user has no idea whether/how-many
+      paths were renamed before the failure.
+    - One approach is to count N of paths actually renamed before the fail?
+
 Other operations: copy, backup, link, chmod, touch, timestamps.
 
 Option: --row-delimiter [default: tab]

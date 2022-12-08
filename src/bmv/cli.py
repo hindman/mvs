@@ -4,6 +4,7 @@ import re
 import string
 import subprocess
 import sys
+import traceback
 
 from datetime import datetime
 from itertools import cycle
@@ -54,10 +55,7 @@ def main(args = None, file_sys = None):
     # Prepare the RenamingPlan and halt if it failed.
     plan.prepare()
     if plan.failed:
-        # TODO: implement this for real.
-        msg = 'RenamingPlan failed [TODO]'
-        for f in plan.failures[None]:
-            print(f)
+        msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
         halt(CON.exit_fail, msg)
 
     # Print the renaming listing.
@@ -86,8 +84,9 @@ def main(args = None, file_sys = None):
         plan.rename_paths()
         return CON.exit_ok if file_sys is None else plan
     except Exception as e:
-        # TODO
-        raise e
+        tb = traceback.format_exc()
+        msg = FAIL.renaming_raised.format(tb)
+        halt(CON.exit_fail, msg)
 
 ####
 # Command-line argument handling.
