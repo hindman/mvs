@@ -11,6 +11,8 @@ class TestResource(object):
 
     WORK_AREA_ROOT = 'tests/work_area/'
 
+    NO_PAGER_ARGS = ('--pager', '')
+
     def dump(self, val = None, label = 'dump()'):
         fmt = '\n--------\n{label} =>\n{val}'
         msg = fmt.format(label = label, val = val)
@@ -19,6 +21,9 @@ class TestResource(object):
     def dumpj(self, val = None, label = 'dump()', indent = 4):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
+
+    def cliargs(self, *xs):
+        return self.NO_PAGER_ARGS + xs
 
 class StdStreams(object):
 

@@ -19,6 +19,19 @@ Testing:
     test_cli.py
         See docstring
 
+        Problem:
+            - returning plan from main() is not a viable strategy
+            - you cannot check plan under any scenario where halt() is called.
+            - which you might want to do when the plan fails
+
+        Problem:
+            - collecting input paths can fail (eg, missing or unreadable input file-source).
+
+        Problem:
+            Need a better way to check error messages:
+                - see test_main_prepare_failed()
+                - my helper for this (a) wasn't very good, (b) resides in test_plan.py
+
     test_plan.py:
         - Code organization.
         - Find a way to reduce code repetition.

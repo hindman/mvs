@@ -1,6 +1,9 @@
 import pytest
 import io
+import re
+
 from pathlib import Path
+from textwrap import dedent
 
 from bmv.constants import (
     CON,
@@ -18,7 +21,7 @@ from bmv.cli import (
 '''
 
 TODO:
-    prepare() fails
+    if plan.failed: the true scenario
     dryrun
     user says no to confirmation
     rename_paths() raises
@@ -78,21 +81,42 @@ def test_version_and_help(tr, capsys):
 def glob(pattern, root = '.'):
     return tuple(map(str, Path(root).glob(pattern)))
 
-def test_main(tr, capsys, monkeypatch):
-
-    args = (
-        '--pager', '',
-        '--rename', 'return o + o',
-    )
+def test_main_basic(tr, capsys, monkeypatch):
+    args = tr.cliargs('--rename', 'return o + o')
     origs = ('a', 'b', 'c')
     file_sys = origs
     exp_file_sys = ('aa', 'bb', 'cc')
-
     monkeypatch.setattr('sys.stdin', io.StringIO('yes'))
     plan = main(args + origs, file_sys = file_sys)
     assert tuple(plan.file_sys) == exp_file_sys
     cap = capsys.readouterr()
     assert cap.err == ''
-    # TODO: adjust this to something sane.
-    assert cap.out == 'Paths to be renamed (total 3, listed 3).\n\na\naa\n\nb\nbb\n\nc\ncc\n\n\nRename paths (total 3, listed 3) [yes]? \nPaths renamed.\n'
+    got = re.sub(r' +\n', '\n', cap.out)
+    exp = dedent('''
+        Paths to be renamed (total 3, listed 3).
+
+        a
+        aa
+
+        b
+        bb
+
+        c
+        cc
+
+
+        Rename paths (total 3, listed 3) [yes]?
+        Paths renamed.
+    ''').lstrip()
+    assert got == exp
+
+def test_main_prepare_failed(tr, capsys, monkeypatch):
+    origs = ('z1',)
+    args = tr.cliargs()
+    with pytest.raises(SystemExit) as exc:
+        main(args + origs, file_sys = origs)
+    assert exc.value.code == CON.exit_fail
+    cap = capsys.readouterr()
+    assert cap.out == ''
+    assert cap.err == 'Renaming preparation failed: Got an unequal number of original paths and new paths.\n'
 
