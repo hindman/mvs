@@ -4,6 +4,7 @@ import re
 from io import StringIO
 from pathlib import Path
 from textwrap import dedent
+from string import ascii_lowercase
 
 from bmv.constants import (
     CON,
@@ -16,23 +17,25 @@ from bmv.version import __version__
 from bmv.cli import (
     main,
     CliRenamer,
+    write_to_clipboard,
 )
 
 '''
 
 TODO:
-    main()                  # Ignore?
-
-    rename_paths() raises   # Test by setting plan.has_renamed = True
-
-    pagination              # Ignore?
-
-    input paths from:
-        clipboard
-        file
-        stdin
 
     scenario with some failed rps in the listing.
+        See test_some_failed_rps()
+
+        plan.uncontrolled_failures lacks the info it needs (the underlying rp).
+
+        Need to address this.
+
+        And that problem, means the failure listing in the command-line use
+        case isn't helpful:
+
+            # For example, the output tells you nothing.
+            bmv a b aa bb
 
     scenario with some invalid failure controls via the CliRenamer
 
@@ -40,24 +43,27 @@ TODO:
 
     Then refactor validated_options()into one function.
 
+    Now that CliRenamer exists, handle_exit() seems out of place: remove?
+
 '''
 
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer using StringIO instances:
     #
-    # - Adds args to disable pagination.
+    # - Adds args to disable pagination by default.
     # - Sets I/O handles to be StringIO instances, so we can capture outputs.
-    # - Add a convenience for user confirmation.
+    # - Adds a convenience (yes) to simulate user confirmation.
+    # - Adds a convenience (replies) to feed stdin.
     # - Adds a few properties/methods to simplify assertion making.
 
-    def __init__(self, *args, file_sys = None, reply = '', yes = False):
-        args = args + ('--pager', '')
+    def __init__(self, *args, file_sys = None, replies = '', yes = False, pager = ''):
+        args = args + ('--pager', pager)
         super().__init__(
             args,
             file_sys = file_sys,
             stdout = StringIO(),
             stderr = StringIO(),
-            stdin = StringIO('yes' if yes else reply),
+            stdin = StringIO('yes' if yes else replies),
             logfh = StringIO(),
         )
 
@@ -84,7 +90,7 @@ class CliRenamerSIO(CliRenamer):
     def check_file_sys(self, *paths):
         assert tuple(self.plan.file_sys) == paths
 
-def test_version_and_help(tr, capsys):
+def test_version_and_help(tr):
     # Version.
     cli = CliRenamerSIO('bmv', '--version')
     cli.run()
@@ -184,4 +190,114 @@ def test_indent_and_posint(tr):
         exp = '--indent: invalid positive_int value'
         assert exp in cli.err
         assert cli.err.startswith(f'usage: {CON.app_name}')
+
+def test_rename_paths_raises(tr):
+    # Paths and args.
+    origs = ('z1', 'z2')
+    news = ('z1x', 'z2x')
+    args = origs + news + ('--yes',)
+
+    # A working scenario.
+    cli = CliRenamerSIO(*args, file_sys = origs)
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # Same thing, but using do_prepare() and do_rename().
+    cli = CliRenamerSIO(*args, file_sys = origs)
+    cli.do_prepare()
+    cli.do_rename()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # Same thing. Calling the methods multiple times has no effect.
+    cli = CliRenamerSIO(*args, file_sys = origs)
+    cli.do_prepare()
+    cli.do_prepare()
+    cli.do_rename()
+    cli.do_rename()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # Same thing, but we will set plan.has_renamed to trigger an exception
+    # when plan.rename_paths() is called.
+    cli = CliRenamerSIO(*args, file_sys = origs)
+    cli.do_prepare()
+    cli.plan.has_renamed = True
+    cli.do_rename()
+    assert cli.failure
+    assert cli.err.strip().startswith('Renaming raised an error')
+    assert 'raise BmvError(FAIL.rename_done_already)' in cli.err
+
+def test_sources(tr):
+    # Paths and args.
+    origs = ('z1', 'z2', 'z3')
+    news = ('A1', 'A2', 'A3')
+    args = origs + news
+    args_txt = CON.newline.join(args)
+    yes = '--yes'
+
+    def do_checks(cli):
+        cli.run()
+        assert cli.success
+        cli.check_file_sys(*news)
+
+    # Base scenario: paths via args.
+    cli = CliRenamerSIO(*args, yes, file_sys = origs)
+    do_checks(cli)
+
+    # Paths via clipboard.
+    write_to_clipboard(args_txt)
+    cli = CliRenamerSIO('--clipboard', yes, file_sys = origs)
+    do_checks(cli)
+
+    # Paths via stdin.
+    cli = CliRenamerSIO('--stdin', yes, file_sys = origs, replies = args_txt)
+    do_checks(cli)
+
+    # Paths via a file.
+    path = tr.TEMP_PATH
+    with open(path, 'w') as fh:
+        fh.write(args_txt)
+    cli = CliRenamerSIO('--file', path, yes, file_sys = origs, replies = args_txt)
+    do_checks(cli)
+
+def test_pagination(tr):
+    # Paths.
+    origs = tuple(ascii_lowercase)
+    news = tuple(o + o for o in origs)
+
+    # Exercise the paginate() function by using cat and /dev/null.
+    cli = CliRenamerSIO(
+        *origs,
+        '--rename',
+        'return o + o',
+        file_sys = origs,
+        yes = True,
+        pager = 'cat > /dev/null',
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+def test_some_failed_rps(tr):
+    # Paths and args.
+    origs = ('z1', 'z2', 'z3', 'z4')
+    news = ('A1', 'z2', 'z3', 'A4')
+    args = origs + news
+
+    # TODO
+    return
+
+    # ...
+    cli = CliRenamerSIO(
+        *args,
+        '',
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
 

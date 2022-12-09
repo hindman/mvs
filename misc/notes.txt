@@ -24,10 +24,6 @@ Testing:
 
     Issues:
 
-        - CliRenamer.run(): factor out common behavior:
-            - setting exit_code
-            - writing a msg-with-newline to stdout/stderr
-
         - File operations can fail:
             - collecting input paths (eg, missing or unreadable input file-source).
             - writing to log
@@ -36,6 +32,7 @@ Testing:
             - clobbering
             - creating parents
             - A good way make real tests?
+            - A few real tests would also exercise the currently-uncoverable code.
 
         - Reduce code repetition in test_plan.py.
 
@@ -44,6 +41,7 @@ Testing:
             - comments
             - naming
             - clarity/simplicity
+            - Failure types: assess for consistency, naming, and usage in the code.
 
 Project name change:
     - bmv is claimed [emailed maintainer: Nov 2; no reply].

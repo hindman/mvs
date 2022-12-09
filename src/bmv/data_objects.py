@@ -9,6 +9,10 @@ class OptsFailure(Failure):
     pass
 
 @dataclass
+class ArgParseFailure(Failure):
+    pass
+
+@dataclass
 class ParseFailure(Failure):
     pass
 

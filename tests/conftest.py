@@ -13,6 +13,8 @@ class TestResource(object):
 
     WORK_AREA_ROOT = 'tests/work_area/'
 
+    TEMP_PATH = 'tests/work_area/tempfile'
+
     OUTS = dict(
         listing_a2aa = dedent('''
             Paths to be renamed (total 3, listed 3).

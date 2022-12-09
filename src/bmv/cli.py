@@ -14,6 +14,7 @@ from textwrap import dedent
 
 from .version import __version__
 from .plan import RenamingPlan
+
 from .constants import (
     CON,
     CLI,
@@ -22,8 +23,10 @@ from .constants import (
     CONTROLLABLES,
     validated_failure_controls,
 )
+
 from .data_objects import (
     Failure,
+    ArgParseFailure,
     OptsFailure,
     ExitCondition,
 )
@@ -48,7 +51,7 @@ class CliRenamer:
                  stdin = sys.stdin,
                  logfh = None):
 
-        # Store constructor arguments.
+        # Attributes received as arguments.
         self.args = args
         self.file_sys = file_sys
         self.stdout = stdout
@@ -56,14 +59,27 @@ class CliRenamer:
         self.stdin = stdin
         self.logfh = logfh
 
-        # Other attributes that will be set by run().
+        # Data attributes that will be set during do_prepare().
         self.opts = None
         self.inputs = None
         self.plan = None
-        self.exit_msg = None
+
+        # Status tracking attributes.
         self.exit_code = None
+        self.has_prepared = False
+        self.has_renamed = False
 
     def run(self):
+        self.do_prepare()
+        if not self.done:
+            self.do_rename()
+
+    def do_prepare(self):
+        # Don't execute more than once.
+        if self.has_prepared:
+            return
+        else:
+            self.has_prepared = True
 
         # Parse args.
         self.opts = self.handle_exit(parse_command_line_args(self.args))
@@ -71,10 +87,8 @@ class CliRenamer:
         if self.done:
             return
 
-        ###############################################################################
-
         # Collect the input paths.
-        self.inputs = collect_input_paths(self.opts)
+        self.inputs = self.collect_input_paths()
 
         # Initialize RenamingPlan.
         self.plan = RenamingPlan(
@@ -94,8 +108,7 @@ class CliRenamer:
         plan.prepare()
         if plan.failed:
             msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
-            self.stderr.write(with_newline(msg))
-            self.exit_code = CON.exit_fail
+            self.wrapup(CON.exit_fail, msg)
             return
 
         # Print the renaming listing.
@@ -104,16 +117,14 @@ class CliRenamer:
 
         # Stop if dryrun mode.
         if opts.dryrun:
-            self.stdout.write(with_newline(CON.no_action_msg))
-            self.exit_code = CON.exit_ok
+            self.wrapup(CON.exit_ok, CON.no_action_msg)
             return
 
         # User confirmation.
         if not opts.yes:
             msg = msg_with_tallies('\nRename paths{}', plan.rps, opts.limit)
             if not self.get_confirmation(msg, expected = 'yes'):
-                self.stdout.write(with_newline(CON.no_action_msg))
-                self.exit_code = CON.exit_ok
+                self.wrapup(CON.exit_ok, CON.no_action_msg)
                 return
 
         # Log the renamings.
@@ -121,16 +132,29 @@ class CliRenamer:
             log_data = collect_logging_data(opts, plan)
             self.write_to_json_file(log_file_path(), log_data)
 
-        # Rename.
+    def do_rename(self):
+        # Don't execute more than once.
+        if self.has_renamed:
+            return
+        else:
+            self.has_renamed = True
+
+        # Rename paths.
         try:
-            plan.rename_paths()
-            self.exit_code = CON.exit_ok
-            self.stdout.write(with_newline(CON.paths_renamed_msg))
+            self.plan.rename_paths()
+            self.wrapup(CON.exit_ok, CON.paths_renamed_msg)
         except Exception as e:
-            self.exit_code = CON.exit_fail
             tb = traceback.format_exc()
             msg = FAIL.renaming_raised.format(tb)
-            self.stderr.write(with_newline(msg))
+            self.wrapup(CON.exit_fail, msg)
+
+    def wrapup(self, code, msg):
+        # Helper for do_prepare() and do_rename().
+        # Writes a newline-terminated message and sets exit_code.
+        fh = self.stdout if code == CON.exit_ok else self.stderr
+        msg = msg if msg.endswith(CON.newline) else msg + CON.newline
+        fh.write(msg)
+        self.exit_code = code
 
     ####
     # Command-line argument handling.
@@ -142,11 +166,9 @@ class CliRenamer:
 
     def handle_exit(self, x):
         if isinstance(x, Failure):
-            self.exit_code = CON.exit_fail
-            self.stderr.write(with_newline(x.msg))
+            self.wrapup(CON.exit_fail, x.msg)
         elif isinstance(x, ExitCondition):
-            self.exit_code = CON.exit_ok
-            self.stdout.write(with_newline(x.msg))
+            self.wrapup(CON.exit_ok, x.msg)
         return x
 
     def paginate(self, text):
@@ -167,6 +189,22 @@ class CliRenamer:
         with open(path, 'w') as fh:
             json.dump(d, self.logfh or fh, indent = 4)
 
+    def collect_input_paths(self):
+        # Get the input path text from the source.
+        # Returns a tuple of stripped lines.
+        opts = self.opts
+        if opts.paths:
+            paths = opts.paths
+        else:
+            if opts.clipboard:
+                text = read_from_clipboard()
+            elif opts.file:
+                text = read_from_file(opts.file)
+            else:
+                text = self.stdin.read()
+            paths = text.split(CON.newline)
+        return tuple(path.strip() for path in paths)
+
 ####
 # Collecting input paths.
 ####
@@ -174,21 +212,6 @@ class CliRenamer:
 def get_structure(opts):
     gen = (s for s in STRUCTURES.keys() if getattr(opts, s, None))
     return next(gen, None)
-
-def collect_input_paths(opts):
-    # Get the input path text from the source.
-    # Returns a tuple of stripped lines.
-    if opts.paths:
-        paths = opts.paths
-    else:
-        if opts.clipboard:
-            text = read_from_clipboard()
-        elif opts.file:
-            text = read_from_file(opts.file)
-        else:
-            text = sys.stdin.read()
-        paths = text.split(CON.newline)
-    return tuple(path.strip() for path in paths)
 
 ####
 # Utilities: listings, pagination, and logging.
@@ -259,10 +282,6 @@ def fail_controls_kws(opts):
         for k in CONTROLLABLES.keys()
     }
 
-def with_newline(msg):
-    nl = CON.newline
-    return msg if msg.endswith(nl) else msg + nl
-
 def parse_command_line_args(args):
     # Create the parser.
     ap = create_arg_parser()
@@ -276,7 +295,7 @@ def parse_command_line_args(args):
         opts = ap.parse_args(args)
     except SystemExit as e:
         msg = sys.stderr.getvalue()
-        return Failure(msg)
+        return ArgParseFailure(msg)
     finally:
         sys.stderr = real_stderr
 

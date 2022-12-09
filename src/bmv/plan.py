@@ -385,13 +385,6 @@ class RenamingPlan:
         else:
             return clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
 
-        # # If any group contains multiple members, add them all as potential failures.
-        # for g in groups.values():
-        #     if len(g) > 1:
-        #         for rp in g:
-        #             rp = clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
-        #             self.catch_failure(rp)
-
     ####
     # Methods related to failure control.
     ####
