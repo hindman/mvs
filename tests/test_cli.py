@@ -21,35 +21,24 @@ from bmv.cli import (
 '''
 
 TODO:
-    main()                  # Or ignore this for testing
-    pagination              # Ditto
-    rename_paths() raises   # Not sure how to test this.
+    main()                  # Ignore?
 
-    validated_options() returns a Failure
-    check_opts_require_one(): various scenarios
+    rename_paths() raises   # Test by setting plan.has_renamed = True
+
+    pagination              # Ignore?
 
     input paths from:
         clipboard
         file
         stdin
 
-Types of I/O operations in main():
+    scenario with some failed rps in the listing.
 
-    Writing:
-        stdout.write()   # halt()
-        stderr.write()   # halt()
-        print()          # main(), main(), paginate()
-        fh.write()       # log file
+    scenario with some invalid failure controls via the CliRenamer
 
-    Reading:
-        stdin.read()     # collect_input_paths()
-        input()          # get_confirmation()
+    scenario with too few/many sources and structures via the CliRenamer
 
-    Pagination:
-        subprocess       # paginate()
-
-    Exiting:
-        sys.exit()       # halt()
+    Then refactor validated_options()into one function.
 
 '''
 
@@ -171,24 +160,28 @@ def test_no_confirmation(tr):
     exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['no_action']
     assert got == exp
 
-def test_bad_indent(tr, capsys):
+def test_indent_and_posint(tr):
+    # Paths and args.
     origs = ('a', 'b', 'c')
-    cli = CliRenamerSIO(
-        '--rename',
-        'return o + o',
-        '--indent',
-        '-4',
-        *origs,
-        file_sys = origs,
-    )
-    try:
+    args = ('--rename', 'return o + o', '--indent')
+    exp_file_sys = ('aa', 'bb', 'cc')
+
+    # Valid indent values.
+    for i in ('2', '4', '8'):
+        cli = CliRenamerSIO(*args, i, *origs, file_sys = origs, yes = True)
         cli.run()
-        cap = None
-    except SystemExit as e:
-        cap = capsys.readouterr()
-    # TODO: rework arg parsing a bit so I can make assert cli.failure instead.
-    assert cli.exit_code is None
-    exp = '--indent: invalid positive_int value'
-    assert exp in cap.err
-    assert cap.out == ''
+        assert cli.success
+        cli.check_file_sys(*exp_file_sys)
+        assert cli.err == ''
+        assert cli.out
+
+    # Invalid indent values.
+    for i in ('-4', 'xx', '0', '1.2'):
+        cli = CliRenamerSIO(*args, i, *origs, file_sys = origs, yes = True)
+        cli.run()
+        assert cli.failure
+        assert cli.out == ''
+        exp = '--indent: invalid positive_int value'
+        assert exp in cli.err
+        assert cli.err.startswith(f'usage: {CON.app_name}')
 

@@ -7,6 +7,7 @@ import sys
 import traceback
 
 from datetime import datetime
+from io import StringIO
 from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
@@ -98,7 +99,7 @@ class CliRenamer:
             return
 
         # Print the renaming listing.
-        listing = listing_msg(plan.rps, opts.limit, 'Paths to be renamed{}.\n')
+        listing = listing_msg('Paths to be renamed{}.\n', plan.rps, opts.limit)
         self.paginate(listing)
 
         # Stop if dryrun mode.
@@ -109,7 +110,7 @@ class CliRenamer:
 
         # User confirmation.
         if not opts.yes:
-            msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
+            msg = msg_with_tallies('\nRename paths{}', plan.rps, opts.limit)
             if not self.get_confirmation(msg, expected = 'yes'):
                 self.stdout.write(with_newline(CON.no_action_msg))
                 self.exit_code = CON.exit_ok
@@ -193,20 +194,20 @@ def collect_input_paths(opts):
 # Utilities: listings, pagination, and logging.
 ####
 
-def listing_msg(xs, limit, msg_fmt):
-    tallies = tallies_msg(xs, limit, msg_fmt)
-    xs_limited = xs if limit is None else xs[0:limit]
-    if xs_limited:
-        items = CON.newline.join(x.formatted for x in xs_limited)
-        return f'{tallies}\n{items}'
-    else:
-        return tallies_msg
-
-def tallies_msg(xs, limit, msg_fmt):
+def msg_with_tallies(fmt, xs, limit):
+    # Returns a message followed by two counts in parentheses:
+    # N items; and N items listed based on opts.limit.
     n = len(xs)
     lim = n if limit is None else limit
     tallies = f' (total {n}, listed {lim})'
-    return msg_fmt.format(tallies)
+    return fmt.format(tallies)
+
+def listing_msg(fmt, xs, limit):
+    # Returns a message-with-tallies followed by a potentially-limited
+    # listing of RenamePair paths.
+    msg = msg_with_tallies(fmt, xs, limit)
+    items = CON.newline.join(x.formatted for x in xs[0:limit])
+    return f'{msg}\n{items}'
 
 def collect_logging_data(opts, plan):
     d = dict(
@@ -263,19 +264,36 @@ def with_newline(msg):
     return msg if msg.endswith(nl) else msg + nl
 
 def parse_command_line_args(args):
+    # Create the parser.
     ap = create_arg_parser()
-    opts = ap.parse_args(args)
+
+    # Try to parse args. In event of parsing failure, argparse tries to exit
+    # with usage plus error message. We capture that output to standard error
+    # in a StringIO and return the text in a Failure instance.
+    try:
+        real_stderr = sys.stderr
+        sys.stderr = StringIO()
+        opts = ap.parse_args(args)
+    except SystemExit as e:
+        msg = sys.stderr.getvalue()
+        return Failure(msg)
+    finally:
+        sys.stderr = real_stderr
+
+    # Deal with special options that will lead to an early, successful exit.
     if opts.help:
         text = 'U' + ap.format_help()[1:]
         return ExitCondition(text)
     elif opts.version:
         text = f'{CON.app_name} v{__version__}'
         return ExitCondition(text)
-    else:
-        return validated_failure_controls(
-            validated_options(opts),
-            opts_mode = True,
-        )
+
+    # Otherwise return the opts if they pass validations. If not,
+    # we will return a Failure.
+    return validated_failure_controls(
+        validated_options(opts),
+        opts_mode = True,
+    )
 
 def create_arg_parser():
     ap = argparse.ArgumentParser(

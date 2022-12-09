@@ -17,38 +17,33 @@ todos: TODOs
 Testing:
 
     test_cli.py
-        See docstring
+        - See docstring
 
-        Problem:
-            - collecting input paths can fail (eg, missing or unreadable input file-source).
+    test_data_objects.py
+        - Kwexception.new(): exercise it
 
-        Problem:
-            Need a better way to check error messages:
-                - see test_main_prepare_failed()
-                - my helper for this (a) wasn't very good, (b) resides in test_plan.py
+    Issues:
 
-        Problem:
-            When argparse raises SystemExit ... my design crumbles.
+        - CliRenamer.run(): factor out common behavior:
+            - setting exit_code
+            - writing a msg-with-newline to stdout/stderr
 
-            Here's one idea: replace sys.stderr during arg parsing:
+        - File operations can fail:
+            - collecting input paths (eg, missing or unreadable input file-source).
+            - writing to log
 
-                # See tmp/argparse_experiment.py
-                try:
-                    real_stderr = sys.stderr
-                    sys.stderr = StringIO()
-                    opts = p.parse_args()
-                    msg = 'OK'
-                except SystemExit as e:
-                    msg = sys.stderr.getvalue()
-                finally:
-                    sys.stderr = real_stderr
+        - Do all of the file system operations actually work correctly?
+            - clobbering
+            - creating parents
+            - A good way make real tests?
 
-                print(msg)
+        - Reduce code repetition in test_plan.py.
 
-    test_plan.py:
-        - Code organization.
-        - Find a way to reduce code repetition.
-        - Not covered: actual renaming scenario not using an injected file_sys.
+        - Editing pass over code and tests:
+            - organization
+            - comments
+            - naming
+            - clarity/simplicity
 
 Project name change:
     - bmv is claimed [emailed maintainer: Nov 2; no reply].
