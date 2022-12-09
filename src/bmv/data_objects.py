@@ -48,7 +48,7 @@ class RpExistsFailure(Failure):
 class RpCollsionFailure(Failure):
     pass
 
-@dataclass
+@dataclass(frozen = True)
 class ExitCondition:
     msg: str
 

@@ -1,7 +1,7 @@
 import pytest
-import io
 import re
 
+from io import StringIO
 from pathlib import Path
 from textwrap import dedent
 
@@ -15,44 +15,23 @@ from bmv.version import __version__
 
 from bmv.cli import (
     main,
-    parse_command_line_args,
+    CliRenamer,
 )
 
 '''
 
 TODO:
-    if plan.failed: the true scenario
-    dryrun
-    user says no to confirmation
-    rename_paths() raises
+    main()                  # Or ignore this for testing
+    pagination              # Ditto
+    rename_paths() raises   # Not sure how to test this.
+
     validated_options() returns a Failure
     check_opts_require_one(): various scenarios
+
     input paths from:
         clipboard
         file
         stdin
-
-Where I/O happens:
-
-    Writing output:
-
-        - Use capsys
-
-        sys.stderr.write()  # halt()
-        sys.stdout.write()  # halt()
-        print()             # main() twice
-        subprocess          # paginate(), which also uses print()
-        input()             # get_confirmation()
-
-    Exiting:
-        - Catch SystemExit.
-
-        sys.exit()          # halt()
-
-    Getting user input:
-
-        sys.stdin.read()    # collect_input_paths()
-        input()             # get_confirmation()
 
 Types of I/O operations in main():
 
@@ -72,29 +51,34 @@ Types of I/O operations in main():
     Exiting:
         sys.exit()       # halt()
 
+'''
 
-def main(args = None):
-    args = sys.argv[1:] if args is None else args
-    cli = CliRenamer(args)
-    code = cli.go()
-    sys.exit(code)
+class CliRenamerSIO(CliRenamer):
+    # A thin wrapper around a CliRenamer using StringIO instances:
+    #
+    # - Adds args to disable pagination.
+    # - Sets I/O handles to be StringIO instances, so we can capture outputs.
+    # - Add a convenience for user confirmation.
+    # - Adds a few properties/methods to simplify assertion making.
 
-class CliRenamerIO(CliRenamer):
-
-    def __init__(self, args, file_sys = None, replies = tuple()):
-        reply_txt = CON.newline.join(replies)
+    def __init__(self, *args, file_sys = None, reply = '', yes = False):
+        args = args + ('--pager', '')
         super().__init__(
-           *args,
+            args,
             file_sys = file_sys,
             stdout = StringIO(),
             stderr = StringIO(),
-            stdin = StringIO(reply_txt),
+            stdin = StringIO('yes' if yes else reply),
             logfh = StringIO(),
         )
 
     @property
     def success(self):
-        return self.exit_code = CON.exit_ok
+        return self.exit_code == CON.exit_ok
+
+    @property
+    def failure(self):
+        return self.exit_code == CON.exit_fail
 
     @property
     def out(self):
@@ -108,163 +92,103 @@ class CliRenamerIO(CliRenamer):
     def log(self):
         return self.logfh.getvalue()
 
+    def check_file_sys(self, *paths):
+        assert tuple(self.plan.file_sys) == paths
+
 def test_version_and_help(tr, capsys):
     # Version.
-    cli = cli_renamer_io('bmv', '--version')
-    cli.go()
+    cli = CliRenamerSIO('bmv', '--version')
+    cli.run()
     assert cli.success
-    assert cli.out = f'{CON.app_name} v{__version__}\n'
-    assert cli.err = ''
-
-class CliRenamer:
-
-    def __init__(self,
-                 args,
-                 file_sys = None,
-                 stdout = sys.stdout,
-                 stderr = sys.stderr,
-                 stdin = sys.stdin,
-                 logfh = None)
-        self.args = args
-        ...
-
-        self.opts = None
-        self.inputs = None
-        self.plan = None
-
-    def go(self):
-
-        # Parse args.
-        self.opts = self.parse_command_line_args()
-        if self.done:
-            return self.exit_code
-
-        # Collect the input paths.
-        try:
-            self.inputs = self.collect_input_paths()
-        except Exception as e:
-            ...
-            return self.exit_code
-
-        # Initialize RenamingPlan.
-        opts = self.opts
-        self.plan = RenamingPlan(
-            inputs = self.inputs,
-            rename_code = opts.rename,
-            structure = self.get_structure(),
-            seq_start = opts.seq,
-            seq_step = opts.step,
-            filter_code = opts.filter,
-            indent = opts.indent,
-            file_sys = self.file_sys,
-            **fail_controls_kws(opts),
-        )
-
-        # Prepare the RenamingPlan and halt if it failed.
-        plan.prepare()
-        if plan.failed:
-            msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
-            self.stderr.write(msg)
-            return CON.exit_fail
-
-        # Print the renaming listing.
-        listing = listing_msg(plan.rps, opts.limit, 'Paths to be renamed{}.\n')
-        self.paginate(listing)
-
-        # Stop if dryrun mode.
-        if opts.dryrun:
-            self.stdout.write(CON.no_action_msg)
-            return CON.exit_ok
-
-        # User confirmation.
-        if not opts.yes:
-            msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
-            if get_confirmation(msg, expected = 'yes'):
-                print(CON.paths_renamed_msg)
-            else:
-                halt(CON.exit_ok, CON.no_action_msg)
-
-        # Log the renamings.
-        if not opts.nolog:
-            log_data = collect_logging_data(opts, plan)
-            write_to_json_file(log_file_path(), log_data)
-
-        # Rename.
-        try:
-            plan.rename_paths()
-            return CON.exit_ok if file_sys is None else plan
-        except Exception as e:
-            tb = traceback.format_exc()
-            msg = FAIL.renaming_raised.format(tb)
-            halt(CON.exit_fail, msg)
-
-
-
-
-'''
-
-def test_version_and_help(tr, capsys):
-    # Version.
-    args = ('bmv', '--version')
-    with pytest.raises(SystemExit) as exc:
-        main(args)
-    assert exc.value.code == CON.exit_ok
-    cap = capsys.readouterr()
-    assert cap.out == f'{CON.app_name} v{__version__}\n'
-    assert cap.err == ''
+    assert cli.err == ''
+    assert cli.out == f'{CON.app_name} v{__version__}\n'
 
     # Help.
-    args = ('bmv', '--version', '--help')
-    with pytest.raises(SystemExit) as exc:
-        main(args)
-    assert exc.value.code == CON.exit_ok
-    cap = capsys.readouterr()
-    out = cap.out
-    assert cap.err == ''
-    assert out.startswith(f'Usage: {CON.app_name}')
-    assert len(out) > 4000
+    cli = CliRenamerSIO('bmv', '--version', '--help')
+    cli.run()
+    assert cli.success
+    assert cli.err == ''
+    assert cli.out.startswith(f'Usage: {CON.app_name}')
+    assert len(cli.out) > 4000
     for opt in ('--clipboard', '--paragraphs', '--rename'):
-        assert f'\n  {opt}' in out
+        assert f'\n  {opt}' in cli.out
 
-def glob(pattern, root = '.'):
-    return tuple(map(str, Path(root).glob(pattern)))
-
-def test_main_basic(tr, capsys, monkeypatch):
-    args = tr.cliargs('--rename', 'return o + o')
+def test_basic_use_case(tr):
     origs = ('a', 'b', 'c')
-    file_sys = origs
-    exp_file_sys = ('aa', 'bb', 'cc')
-    monkeypatch.setattr('sys.stdin', io.StringIO('yes'))
-    plan = main(args + origs, file_sys = file_sys)
-    assert tuple(plan.file_sys) == exp_file_sys
-    cap = capsys.readouterr()
-    assert cap.err == ''
-    got = re.sub(r' +\n', '\n', cap.out)
-    exp = dedent('''
-        Paths to be renamed (total 3, listed 3).
-
-        a
-        aa
-
-        b
-        bb
-
-        c
-        cc
-
-
-        Rename paths (total 3, listed 3) [yes]?
-        Paths renamed.
-    ''').lstrip()
+    cli = CliRenamerSIO(
+        '--rename',
+        'return o + o',
+        *origs,
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys('aa', 'bb', 'cc')
+    assert cli.err == ''
+    got = cli.out.replace(' \n', '\n\n', 1)
+    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
     assert got == exp
 
-def test_main_prepare_failed(tr, capsys, monkeypatch):
+def test_prepare_failed(tr):
     origs = ('z1',)
-    args = tr.cliargs()
-    with pytest.raises(SystemExit) as exc:
-        main(args + origs, file_sys = origs)
-    assert exc.value.code == CON.exit_fail
-    cap = capsys.readouterr()
+    cli = CliRenamerSIO(*origs, file_sys = origs)
+    cli.run()
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.err == 'Renaming preparation failed: Got an unequal number of original paths and new paths.\n'
+
+def test_dryrun(tr):
+    origs = ('a', 'b', 'c')
+    cli = CliRenamerSIO(
+        '--rename',
+        'return o + o',
+        '--dryrun',
+        *origs,
+        file_sys = origs,
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*origs)
+    assert cli.err == ''
+    got = re.sub(r' +\n', '\n', cli.out)
+    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['no_action']
+    assert got == exp
+
+def test_no_confirmation(tr):
+    origs = ('a', 'b', 'c')
+    cli = CliRenamerSIO(
+        '--rename',
+        'return o + o',
+        *origs,
+        file_sys = origs,
+    )
+    cli.run()
+    assert cli.success
+    assert cli.err == ''
+    cli.check_file_sys(*origs)
+    got = cli.out.replace(' \n', '\n\n', 1)
+    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['no_action']
+    assert got == exp
+
+def test_bad_indent(tr, capsys):
+    origs = ('a', 'b', 'c')
+    cli = CliRenamerSIO(
+        '--rename',
+        'return o + o',
+        '--indent',
+        '-4',
+        *origs,
+        file_sys = origs,
+    )
+    try:
+        cli.run()
+        cap = None
+    except SystemExit as e:
+        cap = capsys.readouterr()
+    # TODO: rework arg parsing a bit so I can make assert cli.failure instead.
+    assert cli.exit_code is None
+    exp = '--indent: invalid positive_int value'
+    assert exp in cap.err
     assert cap.out == ''
-    assert cap.err == 'Renaming preparation failed: Got an unequal number of original paths and new paths.\n'
 

@@ -31,81 +31,253 @@ from .data_objects import (
 # Entry point.
 ####
 
-def main(args = None, file_sys = None):
-    # Parse and validate command-line arguments.
+def main(args = None):
     args = sys.argv[1:] if args is None else args
-    opts = handle_exit(parse_command_line_args(args))
+    cli = CliRenamer(args)
+    cli.run()
+    sys.exit(cli.exit_code)
 
-    # Collect the input paths.
-    inputs = collect_input_paths(opts)
+class CliRenamer:
 
-    # Initialize RenamingPlan.
-    plan = RenamingPlan(
-        inputs = inputs,
-        rename_code = opts.rename,
-        structure = get_structure(opts),
-        seq_start = opts.seq,
-        seq_step = opts.step,
-        filter_code = opts.filter,
-        indent = opts.indent,
-        file_sys = file_sys,
-        **fail_controls_kws(opts),
+    def __init__(self,
+                 args,
+                 file_sys = None,
+                 stdout = sys.stdout,
+                 stderr = sys.stderr,
+                 stdin = sys.stdin,
+                 logfh = None):
+
+        # Store constructor arguments.
+        self.args = args
+        self.file_sys = file_sys
+        self.stdout = stdout
+        self.stderr = stderr
+        self.stdin = stdin
+        self.logfh = logfh
+
+        # Other attributes that will be set by run().
+        self.opts = None
+        self.inputs = None
+        self.plan = None
+        self.exit_msg = None
+        self.exit_code = None
+
+    def run(self):
+
+        # Parse args.
+        self.opts = self.handle_exit(parse_command_line_args(self.args))
+        opts = self.opts
+        if self.done:
+            return
+
+        ###############################################################################
+
+        # Collect the input paths.
+        self.inputs = collect_input_paths(self.opts)
+
+        # Initialize RenamingPlan.
+        self.plan = RenamingPlan(
+            inputs = self.inputs,
+            rename_code = opts.rename,
+            structure = get_structure(opts),
+            seq_start = opts.seq,
+            seq_step = opts.step,
+            filter_code = opts.filter,
+            indent = opts.indent,
+            file_sys = self.file_sys,
+            **fail_controls_kws(opts),
+        )
+        plan = self.plan
+
+        # Prepare the RenamingPlan and halt if it failed.
+        plan.prepare()
+        if plan.failed:
+            msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
+            self.stderr.write(with_newline(msg))
+            self.exit_code = CON.exit_fail
+            return
+
+        # Print the renaming listing.
+        listing = listing_msg(plan.rps, opts.limit, 'Paths to be renamed{}.\n')
+        self.paginate(listing)
+
+        # Stop if dryrun mode.
+        if opts.dryrun:
+            self.stdout.write(with_newline(CON.no_action_msg))
+            self.exit_code = CON.exit_ok
+            return
+
+        # User confirmation.
+        if not opts.yes:
+            msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
+            if not self.get_confirmation(msg, expected = 'yes'):
+                self.stdout.write(with_newline(CON.no_action_msg))
+                self.exit_code = CON.exit_ok
+                return
+
+        # Log the renamings.
+        if not opts.nolog:
+            log_data = collect_logging_data(opts, plan)
+            self.write_to_json_file(log_file_path(), log_data)
+
+        # Rename.
+        try:
+            plan.rename_paths()
+            self.exit_code = CON.exit_ok
+            self.stdout.write(with_newline(CON.paths_renamed_msg))
+        except Exception as e:
+            self.exit_code = CON.exit_fail
+            tb = traceback.format_exc()
+            msg = FAIL.renaming_raised.format(tb)
+            self.stderr.write(with_newline(msg))
+
+    ####
+    # Command-line argument handling.
+    ####
+
+    @property
+    def done(self):
+        return self.exit_code is not None
+
+    def handle_exit(self, x):
+        if isinstance(x, Failure):
+            self.exit_code = CON.exit_fail
+            self.stderr.write(with_newline(x.msg))
+        elif isinstance(x, ExitCondition):
+            self.exit_code = CON.exit_ok
+            self.stdout.write(with_newline(x.msg))
+        return x
+
+    def paginate(self, text):
+        if self.opts.pager:
+            p = subprocess.Popen(self.opts.pager, stdin = subprocess.PIPE, shell = True)
+            p.stdin.write(text.encode(CON.encoding))
+            p.communicate()
+        else:
+            self.stdout.write(text)
+
+    def get_confirmation(self, prompt, expected = 'y'):
+        msg = prompt + f' [{expected}]? '
+        self.stdout.write(msg)
+        reply = self.stdin.readline().lower().strip()
+        return reply == expected
+
+    def write_to_json_file(self, path, d):
+        with open(path, 'w') as fh:
+            json.dump(d, self.logfh or fh, indent = 4)
+
+####
+# Collecting input paths.
+####
+
+def get_structure(opts):
+    gen = (s for s in STRUCTURES.keys() if getattr(opts, s, None))
+    return next(gen, None)
+
+def collect_input_paths(opts):
+    # Get the input path text from the source.
+    # Returns a tuple of stripped lines.
+    if opts.paths:
+        paths = opts.paths
+    else:
+        if opts.clipboard:
+            text = read_from_clipboard()
+        elif opts.file:
+            text = read_from_file(opts.file)
+        else:
+            text = sys.stdin.read()
+        paths = text.split(CON.newline)
+    return tuple(path.strip() for path in paths)
+
+####
+# Utilities: listings, pagination, and logging.
+####
+
+def listing_msg(xs, limit, msg_fmt):
+    tallies = tallies_msg(xs, limit, msg_fmt)
+    xs_limited = xs if limit is None else xs[0:limit]
+    if xs_limited:
+        items = CON.newline.join(x.formatted for x in xs_limited)
+        return f'{tallies}\n{items}'
+    else:
+        return tallies_msg
+
+def tallies_msg(xs, limit, msg_fmt):
+    n = len(xs)
+    lim = n if limit is None else limit
+    tallies = f' (total {n}, listed {lim})'
+    return msg_fmt.format(tallies)
+
+def collect_logging_data(opts, plan):
+    d = dict(
+        version = __version__,
+        current_directory = str(Path.cwd()),
+        opts = vars(opts),
+    )
+    d.update(**plan.as_dict)
+    return d
+
+def log_file_path():
+    home = Path.home()
+    subdir = '.' + CON.app_name
+    now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return Path.home() / subdir / (now + '.json')
+
+####
+# Utilities: reading from or writing to files, clipboard, etc.
+####
+
+def read_from_file(path):
+    with open(path) as fh:
+        return fh.read()
+
+def read_from_clipboard():
+    cp = subprocess.run(
+        ['pbpaste'],
+        capture_output = True,
+        check = True,
+        text = True,
+    )
+    return cp.stdout
+
+def write_to_clipboard(text):
+    subprocess.run(
+        ['pbcopy'],
+        check = True,
+        text = True,
+        input = text,
     )
 
-    # Prepare the RenamingPlan and halt if it failed.
-    plan.prepare()
-    if plan.failed:
-        msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
-        halt(CON.exit_fail, msg)
-
-    # Print the renaming listing.
-    listing = listing_msg(plan.rps, opts.limit, 'Paths to be renamed{}.\n')
-    paginate(listing, opts.pager)
-
-    # Stop if dryrun mode.
-    if opts.dryrun:
-        halt(CON.exit_ok, CON.no_action_msg)
-
-    # User confirmation.
-    if not opts.yes:
-        msg = tallies_msg(plan.rps, opts.limit, '\nRename paths{}')
-        if get_confirmation(msg, expected = 'yes'):
-            print(CON.paths_renamed_msg)
-        else:
-            halt(CON.exit_ok, CON.no_action_msg)
-
-    # Log the renamings.
-    if not opts.nolog:
-        log_data = collect_logging_data(opts, plan)
-        write_to_json_file(log_file_path(), log_data)
-
-    # Rename.
-    try:
-        plan.rename_paths()
-        return CON.exit_ok if file_sys is None else plan
-    except Exception as e:
-        tb = traceback.format_exc()
-        msg = FAIL.renaming_raised.format(tb)
-        halt(CON.exit_fail, msg)
-
 ####
-# Command-line argument handling.
+# Utilities: other.
 ####
+
+def fail_controls_kws(opts):
+    return {
+        k : getattr(opts, k)
+        for k in CONTROLLABLES.keys()
+    }
+
+def with_newline(msg):
+    nl = CON.newline
+    return msg if msg.endswith(nl) else msg + nl
 
 def parse_command_line_args(args):
-    ap, opts = parse_args(args)
+    ap = create_arg_parser()
+    opts = ap.parse_args(args)
     if opts.help:
         text = 'U' + ap.format_help()[1:]
         return ExitCondition(text)
     elif opts.version:
-        return ExitCondition(f'{CON.app_name} v{__version__}')
+        text = f'{CON.app_name} v{__version__}'
+        return ExitCondition(text)
     else:
         return validated_failure_controls(
             validated_options(opts),
             opts_mode = True,
         )
 
-def parse_args(args):
+def create_arg_parser():
     ap = argparse.ArgumentParser(
         prog = CON.app_name,
         description = CLI.description,
@@ -119,8 +291,7 @@ def parse_args(args):
             g = ap.add_argument_group(kws.pop(CLI.group))
         xs = kws.pop(CLI.names).split()
         g.add_argument(*xs, **kws)
-    opts = ap.parse_args(args)
-    return (ap, opts)
+    return ap
 
 def validated_options(opts):
     # Define the option checks.
@@ -159,129 +330,4 @@ def create_opts_failure(opt_names, base_msg):
         for nm in opt_names
     )
     return OptsFailure(f'{base_msg}: {joined}')
-
-####
-# Collecting input paths.
-####
-
-def get_structure(opts):
-    gen = (s for s in STRUCTURES.keys() if getattr(opts, s, None))
-    return next(gen, None)
-
-def collect_input_paths(opts):
-    # Get the input path text from the source.
-    # Returns a tuple of stripped lines.
-    if opts.paths:
-        paths = opts.paths
-    else:
-        if opts.clipboard:
-            text = read_from_clipboard()
-        elif opts.file:
-            text = read_from_file(opts.file)
-        else:
-            text = sys.stdin.read()
-        paths = text.split(CON.newline)
-    return tuple(path.strip() for path in paths)
-
-def handle_exit(x):
-    if isinstance(x, Failure):
-        halt(CON.exit_fail, x.msg)
-    elif isinstance(x, ExitCondition):
-        halt(CON.exit_ok, x.msg)
-    else:
-        return x
-
-####
-# Utilities: listings, pagination, and logging.
-####
-
-def paginate(text, pager_cmd):
-    if pager_cmd:
-        p = subprocess.Popen(pager_cmd, stdin = subprocess.PIPE, shell = True)
-        p.stdin.write(text.encode(CON.encoding))
-        p.communicate()
-    else:
-        print(text)
-
-def listing_msg(xs, limit, msg_fmt):
-    tallies = tallies_msg(xs, limit, msg_fmt)
-    xs_limited = xs if limit is None else xs[0:limit]
-    if xs_limited:
-        items = CON.newline.join(x.formatted for x in xs_limited)
-        return f'{tallies}\n{items}'
-    else:
-        return tallies_msg
-
-def tallies_msg(xs, limit, msg_fmt):
-    n = len(xs)
-    lim = n if limit is None else limit
-    tallies = f' (total {n}, listed {lim})'
-    return msg_fmt.format(tallies)
-
-def collect_logging_data(opts, plan):
-    d = dict(
-        version = __version__,
-        current_directory = str(Path.cwd()),
-        opts = vars(opts),
-    )
-    d.update(**plan.as_dict)
-    return d
-
-def write_to_json_file(path, d):
-    with open(path, 'w') as fh:
-        json.dump(d, fh, indent = 4)
-
-def log_file_path():
-    home = Path.home()
-    subdir = '.' + CON.app_name
-    now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return Path.home() / subdir / (now + '.json')
-
-####
-# Utilities: reading from or writing to files, clipboard, etc.
-####
-
-def read_from_file(path):
-    with open(path) as fh:
-        return fh.read()
-
-def read_from_clipboard():
-    cp = subprocess.run(
-        ['pbpaste'],
-        capture_output = True,
-        check = True,
-        text = True,
-    )
-    return cp.stdout
-
-def write_to_clipboard(text):
-    subprocess.run(
-        ['pbcopy'],
-        check = True,
-        text = True,
-        input = text,
-    )
-
-####
-# Utilities: other.
-####
-
-def get_confirmation(prompt, expected = 'y'):
-    r = input(prompt + f' [{expected}]? ').lower().strip()
-    return r == expected
-
-def halt(code = None, msg = None):
-    code = CON.exit_ok if code is None else code
-    fh = sys.stderr if code else sys.stdout
-    if msg:
-        nl = CON.newline
-        msg = msg if msg.endswith(nl) else msg + nl
-        fh.write(msg)
-    sys.exit(code)
-
-def fail_controls_kws(opts):
-    return {
-        k : getattr(opts, k)
-        for k in CONTROLLABLES.keys()
-    }
 

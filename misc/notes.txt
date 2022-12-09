@@ -20,17 +20,30 @@ Testing:
         See docstring
 
         Problem:
-            - returning plan from main() is not a viable strategy
-            - you cannot check plan under any scenario where halt() is called.
-            - which you might want to do when the plan fails
-
-        Problem:
             - collecting input paths can fail (eg, missing or unreadable input file-source).
 
         Problem:
             Need a better way to check error messages:
                 - see test_main_prepare_failed()
                 - my helper for this (a) wasn't very good, (b) resides in test_plan.py
+
+        Problem:
+            When argparse raises SystemExit ... my design crumbles.
+
+            Here's one idea: replace sys.stderr during arg parsing:
+
+                # See tmp/argparse_experiment.py
+                try:
+                    real_stderr = sys.stderr
+                    sys.stderr = StringIO()
+                    opts = p.parse_args()
+                    msg = 'OK'
+                except SystemExit as e:
+                    msg = sys.stderr.getvalue()
+                finally:
+                    sys.stderr = real_stderr
+
+                print(msg)
 
     test_plan.py:
         - Code organization.

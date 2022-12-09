@@ -3,6 +3,8 @@ import json
 import pytest
 import sys
 
+from textwrap import dedent
+
 @pytest.fixture
 def tr():
     return TestResource()
@@ -11,7 +13,31 @@ class TestResource(object):
 
     WORK_AREA_ROOT = 'tests/work_area/'
 
-    NO_PAGER_ARGS = ('--pager', '')
+    OUTS = dict(
+        listing_a2aa = dedent('''
+            Paths to be renamed (total 3, listed 3).
+
+            a
+            aa
+
+            b
+            bb
+
+            c
+            cc
+
+        ''').lstrip(),
+        confirm3 = dedent('''
+            Rename paths (total 3, listed 3) [yes]?
+
+        ''').lstrip(),
+        paths_renamed = dedent('''
+            Paths renamed.
+        ''').lstrip(),
+        no_action = dedent('''
+            No action taken.
+        ''').lstrip(),
+    )
 
     def dump(self, val = None, label = 'dump()'):
         fmt = '\n--------\n{label} =>\n{val}'
@@ -21,9 +47,6 @@ class TestResource(object):
     def dumpj(self, val = None, label = 'dump()', indent = 4):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
-
-    def cliargs(self, *xs):
-        return self.NO_PAGER_ARGS + xs
 
 class StdStreams(object):
 
