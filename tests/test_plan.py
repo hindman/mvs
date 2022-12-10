@@ -180,10 +180,10 @@ def test_code_compilation_fails(tr):
         with pytest.raises(BmvError) as einfo:
             p.rename_paths()
         assert einfo.value.params['msg'] == FAIL.prepare_failed
-        f = p.uncontrolled_failures[0]
-        assert isinstance(f, UserCodeExecFailure)
-        assert bad_code in f.msg
-        assert 'invalid syntax' in f.msg
+        wf = p.uncontrolled_failures[0]
+        assert isinstance(wf.failure, UserCodeExecFailure)
+        assert bad_code in wf.msg
+        assert 'invalid syntax' in wf.msg
 
     # Scenario: invalid renaming code.
     plan = RenamingPlan(

@@ -31,6 +31,7 @@ from .data_objects import (
     RpExistsFailure,
     RpCollsionFailure,
     BmvError,
+    WrappedFailure,
 )
 
 class RenamingPlan:
@@ -307,13 +308,13 @@ class RenamingPlan:
                 pass
             elif control == CONTROLS.keep:
                 # Retain the RenamePair even though a failure occured during filtering.
-                yield clone(rp, failure = None)
+                yield clone(rp)
             elif control == CONTROLS.create:
                 # The RenamePair lacks a parent, but we will create it before renaming.
-                yield clone(rp, create_parent = True, failure = None)
+                yield clone(rp, create_parent = True)
             elif control == CONTROLS.clobber:
                 # During renaming, the RenamePair will overwrite something.
-                yield clone(rp, clobber = True, failure = None)
+                yield clone(rp, clobber = True)
             elif rp.exclude:
                 # The user's code decided to filter out the RenamePair.
                 pass
@@ -400,21 +401,22 @@ class RenamingPlan:
     def catch_failure(self, x, control_mode = False):
         # Used as a helper when calling other methods to:
         # - Examine an object X to see if it is/has a Failure.
-        # - If so, store the Failure.
+        # - If so, store the Failure as a WrappedFailure.
         # - Return either X or the failure-control mechanism.
 
         # Get the Failure, if any.
         if isinstance(x, Failure):
-            f = x
+            f, rp = (x, None)
         elif isinstance(x, RenamePair):
-            f = x.failure
+            f, rp = (x.failure, x)
         else:
-            f = None
+            f, rp = (None, None)
 
         # Track it and determine its failure-control mechanism, if any.
         if f:
+            wf = WrappedFailure(f.msg, f, rp)
             control = self.fail_config.get(type(f), None)
-            self.failures[control].append(f)
+            self.failures[control].append(wf)
         else:
             control = None
 
@@ -429,11 +431,6 @@ class RenamingPlan:
     @property
     def uncontrolled_failures(self):
         return self.failures[None]
-
-    @property
-    def first_failure(self):
-        fs = self.uncontrolled_failures
-        return fs[0] if fs else None
 
     ####
     # Sequence number and common prefix.

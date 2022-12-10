@@ -106,12 +106,12 @@ class CliRenamer:
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()
         if plan.failed:
-            msg = FAIL.prepare_failed_cli.format(plan.first_failure.msg)
+            msg = self.listing_msg(FAIL.prepare_failed_cli, plan.uncontrolled_failures)
             self.wrapup(CON.exit_fail, msg)
             return
 
         # Print the renaming listing.
-        listing = listing_msg('Paths to be renamed{}.\n', plan.rps, opts.limit)
+        listing = self.listing_msg('Paths to be renamed{}.\n', plan.rps)
         self.paginate(listing)
 
         # Stop if dryrun mode.
@@ -121,7 +121,7 @@ class CliRenamer:
 
         # User confirmation.
         if not opts.yes:
-            msg = msg_with_tallies('\nRename paths{}', plan.rps, opts.limit)
+            msg = self.msg_with_tallies('\nRename paths{}', plan.rps)
             if not self.get_confirmation(msg, expected = 'yes'):
                 self.wrapup(CON.exit_ok, CON.no_action_msg)
                 return
@@ -204,6 +204,21 @@ class CliRenamer:
             paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)
 
+    def msg_with_tallies(self, fmt, xs):
+        # Returns a message followed by two counts in parentheses:
+        # N items; and N items listed based on opts.limit.
+        n = len(xs)
+        lim = n if self.opts.limit is None else self.opts.limit
+        tallies = f' (total {n}, listed {lim})'
+        return fmt.format(tallies)
+
+    def listing_msg(self, fmt, xs):
+        # Returns a message-with-tallies followed by a potentially-limited
+        # listing of RenamePair paths.
+        msg = self.msg_with_tallies(fmt, xs)
+        items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
+        return f'{msg}\n{items}'
+
 ####
 # Collecting input paths.
 ####
@@ -215,21 +230,6 @@ def get_structure(opts):
 ####
 # Utilities: listings, pagination, and logging.
 ####
-
-def msg_with_tallies(fmt, xs, limit):
-    # Returns a message followed by two counts in parentheses:
-    # N items; and N items listed based on opts.limit.
-    n = len(xs)
-    lim = n if limit is None else limit
-    tallies = f' (total {n}, listed {lim})'
-    return fmt.format(tallies)
-
-def listing_msg(fmt, xs, limit):
-    # Returns a message-with-tallies followed by a potentially-limited
-    # listing of RenamePair paths.
-    msg = msg_with_tallies(fmt, xs, limit)
-    items = CON.newline.join(x.formatted for x in xs[0:limit])
-    return f'{msg}\n{items}'
 
 def collect_logging_data(opts, plan):
     d = dict(

@@ -112,3 +112,15 @@ class Kwexception(Exception):
 class BmvError(Kwexception):
     pass
 
+@dataclass
+class WrappedFailure(Failure):
+    failure: Failure
+    rp: RenamePair = None
+
+    @property
+    def formatted(self):
+        if self.rp is None:
+            return self.msg
+        else:
+            return self.rp.formatted
+

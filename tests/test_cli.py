@@ -25,17 +25,12 @@ from bmv.cli import (
 TODO:
 
     scenario with some failed rps in the listing.
-        See test_some_failed_rps()
 
-        plan.uncontrolled_failures lacks the info it needs (the underlying rp).
+        plan.uncontrolled_failures now contains WrappedFailure instances.
 
-        Need to address this.
+        See test_some_failed_rps() to continue this scenario
 
-        And that problem, means the failure listing in the command-line use
-        case isn't helpful:
-
-            # For example, the output tells you nothing.
-            bmv a b aa bb
+        but there is a new problem: cannot JSONify a WrappedFailure
 
     scenario with some invalid failure controls via the CliRenamer
 
@@ -131,7 +126,7 @@ def test_prepare_failed(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    assert cli.err == 'Renaming preparation failed: Got an unequal number of original paths and new paths.\n'
+    assert cli.err == 'Renaming preparation resulted in failures: (total 1, listed 1).\n\nGot an unequal number of original paths and new paths\n'
 
 def test_dryrun(tr):
     origs = ('a', 'b', 'c')
@@ -286,18 +281,29 @@ def test_some_failed_rps(tr):
     news = ('A1', 'z2', 'z3', 'A4')
     args = origs + news
 
-    # TODO
-    return
-
-    # ...
+    # Initial scenario fails: orig and new paths are the same.
     cli = CliRenamerSIO(
         *args,
-        '',
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.failure
+    assert cli.err.startswith('Renaming preparation resulted in failures: (total 2, listed 2)')
+    assert 'Original path and new path are the same' in cli.err
+
+    # TODO
+    # WrappedFailure is not JSON serializable.
+    return
+
+    # Initial scenario fails: orig and new paths are the same.
+    cli = CliRenamerSIO(
+        *args,
+        '--skip-equal',
         file_sys = origs,
         yes = True,
     )
     cli.run()
     assert cli.success
-    cli.check_file_sys(*news)
-
+    cli.check_file_sys(news[0], news[-1])
 
