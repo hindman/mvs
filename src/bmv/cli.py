@@ -12,23 +12,11 @@ from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
 
-from .version import __version__
+from .data_objects import Failure
 from .plan import RenamingPlan, validated_failure_controls
-
-from .constants import (
-    CON,
-    CLI,
-    FAIL,
-    STRUCTURES,
-    CONTROLLABLES,
-)
-
-from .data_objects import (
-    Failure,
-    ArgParseFailure,
-    OptsFailure,
-    ExitCondition,
-)
+from .version import __version__
+from .constants import CON, CLI, FAIL, STRUCTURES, CONTROLLABLES
+from .utils import read_from_clipboard, read_from_file, write_to_clipboard
 
 ####
 # Entry point.
@@ -39,6 +27,10 @@ def main(args = None):
     cli = CliRenamer(args)
     cli.run()
     sys.exit(cli.exit_code)
+
+####
+# A class to do the work of main() in way amenable to testing.
+####
 
 class CliRenamer:
 
@@ -81,10 +73,11 @@ class CliRenamer:
             self.has_prepared = True
 
         # Parse args.
-        self.opts = self.handle_exit(parse_command_line_args(self.args))
-        opts = self.opts
+        self.opts = self.parse_command_line_args()
         if self.done:
             return
+        else:
+            opts = self.opts
 
         # Collect the input paths.
         self.inputs = self.collect_input_paths()
@@ -93,13 +86,13 @@ class CliRenamer:
         self.plan = RenamingPlan(
             inputs = self.inputs,
             rename_code = opts.rename,
-            structure = get_structure(opts),
+            structure = self.get_structure(),
             seq_start = opts.seq,
             seq_step = opts.step,
             filter_code = opts.filter,
             indent = opts.indent,
             file_sys = self.file_sys,
-            **fail_controls_kws(opts),
+            **self.fail_controls_kws,
         )
         plan = self.plan
 
@@ -128,8 +121,7 @@ class CliRenamer:
 
         # Log the renamings.
         if not opts.nolog:
-            log_data = collect_logging_data(opts, plan)
-            self.write_to_json_file(log_file_path(), log_data)
+            self.write_to_json_file(self.log_file_path, self.log_data)
 
     def do_rename(self):
         # Don't execute more than once.
@@ -162,13 +154,6 @@ class CliRenamer:
     @property
     def done(self):
         return self.exit_code is not None
-
-    def handle_exit(self, x):
-        if isinstance(x, Failure):
-            self.wrapup(CON.exit_fail, x.msg)
-        elif isinstance(x, ExitCondition):
-            self.wrapup(CON.exit_ok, x.msg)
-        return x
 
     def paginate(self, text):
         if self.opts.pager:
@@ -219,151 +204,126 @@ class CliRenamer:
         items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
         return f'{msg}\n{items}'
 
-####
-# Collecting input paths.
-####
+    def parse_command_line_args(self):
+        # Create the parser.
+        ap = self.create_arg_parser()
 
-def get_structure(opts):
-    gen = (s for s in STRUCTURES.keys() if getattr(opts, s, None))
-    return next(gen, None)
+        # Use argparse to parse self.args.
+        #
+        # In event of parsing failure, argparse tries to exit
+        # with usage plus error message. We capture that output
+        # to standard error in a StringIO and return the text
+        # in a Failure instance.
+        try:
+            real_stderr = sys.stderr
+            sys.stderr = StringIO()
+            opts = ap.parse_args(self.args)
+        except SystemExit as e:
+            msg = sys.stderr.getvalue()
+            self.wrapup(CON.exit_fail, msg)
+            return None
+        finally:
+            sys.stderr = real_stderr
 
-####
-# Utilities: listings, pagination, and logging.
-####
+        # Deal with special options that will lead to an early, successful exit.
+        if opts.help:
+            msg = 'U' + ap.format_help()[1:]
+            self.wrapup(CON.exit_ok, msg)
+            return None
+        elif opts.version:
+            msg = f'{CON.app_name} v{__version__}'
+            self.wrapup(CON.exit_ok, msg)
+            return None
 
-def collect_logging_data(opts, plan):
-    d = dict(
-        version = __version__,
-        current_directory = str(Path.cwd()),
-        opts = vars(opts),
-    )
-    d.update(**plan.as_dict)
-    return d
+        # Validate the options related to input sources and structures.
+        self.validate_sources_structures(opts)
+        if self.done:
+            return None
 
-def log_file_path():
-    home = Path.home()
-    subdir = '.' + CON.app_name
-    now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return Path.home() / subdir / (now + '.json')
+        # Validate the failure-control options.
+        result = validated_failure_controls(opts, opts_mode = True)
+        if isinstance(result, Failure):
+            self.wrapup(CON.exit_fail, result.msg)
+            return None
+        else:
+            return opts
 
-####
-# Utilities: reading from or writing to files, clipboard, etc.
-####
+    def create_arg_parser(self):
+        ap = argparse.ArgumentParser(
+            prog = CON.app_name,
+            description = CLI.description,
+            epilog = CLI.epilog,
+            add_help = False,
+        )
+        g = None
+        for oc in CLI.opts_config:
+            kws = dict(oc)
+            if CLI.group in kws:
+                g = ap.add_argument_group(kws.pop(CLI.group))
+            xs = kws.pop(CLI.names).split()
+            g.add_argument(*xs, **kws)
+        return ap
 
-def read_from_file(path):
-    with open(path) as fh:
-        return fh.read()
+    def validate_sources_structures(self, opts):
+        # Define the checks:
+        # - Exactly one source for input paths.
+        # - Zero or one option specifying an input structure.
+        checks = (
+            (CLI.sources.keys(), False),
+            (CLI.structures.keys(), True),
+        )
 
-def read_from_clipboard():
-    cp = subprocess.run(
-        ['pbpaste'],
-        capture_output = True,
-        check = True,
-        text = True,
-    )
-    return cp.stdout
+        # Run the checks.
+        for opt_names, zero_ok in checks:
+            # N of sources or structures used.
+            n = len(tuple(
+                nm for nm in opt_names
+                if getattr(opts, nm, None)
+            ))
 
-def write_to_clipboard(text):
-    subprocess.run(
-        ['pbcopy'],
-        check = True,
-        text = True,
-        input = text,
-    )
+            # If there is a problem, first set the failure msg.
+            if n == 0 and not zero_ok:
+                msg = FAIL.opts_require_one
+            elif n > 1:
+                msg = FAIL.opts_mutex
+            else:
+                msg = None
+                continue
 
-####
-# Utilities: other.
-####
+            # And then register the failure message.
+            choices = ', '.join(
+                ('' if nm == CLI.sources.paths else '--') + nm
+                for nm in opt_names
+            )
+            msg = f'{msg}: {choices}'
+            self.wrapup(CON.exit_fail, msg)
+            return
 
-def fail_controls_kws(opts):
-    return {
-        k : getattr(opts, k)
-        for k in CONTROLLABLES.keys()
-    }
+    def get_structure(self):
+        gen = (s for s in STRUCTURES.keys() if getattr(self.opts, s, None))
+        return next(gen, None)
 
-def parse_command_line_args(args):
-    # Create the parser.
-    ap = create_arg_parser()
+    @property
+    def log_data(self):
+        d = dict(
+            version = __version__,
+            current_directory = str(Path.cwd()),
+            opts = vars(self.opts),
+        )
+        d.update(**self.plan.as_dict)
+        return d
 
-    # Try to parse args. In event of parsing failure, argparse tries to exit
-    # with usage plus error message. We capture that output to standard error
-    # in a StringIO and return the text in a Failure instance.
-    try:
-        real_stderr = sys.stderr
-        sys.stderr = StringIO()
-        opts = ap.parse_args(args)
-    except SystemExit as e:
-        msg = sys.stderr.getvalue()
-        return ArgParseFailure(msg)
-    finally:
-        sys.stderr = real_stderr
+    @property
+    def log_file_path(self):
+        home = Path.home()
+        subdir = '.' + CON.app_name
+        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        return Path.home() / subdir / (now + '.json')
 
-    # Deal with special options that will lead to an early, successful exit.
-    if opts.help:
-        text = 'U' + ap.format_help()[1:]
-        return ExitCondition(text)
-    elif opts.version:
-        text = f'{CON.app_name} v{__version__}'
-        return ExitCondition(text)
-
-    # Otherwise return the opts if they pass validations. If not,
-    # we will return a Failure.
-    return validated_failure_controls(
-        validated_options(opts),
-        opts_mode = True,
-    )
-
-def create_arg_parser():
-    ap = argparse.ArgumentParser(
-        prog = CON.app_name,
-        description = CLI.description,
-        epilog = CLI.epilog,
-        add_help = False,
-    )
-    g = None
-    for oc in CLI.opts_config:
-        kws = dict(oc)
-        if CLI.group in kws:
-            g = ap.add_argument_group(kws.pop(CLI.group))
-        xs = kws.pop(CLI.names).split()
-        g.add_argument(*xs, **kws)
-    return ap
-
-def validated_options(opts):
-    # Define the option checks.
-    checks = (
-        # Exactly one source for input paths.
-        (CLI.sources.keys(), False),
-        # Zero or one option specifying an input structure.
-        (CLI.structures.keys(), True),
-    )
-    # Run the checks, all of which return OptsFailure or None.
-    for opt_names, zero_ok in checks:
-        result = check_opts_require_one(opts, opt_names, zero_ok)
-        if result:
-            return result
-    # Success.
-    return opts
-
-def check_opts_require_one(opts, opt_names, zero_ok):
-    used = tuple(
-        nm for nm in opt_names
-        if getattr(opts, nm, None)
-    )
-    n = len(used)
-    if n == 0 and zero_ok:
-        return None
-    elif n == 0:
-        return create_opts_failure(opt_names, FAIL.opts_require_one)
-    elif n == 1:
-        return None
-    else:
-        return create_opts_failure(opt_names, FAIL.opts_mutex)
-
-def create_opts_failure(opt_names, base_msg):
-    joined = ', '.join(
-        ('' if nm == CLI.sources.paths else '--') + nm
-        for nm in opt_names
-    )
-    return OptsFailure(f'{base_msg}: {joined}')
+    @property
+    def fail_controls_kws(self):
+        return {
+            k : getattr(self.opts, k)
+            for k in CONTROLLABLES.keys()
+        }
 

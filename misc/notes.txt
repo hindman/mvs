@@ -16,9 +16,34 @@ todos: TODOs
 
 Remaining issues from testing/refactoring work:
 
-    - Refactor validated_options() into one function.
+    - Re-assess failure control, which is awkward:
+        - The Failure types are just wrappers around strings.
 
-    ===========
+            - Proliferation of types seems unnecessary.
+            - Adn there's nearly[?] a 1-to-1 relationship between types and messages.
+
+            - For example, rather than this:
+
+                # Map each failure kind to its msg-fmt.
+                FK = constants('FailureKinds', ...)
+
+                # Instead of building messages in code and returning
+                # a particular type of Failure.
+                msg = FAIL.conflicting_controls.format(name1, name2)
+                return OptsFailure(msg)
+
+                # Delegate all of that to a general Failure class
+                # that knows how to to the string building and kind-setting.
+                return Failure(FT.conflicting_controls, name1, name2)
+
+        - The related data structures and validation logic seem overly complex.
+            - Figure out the underlying use-cases/needs. For example:
+                - User supplies failure-control opts/names.
+                    - We need to validate them for conflicts.
+                    - And we need to store the configurations for ease of use later.
+                - When a Failure is handled during prepare()
+                    - We need to look up the failure-kind.
+                    - And decide what to do.
 
     - Real command-line testing scenarios:
         - To exercise currently-uncoverable code.

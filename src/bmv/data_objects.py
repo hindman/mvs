@@ -9,10 +9,6 @@ class OptsFailure(Failure):
     pass
 
 @dataclass
-class ArgParseFailure(Failure):
-    pass
-
-@dataclass
 class ParseFailure(Failure):
     pass
 
@@ -51,10 +47,6 @@ class RpExistsFailure(Failure):
 @dataclass
 class RpCollsionFailure(Failure):
     pass
-
-@dataclass(frozen = True)
-class ExitCondition:
-    msg: str
 
 @dataclass
 class RenamePair:

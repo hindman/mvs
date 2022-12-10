@@ -9,7 +9,6 @@ from .data_objects import(
     RpMissingParentFailure,
     RpExistsFailure,
     RpCollsionFailure,
-    OptsFailure,
 )
 
 class CON:
