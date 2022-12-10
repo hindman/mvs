@@ -87,8 +87,8 @@ class RenamingPlan:
         self.keep_failed_filter = keep_failed_filter
         self.create_missing_parent = create_missing_parent
 
-        # Get a dict mapping each Failure type to the user's requested control
-        # mechanism (skip, keep, create, clobber).
+        # Get a dict mapping each Failure type to the user's requested
+        # control mechanism (skip, keep, create, clobber).
         result = validated_failure_controls(self)
         if isinstance(result, Failure):
             raise BmvError(result.msg)
@@ -139,20 +139,16 @@ class RenamingPlan:
             self.has_prepared = True
 
         # Get the input paths and parse them to get RenamePair instances.
-        result = self.catch_failure(self.parse_inputs())
+        self.rps = self.parse_inputs()
         if self.failed:
             return
-        else:
-            self.rps = result
 
         # Create the renaming and filtering functions from
         # user-supplied code, if any was given.
-        for action in ('filter', 'rename'):
-            result = self.catch_failure(self.make_user_defined_func(action))
-            if self.failed:
-                return
-            else:
-                setattr(self, f'{action}_func', result)
+        self.rename_func = self.make_user_defined_func('rename')
+        self.filter_func = self.make_user_defined_func('filter')
+        if self.failed:
+            return
 
         # Run various steps that process the RenamePair instances individually:
         # filtering, computing new paths, or validating.
@@ -178,7 +174,7 @@ class RenamingPlan:
             # Register failure if the step & failure-control filtered out everything.
             if not self.rps:
                 f = NoPathsFailure(FAIL.no_paths_after_processing)
-                self.catch_failure(f)
+                self.add_failure(f)
 
             # Stop if the plan has failed either directly or via filtering.
             if self.failed:
@@ -189,6 +185,11 @@ class RenamingPlan:
     ####
 
     def parse_inputs(self):
+        # Helper to add a Failure and return an empty result.
+        def do_fail(msg):
+            self.add_failure(ParseFailure(msg))
+            return ()
+
         # If we have rename_code, inputs are just original paths.
         if self.rename_code:
             rps = tuple(
@@ -196,7 +197,10 @@ class RenamingPlan:
                 for orig in self.inputs
                 if orig
             )
-            return rps if rps else ParseFailure(FAIL.no_input_paths)
+            if rps:
+                return rps
+            else:
+                return do_fail(FAIL.no_input_paths)
 
         # Otherwise, organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.paragraphs:
@@ -209,7 +213,8 @@ class RenamingPlan:
             if len(groups) == 2:
                 origs, news = groups
             else:
-                return ParseFailure(FAIL.parsing_paragraphs)
+                return do_fail(FAIL.parsing_paragraphs)
+
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
             origs = []
@@ -230,7 +235,8 @@ class RenamingPlan:
                         origs.append(cells[0])
                         news.append(cells[1])
                     else:
-                        return ParseFailure(FAIL.parsing_row.format(row = row))
+                        return do_fail(FAIL.parsing_row.format(row = row))
+
         else:
             # Flat: like paragraphs without the blank-line delimiter.
             paths = [line for line in self.inputs if line]
@@ -239,9 +245,9 @@ class RenamingPlan:
 
         # Fail if we got unqual numbers of original vs new paths, or no paths at all.
         if len(origs) != len(news):
-            return ParseFailure(FAIL.parsing_inequality)
+            return do_fail(FAIL.parsing_inequality)
         elif not origs:
-            return ParseFailure(FAIL.no_input_paths)
+            return do_fail(FAIL.no_input_paths)
 
         # Return the RenamePair instances.
         return tuple(
@@ -280,7 +286,8 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             msg = traceback.format_exc(limit = 0)
-            return UserCodeExecFailure(msg)
+            self.add_failure(UserCodeExecFailure(msg))
+            return None
 
     ####
     # A method to execute the steps that process RenamePair instance individually.
@@ -302,7 +309,7 @@ class RenamingPlan:
             rp = step(rp, next(seq))
 
             # Check whether the RenamePair has a failure and act accordingly.
-            control = self.catch_failure(rp, control_mode = True)
+            control = self.add_failure(rp)
             if control == CONTROLS.skip:
                 # Skip RenamePair because a failure occured, but proceed with others.
                 pass
@@ -398,30 +405,30 @@ class RenamingPlan:
     # Methods related to failure control.
     ####
 
-    def catch_failure(self, x, control_mode = False):
+    def add_failure(self, x):
         # Used as a helper when calling other methods to:
-        # - Examine an object X to see if it is/has a Failure.
-        # - If so, store the Failure as a WrappedFailure.
-        # - Return either X or the failure-control mechanism.
+        # - Examines an object X to see if it is/has a Failure.
+        # - If so, stores the Failure as a WrappedFailure.
+        # - Returns the failure-control mechanism.
 
         # Get the Failure, if any.
         if isinstance(x, Failure):
-            f, rp = (x, None)
+            f = x
+            rp = None
         elif isinstance(x, RenamePair):
-            f, rp = (x.failure, x)
+            f = x.failure
+            rp = x
         else:
-            f, rp = (None, None)
+            return None
 
         # Track it and determine its failure-control mechanism, if any.
         if f:
             wf = WrappedFailure(f.msg, f, rp)
             control = self.fail_config.get(type(f), None)
             self.failures[control].append(wf)
+            return control
         else:
-            control = None
-
-        # Return initial object or the control.
-        return control if control_mode else x
+            return None
 
     @property
     def failed(self):
