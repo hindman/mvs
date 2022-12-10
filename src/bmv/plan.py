@@ -311,8 +311,8 @@ class RenamingPlan:
             # Check whether the RenamePair has a failure and act accordingly.
             control = self.add_failure(rp)
             if control == CONTROLS.skip:
-                # Skip RenamePair because a failure occured, but proceed with others.
-                pass
+                # Skip RenamePair because a failure occurred, but proceed with others.
+                continue
             elif control == CONTROLS.keep:
                 # Retain the RenamePair even though a failure occured during filtering.
                 yield clone(rp)
@@ -322,12 +322,10 @@ class RenamingPlan:
             elif control == CONTROLS.clobber:
                 # During renaming, the RenamePair will overwrite something.
                 yield clone(rp, clobber = True)
-            elif rp.exclude:
-                # The user's code decided to filter out the RenamePair.
-                pass
             else:
-                # No failure and not filtered out.
-                yield rp
+                # No failure: yield unless filtered out by user's code.
+                if not rp.exclude:
+                    yield rp
 
     ####
     # The steps that process RenamePair instance individually.
@@ -543,9 +541,15 @@ class RenamingPlan:
             skip_failed_filter = self.skip_failed_filter,
             keep_failed_filter = self.keep_failed_filter,
             # Other.
-            failures = self.failures,
             prefix_len = self.prefix_len,
-            rename_pairs = [asdict(rp) for rp in self.rps],
+            rename_pairs = [
+                asdict(rp)
+                for rp in self.rps
+            ],
+            failures = {
+                control : [asdict(f) for f in fs]
+                for control, fs in self.failures.items()
+            },
         )
 
 def validated_failure_controls(x, opts_mode = False):

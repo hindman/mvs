@@ -26,11 +26,7 @@ TODO:
 
     scenario with some failed rps in the listing.
 
-        plan.uncontrolled_failures now contains WrappedFailure instances.
-
         See test_some_failed_rps() to continue this scenario
-
-        but there is a new problem: cannot JSONify a WrappedFailure
 
     scenario with some invalid failure controls via the CliRenamer
 
@@ -279,6 +275,7 @@ def test_some_failed_rps(tr):
     # Paths and args.
     origs = ('z1', 'z2', 'z3', 'z4')
     news = ('A1', 'z2', 'z3', 'A4')
+    exp_file_sys = ('z2', 'z3', 'A1', 'A4')
     args = origs + news
 
     # Initial scenario fails: orig and new paths are the same.
@@ -292,10 +289,6 @@ def test_some_failed_rps(tr):
     assert cli.err.startswith('Renaming preparation resulted in failures: (total 2, listed 2)')
     assert 'Original path and new path are the same' in cli.err
 
-    # TODO
-    # WrappedFailure is not JSON serializable.
-    return
-
     # Initial scenario fails: orig and new paths are the same.
     cli = CliRenamerSIO(
         *args,
@@ -305,5 +298,8 @@ def test_some_failed_rps(tr):
     )
     cli.run()
     assert cli.success
-    cli.check_file_sys(news[0], news[-1])
+    cli.check_file_sys(*exp_file_sys)
+
+    # TODO: check log?
+    # cli.log
 
