@@ -174,7 +174,7 @@ class RenamingPlan:
             # Register failure if the step & failure-control filtered out everything.
             if not self.rps:
                 f = NoPathsFailure(FAIL.no_paths_after_processing)
-                self.add_failure(f)
+                self.handle_failure(f)
 
             # Stop if the plan has failed either directly or via filtering.
             if self.failed:
@@ -187,7 +187,7 @@ class RenamingPlan:
     def parse_inputs(self):
         # Helper to add a Failure and return an empty result.
         def do_fail(msg):
-            self.add_failure(ParseFailure(msg))
+            self.handle_failure(ParseFailure(msg))
             return ()
 
         # If we have rename_code, inputs are just original paths.
@@ -286,7 +286,7 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             msg = traceback.format_exc(limit = 0)
-            self.add_failure(UserCodeExecFailure(msg))
+            self.handle_failure(UserCodeExecFailure(msg))
             return None
 
     ####
@@ -309,7 +309,7 @@ class RenamingPlan:
             rp = step(rp, next(seq))
 
             # Check whether the RenamePair has a failure and act accordingly.
-            control = self.add_failure(rp)
+            control = self.handle_failure_rp(rp)
             if control == CONTROLS.skip:
                 # Skip RenamePair because a failure occurred, but proceed with others.
                 continue
@@ -403,28 +403,23 @@ class RenamingPlan:
     # Methods related to failure control.
     ####
 
-    def add_failure(self, x):
-        # Used as a helper when calling other methods to:
-        # - Examines an object X to see if it is/has a Failure.
-        # - If so, stores the Failure as a WrappedFailure.
-        # - Returns the failure-control mechanism.
+    def handle_failure(self, f, rp = None):
+        # Takes a Failure and optionally a RenamePair.
+        #
+        # - Determines whether a failure-control is active for the Failure type.
+        # - Stores a WrappedFailure containing the Failure and RenamePair.
+        # - Returns the control (which might be None).
+        #
+        control = self.fail_config.get(type(f), None)
+        wf = WrappedFailure(f.msg, f, rp)
+        self.failures[control].append(wf)
+        return control
 
-        # Get the Failure, if any.
-        if isinstance(x, Failure):
-            f = x
-            rp = None
-        elif isinstance(x, RenamePair):
-            f = x.failure
-            rp = x
-        else:
-            return None
-
-        # Track it and determine its failure-control mechanism, if any.
+    def handle_failure_rp(self, rp):
+        # Helper for using handle_failure() via a RenamePair.
+        f = rp.failure
         if f:
-            wf = WrappedFailure(f.msg, f, rp)
-            control = self.fail_config.get(type(f), None)
-            self.failures[control].append(wf)
-            return control
+            return self.handle_failure(f, rp)
         else:
             return None
 

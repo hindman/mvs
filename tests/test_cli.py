@@ -1,3 +1,4 @@
+import json
 import pytest
 import re
 
@@ -6,11 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from string import ascii_lowercase
 
-from bmv.constants import (
-    CON,
-    FAIL,
-    STRUCTURES,
-)
+from bmv.constants import CLI, CON, FAIL, STRUCTURES
 
 from bmv.version import __version__
 
@@ -19,24 +16,6 @@ from bmv.cli import (
     CliRenamer,
     write_to_clipboard,
 )
-
-'''
-
-TODO:
-
-    scenario with some failed rps in the listing.
-
-        See test_some_failed_rps() to continue this scenario
-
-    scenario with some invalid failure controls via the CliRenamer
-
-    scenario with too few/many sources and structures via the CliRenamer
-
-    Then refactor validated_options()into one function.
-
-    Now that CliRenamer exists, handle_exit() seems out of place: remove?
-
-'''
 
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer using StringIO instances:
@@ -95,7 +74,7 @@ def test_version_and_help(tr):
     assert cli.success
     assert cli.err == ''
     assert cli.out.startswith(f'Usage: {CON.app_name}')
-    assert len(cli.out) > 4000
+    assert len(cli.out) > 3000
     for opt in ('--clipboard', '--paragraphs', '--rename'):
         assert f'\n  {opt}' in cli.out
 
@@ -253,6 +232,14 @@ def test_sources(tr):
     cli = CliRenamerSIO('--file', path, yes, file_sys = origs, replies = args_txt)
     do_checks(cli)
 
+    # Too many sources.
+    cli = CliRenamerSIO('--clipboard', '--stdin', yes, file_sys = origs)
+    cli.run()
+    assert cli.failure
+    assert cli.err.startswith(FAIL.opts_mutex)
+    assert '--clipboard' in cli.err
+    assert '--stdin' in cli.err
+
 def test_pagination(tr):
     # Paths.
     origs = tuple(ascii_lowercase)
@@ -272,34 +259,148 @@ def test_pagination(tr):
     cli.check_file_sys(*news)
 
 def test_some_failed_rps(tr):
-    # Paths and args.
+    # Paths, args, file-sys, options, expectations.
     origs = ('z1', 'z2', 'z3', 'z4')
-    news = ('A1', 'z2', 'z3', 'A4')
-    exp_file_sys = ('z2', 'z3', 'A1', 'A4')
+    news = ('A1', 'A2', 'A3', 'A4')
     args = origs + news
+    file_sys = origs + news[1:3]
+    exp_file_sys = ('z2', 'z3', 'A2', 'A3', 'A1', 'A4')
+    opt_skip = '--skip-existing-new'
+    opt_clobber = '--clobber-existing-new'
+    exp_cli_prep = FAIL.prepare_failed_cli.split(':')[0]
+    exp_conflict = FAIL.conflicting_controls.split(':')[0]
 
-    # Initial scenario fails: orig and new paths are the same.
+    # Initial scenario fails: 2 of the new paths already exist.
     cli = CliRenamerSIO(
         *args,
-        file_sys = origs,
+        file_sys = file_sys,
         yes = True,
     )
     cli.run()
     assert cli.failure
-    assert cli.err.startswith('Renaming preparation resulted in failures: (total 2, listed 2)')
-    assert 'Original path and new path are the same' in cli.err
+    assert cli.err.startswith(exp_cli_prep)
+    assert FAIL.new_exists in cli.err
 
-    # Initial scenario fails: orig and new paths are the same.
+    # Renaming succeeds if we pass --skip-existing-new.
     cli = CliRenamerSIO(
         *args,
-        '--skip-equal',
-        file_sys = origs,
+        opt_skip,
+        file_sys = file_sys,
         yes = True,
     )
     cli.run()
     assert cli.success
     cli.check_file_sys(*exp_file_sys)
 
-    # TODO: check log?
-    # cli.log
+    # Renaming fails if we pass both failure-control options.
+    cli = CliRenamerSIO(
+        *args,
+        opt_skip,
+        opt_clobber,
+        file_sys = file_sys,
+        yes = True,
+    )
+    cli.run()
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.err.startswith(exp_conflict)
+    assert opt_skip in cli.err
+    assert opt_clobber in cli.err
+
+def test_filter_all(tr):
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    args = origs + news
+    exp_cli_prep = FAIL.prepare_failed_cli.split(':')[0]
+    exp_conflict = FAIL.conflicting_controls.split(':')[0]
+
+    # Initial scenario: it works.
+    cli = CliRenamerSIO(
+        *args,
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # But it fails if the user's code filters everything out.
+    cli = CliRenamerSIO(
+        *args,
+        '--filter',
+        'return False',
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.err.startswith(exp_cli_prep)
+    assert FAIL.no_paths_after_processing in cli.err
+
+def test_no_input_paths(tr):
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    rename_args = ('--rename', 'return o + o')
+    empty_paths = ('', '   ', ' ')
+
+    # Initial scenario: it works.
+    cli = CliRenamerSIO(
+        *rename_args,
+        *origs,
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # But it fails if we omit the input paths.
+    cli = CliRenamerSIO(
+        *rename_args,
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.err.startswith(FAIL.opts_require_one)
+    for name in CLI.sources.keys():
+        assert name in cli.err
+
+    # It also fails if the input paths are empty.
+    cli = CliRenamerSIO(
+        *rename_args,
+        *empty_paths,
+        file_sys = origs,
+        yes = True,
+    )
+    cli.run()
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.log == ''
+    assert FAIL.no_input_paths in cli.err
+
+def test_log(tr):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    rename_args = ('--rename', 'return o + o')
+
+    # A basic scenario that works.
+    cli = CliRenamerSIO(*rename_args, *origs, file_sys = origs, yes = True)
+    cli.run()
+    assert cli.success
+    cli.check_file_sys(*news)
+
+    # We can load its log file and check that its a dict
+    # with some of the expected keys.
+    got = json.loads(cli.log)
+    assert got['version'] == __version__
+    ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'failures']
+    for k in ks:
+        assert k in got
 

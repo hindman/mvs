@@ -14,34 +14,34 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Testing:
+Remaining issues from testing/refactoring work:
 
-    test_cli.py
-        - See docstring
+    - Refactor validated_options() into one function.
 
-    test_data_objects.py
-        - Kwexception.new(): exercise it
+    ===========
 
-    Issues:
-
-        - File operations can fail:
-            - collecting input paths (eg, missing or unreadable input file-source).
-            - writing to log
-
-        - Do all of the file system operations actually work correctly?
+    - Real command-line testing scenarios:
+        - To exercise currently-uncoverable code.
+        - To confirm that file system operations are in working order:
+            - renaming
             - clobbering
             - creating parents
-            - A good way make real tests?
-            - A few real tests would also exercise the currently-uncoverable code.
 
-        - Reduce code repetition in test_plan.py.
+    ===========
 
-        - Editing pass over code and tests:
-            - organization
-            - comments
-            - naming
-            - clarity/simplicity
-            - Failure types: assess for consistency, naming, and usage in the code.
+    - Editing pass over code and tests:
+        - organization
+        - comments
+        - naming
+        - clarity/simplicity
+        - Failure types: assess for consistency, naming, and usage in the code.
+        - Reduce testing-code repetition.
+
+    ===========
+
+    - File operations can fail:
+        - collecting input paths (eg, missing or unreadable input file-source).
+        - writing to log
 
 Project name change:
     - bmv is claimed [emailed maintainer: Nov 2; no reply].
