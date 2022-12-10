@@ -385,13 +385,13 @@ def test_invalid_controls(tr):
     assert tuple(plan.file_sys) == news
 
     # If we try to create a RenamingPlan using any of those
-    # pairs both set to true, we get a ValueError.
+    # pairs both set to true, we get a an exception.
     for pair in conflicting_pairs:
         conflicting = {k : True for k in pair}
         controls = {**all_controls, **conflicting}
-        with pytest.raises(ValueError) as einfo:
+        with pytest.raises(BmvError) as einfo:
             plan = RenamingPlan(**common, **controls)
-        msg = str(einfo.value)
+        msg = einfo.value.params['msg']
         exp = FAIL.conflicting_controls.format(*pair)
         assert msg == exp
 

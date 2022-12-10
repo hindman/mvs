@@ -13,7 +13,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from .version import __version__
-from .plan import RenamingPlan
+from .plan import RenamingPlan, validated_failure_controls
 
 from .constants import (
     CON,
@@ -21,7 +21,6 @@ from .constants import (
     FAIL,
     STRUCTURES,
     CONTROLLABLES,
-    validated_failure_controls,
 )
 
 from .data_objects import (

@@ -18,6 +18,7 @@ class CON:
     tab = '\t'
     underscore = '_'
     hyphen = '-'
+    dash = hyphen + hyphen
     exit_ok = 0
     exit_fail = 1
     renamer_name = 'do_rename'
@@ -66,7 +67,7 @@ CONTROLS = constants('Controls', (
     'clobber',
 ))
 
-# Mapping from the user-facing failure control options to their:
+# Mapping from the user-facing failure control names to their:
 # (1) failure-control mechanisms and (2) Failure type.
 #
 #   skip   : The affected RenamePair will be skipped.
@@ -333,34 +334,4 @@ class CLI:
         },
 
     )
-
-def validated_failure_controls(x, opts_mode = False):
-    # Takes either the parsed command-line options (opts) or a RenamingPlan
-    # instance. Checks the failure-control attributes of that object.
-    #
-    # If invalid, returns an OptsFailure.
-    #
-    # Otherwise, returns either a dict mapping the Failure to the requested
-    # control mechanism or the original object (opts_mode = True).
-    #
-    config = {}
-    name_to_opt = lambda nm: '--' + nm.replace(CON.underscore, CON.hyphen)
-    for k2, (control, fail_cls) in CONTROLLABLES:
-        if getattr(x, k2, None):
-            if fail_cls in config:
-                (_, k1) = config[fail_cls]
-                if opts_mode:
-                    k1, k2 = (name_to_opt(k1), name_to_opt(k2))
-                msg = FAIL.conflicting_controls.format(k1, k2)
-                return OptsFailure(msg)
-            else:
-                config[fail_cls] = (control, k2)
-    if opts_mode:
-        return x
-    else:
-        d = {
-            fail_cls : control
-            for fail_cls, (control, _) in config.items()
-        }
-        return d
 

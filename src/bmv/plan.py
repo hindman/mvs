@@ -14,13 +14,14 @@ from .constants import (
     CONTROLS,
     CONTROLLABLES,
     STRUCTURES,
-    validated_failure_controls,
 )
+
 from .data_objects import (
     RenamePair,
     Failure,
     ParseFailure,
     UserCodeExecFailure,
+    OptsFailure,
     NoPathsFailure,
     RpFilterFailure,
     RpRenameFailure,
@@ -89,7 +90,7 @@ class RenamingPlan:
         # mechanism (skip, keep, create, clobber).
         result = validated_failure_controls(self)
         if isinstance(result, Failure):
-            raise ValueError(result.msg)
+            raise BmvError(result.msg)
         else:
             self.fail_config = result
 
@@ -97,7 +98,7 @@ class RenamingPlan:
         # A failure can be either controlled (as requested by the user) or not.
         # The dict maps each control mechanism to the failures that were
         # controlled by that mechanism. If the dict ends up having any
-        # uncontrollec failures (under the None key), the RenamingPlan will
+        # uncontrolled failures (under the None key), the RenamingPlan will
         # have failed.
         self.failures = {
             control : []
@@ -110,6 +111,9 @@ class RenamingPlan:
 
         # Lenth of the longest common prefix string on the original paths.
         self.prefix_len = 0
+
+        self.filter_func = None
+        self.rename_func = None
 
         self.has_prepared = False
         self.has_renamed = False
@@ -134,22 +138,20 @@ class RenamingPlan:
             self.has_prepared = True
 
         # Get the input paths and parse them to get RenamePair instances.
-        self.rps, _ = self.catch_failure(self.parse_inputs())
+        result = self.catch_failure(self.parse_inputs())
         if self.failed:
-            self.rps = tuple()
             return
+        else:
+            self.rps = result
 
-        # Create filtering function from user code.
-        if self.filter_code:
-            self.filter_func, _ = self.catch_failure(self.make_user_defined_func('filter'))
+        # Create the renaming and filtering functions from
+        # user-supplied code, if any was given.
+        for action in ('filter', 'rename'):
+            result = self.catch_failure(self.make_user_defined_func(action))
             if self.failed:
                 return
-
-        # Create renaming function from user code.
-        if self.rename_code:
-            self.rename_func, _ = self.catch_failure(self.make_user_defined_func('rename'))
-            if self.failed:
-                return
+            else:
+                setattr(self, f'{action}_func', result)
 
         # Run various steps that process the RenamePair instances individually:
         # filtering, computing new paths, or validating.
@@ -251,13 +253,19 @@ class RenamingPlan:
     ####
 
     def make_user_defined_func(self, action):
+        # Get the user's code, if any.
+        user_code = getattr(self, f'{action}_code')
+        if not user_code:
+            return None
+
         # Define the text of the code.
         func_name = f'do_{action}'
         code = CON.user_code_fmt.format(
             func_name = func_name,
-            user_code = getattr(self, f'{action}_code'),
+            user_code = user_code,
             indent = ' ' * self.indent,
         )
+
         # Create the function via exec() in the context of:
         # - Globals that we want to make available to the user's code.
         # - A locals dict that we can use to return the generated function.
@@ -293,7 +301,7 @@ class RenamingPlan:
             rp = step(rp, next(seq))
 
             # Check whether the RenamePair has a failure and act accordingly.
-            _, control = self.catch_failure(rp)
+            control = self.catch_failure(rp, control_mode = True)
             if control == CONTROLS.skip:
                 # Skip RenamePair because a failure occured, but proceed with others.
                 pass
@@ -389,11 +397,11 @@ class RenamingPlan:
     # Methods related to failure control.
     ####
 
-    def catch_failure(self, x):
-        # Used when calling other methods to:
-        #   - Catch a Failure instance, either directly or attached to a RenamePair.
-        #   - Store it in self.failures under the appropriate failure-control key.
-        #   - Forward the value along with the control in a tuple.
+    def catch_failure(self, x, control_mode = False):
+        # Used as a helper when calling other methods to:
+        # - Examine an object X to see if it is/has a Failure.
+        # - If so, store the Failure.
+        # - Return either X or the failure-control mechanism.
 
         # Get the Failure, if any.
         if isinstance(x, Failure):
@@ -410,8 +418,8 @@ class RenamingPlan:
         else:
             control = None
 
-        # Return initial object and the control.
-        return (x, control)
+        # Return initial object or the control.
+        return control if control_mode else x
 
     @property
     def failed(self):
@@ -535,4 +543,46 @@ class RenamingPlan:
             prefix_len = self.prefix_len,
             rename_pairs = [asdict(rp) for rp in self.rps],
         )
+
+def validated_failure_controls(x, opts_mode = False):
+    # Takes either the parsed command-line options (opts) or a RenamingPlan
+    # instance. Processes the failure-control attributes of that object.
+    #
+    # Builds a dict mapping each Failure class that the user wants to control
+    # to a (CONTROL, NAME) tuple.
+    #
+    # Returns that dict (opts_mode = True), a simplified version of it (False),
+    # or an OptsFailure (in the case of contradictory configurations by
+    # the user).
+
+    # Converts a name to an option: eg, 'skip_equal' to '--skip-equal'.
+    name_to_opt = lambda nm: CON.dash + nm.replace(CON.underscore, CON.hyphen)
+
+    # Build the failure-control dict.
+    config = {}
+    for name2, (control, fail_cls) in CONTROLLABLES:
+        # If X has a true value for the attribute, we need to deal with it.
+        if getattr(x, name2, None):
+            if fail_cls in config:
+                # If the failure-class is already in the failure-control
+                # dict, the user has attempted to set two different
+                # controls for the same failure type. Return an OptsFailure.
+                (_, name1) = config[fail_cls]
+                if opts_mode:
+                    name1, name2 = (name_to_opt(name1), name_to_opt(name2))
+                msg = FAIL.conflicting_controls.format(name1, name2)
+                return OptsFailure(msg)
+            else:
+                # No problem: add an entry to the dict.
+                config[fail_cls] = (control, name2)
+
+    # Return the dict or a simplified variant of it.
+    if opts_mode:
+        return x
+    else:
+        d = {
+            fail_cls : control
+            for fail_cls, (control, name) in config.items()
+        }
+        return d
 
