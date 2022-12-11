@@ -283,3 +283,139 @@ GUI tools and OS-specific tools:
 
     - https://github.com/metamorphose/metamorphose2
 
+--------
+failure-notes: Notes on Failure classes and failure-control
+--------
+
+constants.py
+    FAIL: mapping: message-name => message
+    CONTROLS: control-names
+    CONTROLLABLES: mapping: control-problem-kind => (control-name, Failure-class)
+    argparse config: control-problem-kinds, expressed as flag-options
+
+data_objects.py
+
+    Failure
+    Failure subclasses
+    RenamePair: has a Failure
+    WrappedFailure: has a Failure, RenamePair-with-Failure  [ugh!]
+
+utils.py
+
+    validated_failure_controls():
+        - uses CONTROLLABLES
+        - returns dict or an OptsFailure
+        - dict: failure-class => control-name
+
+cli.py
+
+    Need: Ability to generate all of the control-problem-kinds (as flags).
+
+    Need: Ability to know when conflicting control-problem-kinds have been set
+    True for the same problem-kind.
+
+plan.py
+
+    Need: When a problem occurs, ability to take a problem-kind and look up
+    which control (if any) has been requested by user.
+
+    Need: When a problem occurs, ability to create the right kind of problem
+    with the appropriate message (which might be a simple string or a
+    format-string needing further args).
+
+    Confusion: Does a RenamePair need a Failure, or vice-versa? WrappedFailure??
+
+CONTROLS:
+    skip
+    keep
+    create
+    clobber
+
+ProblemSpec
+
+    Current name        | Controls      | Current msg-fmt
+    ----------------------------------------------------------------------------------------------------
+    equal               | skip          | orig_new_same
+    missing             | skip          | orig_missing
+    missing_parent      | skip, create  | new_parent_missing
+    existing_new        | skip, clobber | new_exists
+    colliding_new       | skip, clobber | new_collision
+    failed_rename       | skip          | rename_code_invalid, rename_code_bad_return
+    failed_filter       | skip, keep    | filter_code_invalid
+    ----------------------------------------------------------------------------------------------------
+    NoPathsFailure      | .             | no_paths_after_processing
+    OptsFailure         | .             | conflicting_controls
+    ParseFailure        | .             | no_input_paths, parsing_paragraphs, parsing_row, parsing_inequality
+    UserCodeExecFailure | .             | [traceback]
+
+    ProblemSpec(
+        problem  = PROBS.equal,
+        controls = (CONTROLS.skip,),
+        fmts     = (FAIL.orig_new_same,),
+    )
+
+Problem:
+
+    def __init__(self, kind, *xs, reason = None):
+        self.kind = kind
+        self.msg = based on kind+reason, then use format(*xs)
+
+    def isa(self, kind):
+        return self.kind == kind
+
+Failure subclasses:
+
+    NoPathsFailure         | no_paths_after_processing
+    OptsFailure            | conflicting_controls
+    ParseFailure           | no_input_paths, parsing_paragraphs, parsing_row, parsing_inequality
+    UserCodeExecFailure    | [traceback]
+    ----------------------------------------
+    RpCollsionFailure      | .
+    RpEqualFailure         | .
+    RpExistsFailure        | .
+    RpFilterFailure        | .
+    RpMissingFailure       | .
+    RpMissingParentFailure | .
+    RpRenameFailure        | .
+    ----------------------------------------
+    WrappedFailure         | .
+
+
+
+CONTROLLABLES:
+    skip_equal            = (CONTROLS.skip, RpEqualFailure),
+    skip_missing          = (CONTROLS.skip, RpMissingFailure),
+    skip_missing_parent   = (CONTROLS.skip, RpMissingParentFailure),
+    create_missing_parent = (CONTROLS.create, RpMissingParentFailure),
+    skip_existing_new     = (CONTROLS.skip, RpExistsFailure),
+    clobber_existing_new  = (CONTROLS.clobber, RpExistsFailure),
+    skip_colliding_new    = (CONTROLS.skip, RpCollsionFailure),
+    clobber_colliding_new = (CONTROLS.clobber, RpCollsionFailure),
+    skip_failed_rename    = (CONTROLS.skip, RpRenameFailure),
+    skip_failed_filter    = (CONTROLS.skip, RpFilterFailure),
+    keep_failed_filter    = (CONTROLS.keep, RpFilterFailure),
+
+FAIL:
+    orig_missing              = 'Original path does not exist',
+    new_exists                = 'New path exists',
+    new_parent_missing        = 'Parent directory of new path does not exist',
+    orig_new_same             = 'Original path and new path are the same',
+    new_collision             = 'New path collides with another new path',
+    no_input_paths            = 'No input paths',
+    no_paths                  = 'No paths to be renamed',
+    no_paths_after_processing = 'All paths were filtered out by failure control during processing',
+    parsing_no_structures     = 'No input structures given',
+    parsing_row               = 'The --rows option expects rows with exactly two cells: {row!r}',
+    parsing_paragraphs        = 'The --paragraphs option expects exactly two paragraphs',
+    parsing_inequality        = 'Got an unequal number of original paths and new paths',
+    opts_require_one          = 'One of these options is required',
+    opts_mutex                = 'No more than one of these options should be used',
+    prepare_failed            = 'RenamingPlan cannot rename paths because failures occurred during preparation',
+    rename_done_already       = 'RenamingPlan cannot rename paths because renaming has already been executed',
+    conflicting_controls      = 'Conflicting controls specified for a failure type: {} and {}',
+    filter_code_invalid       = 'Error in user-supplied filtering code: {} [original path: {}]',
+    rename_code_invalid       = 'Error in user-supplied renaming code: {} [original path: {}]',
+    rename_code_bad_return    = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
+    prepare_failed_cli        = 'Renaming preparation resulted in failures:{}.\n',
+    renaming_raised           = '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',
+

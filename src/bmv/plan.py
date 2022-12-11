@@ -15,7 +15,6 @@ from .data_objects import (
     BmvError,
     Failure,
     NoPathsFailure,
-    OptsFailure,
     ParseFailure,
     RenamePair,
     RpCollsionFailure,
