@@ -323,7 +323,7 @@ plan.py
     with the appropriate message (which might be a simple string or a
     format-string needing further args).
 
-    Confusion: Does a RenamePair need a Failure, or vice-versa? WrappedFailure??
+    Dilemma: Does a RenamePair need a Failure, or vice-versa? WrappedFailure??
 
 CONTROLS:
     skip
@@ -331,7 +331,7 @@ CONTROLS:
     create
     clobber
 
-ProblemSpec
+Current situation:
 
     Current name        | Controls      | Current msg-fmt
     ----------------------------------------------------------------------------------------------------
@@ -347,21 +347,6 @@ ProblemSpec
     OptsFailure         | .             | conflicting_controls
     ParseFailure        | .             | no_input_paths, parsing_paragraphs, parsing_row, parsing_inequality
     UserCodeExecFailure | .             | [traceback]
-
-    ProblemSpec(
-        problem  = PROBS.equal,
-        controls = (CONTROLS.skip,),
-        fmts     = (FAIL.orig_new_same,),
-    )
-
-Problem:
-
-    def __init__(self, kind, *xs, reason = None):
-        self.kind = kind
-        self.msg = based on kind+reason, then use format(*xs)
-
-    def isa(self, kind):
-        return self.kind == kind
 
 Failure subclasses:
 
