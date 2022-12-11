@@ -48,12 +48,11 @@ class RpExistsFailure(Failure):
 class RpCollsionFailure(Failure):
     pass
 
-@dataclass
+@dataclass(frozen = True)
 class RenamePair:
     # A data object to hold an original path and the corresponding new path.
     orig: str
     new: str
-    failure: Failure = None
     exclude: bool = False
     create_parent: bool = False
     clobber: bool = False
@@ -63,16 +62,20 @@ class RenamePair:
         return self.orig == self.new
 
     @property
-    def failed(self):
-        return bool(self.failure)
+    def formatted(self):
+        return f'{self.orig}\n{self.new}\n'
+
+@dataclass
+class RpFailure(Failure):
+    rp: RenamePair
+    failure: str
 
     @property
     def formatted(self):
-        paths = f'{self.orig}\n{self.new}\n'
-        if self.failed:
-            return f'{self.failure.msg}:\n{paths}'
+        if self.rp:
+            return f'{self.msg}:\n{self.rp.formatted}'
         else:
-            return paths
+            return self.msg
 
 class Kwexception(Exception):
 
@@ -90,16 +93,4 @@ class Kwexception(Exception):
 
 class BmvError(Kwexception):
     pass
-
-@dataclass
-class WrappedFailure(Failure):
-    failure: Failure
-    rp: RenamePair = None
-
-    @property
-    def formatted(self):
-        if self.rp is None:
-            return self.msg
-        else:
-            return self.rp.formatted
 

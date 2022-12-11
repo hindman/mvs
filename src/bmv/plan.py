@@ -25,7 +25,7 @@ from .data_objects import (
     RpMissingParentFailure,
     RpRenameFailure,
     UserCodeExecFailure,
-    WrappedFailure,
+    RpFailure,
 )
 
 class RenamingPlan:
@@ -300,10 +300,18 @@ class RenamingPlan:
             #   - create_parent: can be set here if a controlled failure occurred.
             #   - clobber: ditto.
             #
-            rp = step(rp, next(seq))
 
-            # Check whether the RenamePair has a failure and act accordingly.
-            control = self.handle_failure_rp(rp)
+            # Check whether the RenamePair has a failure.
+            # If so, get the failure-control mechanism, if any.
+            # If not, set rp to the return result.
+            result = step(rp, next(seq))
+            if isinstance(result, Failure):
+                control = self.handle_failure(result, rp)
+            else:
+                control = None
+                rp = result
+
+            # Act based on the failure-control and the rp.
             if control == CONTROLS.skip:
                 # Skip RenamePair because a failure occurred, but proceed with others.
                 continue
@@ -332,7 +340,7 @@ class RenamingPlan:
                 return rp if result else clone(rp, exclude = True)
             except Exception as e:
                 msg = FAIL.filter_code_invalid.format(e, rp.orig)
-                return clone(rp, failure = RpFilterFailure(msg))
+                return RpFilterFailure(msg)
         else:
             return rp
 
@@ -343,14 +351,14 @@ class RenamingPlan:
                 new = self.rename_func(rp.orig, Path(rp.orig), seq_val, self)
             except Exception as e:
                 msg = FAIL.rename_code_invalid.format(e, rp.orig)
-                return clone(rp, failure = RpRenameFailure(msg))
+                return RpRenameFailure(msg)
             # Validate its type and return a modified RenamePair instance.
             if isinstance(new, (str, Path)):
                 return clone(rp, new = str(new))
             else:
                 typ = type(new).__name__
                 msg = FAIL.rename_code_bad_return.format(typ, rp.orig)
-                return clone(rp, failure = RpRenameFailure(msg))
+                return RpRenameFailure(msg)
         else:
             return rp
 
@@ -358,11 +366,11 @@ class RenamingPlan:
         if self.path_exists(rp.orig):
             return rp
         else:
-            return clone(rp, failure = RpMissingFailure(FAIL.orig_missing))
+            return RpMissingFailure(FAIL.orig_missing)
 
     def check_orig_new_differ(self, rp, seq_val):
         if rp.equal:
-            return clone(rp, failure = RpEqualFailure(FAIL.orig_new_same))
+            return RpEqualFailure(FAIL.orig_new_same)
         else:
             return rp
 
@@ -370,7 +378,7 @@ class RenamingPlan:
         # The failure is conditional on ORIG and NEW being different
         # to avoid pointless reporting of multiple failures in such cases.
         if self.path_exists(rp.new) and not rp.equal:
-            return clone(rp, failure = RpExistsFailure(FAIL.new_exists))
+            return RpExistsFailure(FAIL.new_exists)
         else:
             return rp
 
@@ -378,7 +386,7 @@ class RenamingPlan:
         if self.path_exists(str(Path(rp.new).parent)):
             return rp
         else:
-            return clone(rp, failure = RpMissingParentFailure(FAIL.new_parent_missing))
+            return RpMissingParentFailure(FAIL.new_parent_missing)
 
     def prepare_new_groups(self):
         # Organize rps into dict-of-list, keyed by the new path.
@@ -391,7 +399,7 @@ class RenamingPlan:
         if len(g) == 1:
             return rp
         else:
-            return clone(rp, failure = RpCollsionFailure(FAIL.new_collision))
+            return RpCollsionFailure(FAIL.new_collision)
 
     ####
     # Methods related to failure control.
@@ -401,21 +409,13 @@ class RenamingPlan:
         # Takes a Failure and optionally a RenamePair.
         #
         # - Determines whether a failure-control is active for the Failure type.
-        # - Stores a WrappedFailure containing the Failure and RenamePair.
+        # - Stores a RpFailure containing the Failure and RenamePair.
         # - Returns the control (which might be None).
         #
         control = self.fail_config.get(type(f), None)
-        wf = WrappedFailure(f.msg, f, rp)
+        wf = RpFailure(f.msg, rp, type(f).__name__)
         self.failures[control].append(wf)
         return control
-
-    def handle_failure_rp(self, rp):
-        # Helper for using handle_failure() via a RenamePair.
-        f = rp.failure
-        if f:
-            return self.handle_failure(f, rp)
-        else:
-            return None
 
     @property
     def failed(self):

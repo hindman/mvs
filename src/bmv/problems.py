@@ -144,44 +144,15 @@ Naming and modeling:
     skip_missing_parent=True for a RenamingPlan, or --skip_missing_parent in a
     command-line usage).
 
-Solved:
+    Drop all Failure classes except for:
 
-    Does a RenamePair need a Failure, or vice-versa?
+        @dataclass(frozen = True)
+        class Failure:
+            msg : str
 
-        Neither.
-
-    PHASE I
-
-        ** NOTE: This part can be done before converting the entire failure apparatus.
-
-        Drop the failure attribute from RenamePair (and make it frozen too).
-
-        Convert the rp-step-functions back to the simpler model of returning
-        either the new-rp or a Failure.
-
-        Then adjust the processing generator accordingly:
-
-            def processed_rps(self, step):
-                ...
-                result = step(rp, next(seq))
-                if isinstance(result, Failure):
-                    control = self.handle_failure(result, rp)
-                else:
-                    control = None
-                    rp = result
-                ...
-
-    PHASE II
-
-        Drop all Failure classes except for:
-
-            @dataclass(frozen = True)
-            class Failure:
-                msg : str
-
-            @dataclass(frozen = True)
-            class RpFailure(Failure):
-                rp : RenamePair
+        @dataclass(frozen = True)
+        class RpFailure(Failure):
+            rp : RenamePair
 
 Solved:
 

@@ -181,7 +181,7 @@ def test_code_compilation_fails(tr):
             p.rename_paths()
         assert einfo.value.params['msg'] == FAIL.prepare_failed
         wf = p.uncontrolled_failures[0]
-        assert isinstance(wf.failure, UserCodeExecFailure)
+        assert wf.failure == 'UserCodeExecFailure'
         assert bad_code in wf.msg
         assert 'invalid syntax' in wf.msg
 
@@ -213,6 +213,11 @@ def test_code_execution_fails(tr):
     filter_code = 'return FUBB if seq == 2 else True'
     exp_rp_fails = [False, True, False]
 
+    def check(p):
+        fails = p.uncontrolled_failures
+        assert len(fails) == 1
+        assert fails[0].rp.orig == 'b'
+
     # Run the scenario for renaming.
     plan = RenamingPlan(
         inputs = origs,
@@ -223,8 +228,7 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, FAIL.rename_code_invalid, i = 36)
-    rp_fails = [rp.failed for rp in plan.rps]
-    assert rp_fails == exp_rp_fails
+    check(plan)
 
     # Run the other scenario for renaming: return bad data type.
     plan = RenamingPlan(
@@ -236,8 +240,7 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, FAIL.rename_code_bad_return, i = 45)
-    rp_fails = [rp.failed for rp in plan.rps]
-    assert rp_fails == exp_rp_fails
+    check(plan)
 
     # Run the scenario for filtering.
     plan = RenamingPlan(
@@ -250,8 +253,7 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, FAIL.filter_code_invalid, i = 37)
-    rp_fails = [rp.failed for rp in plan.rps]
-    assert rp_fails == exp_rp_fails
+    check(plan)
 
     # Run the scenario for filtering, keeping those that fail during filtering.
     plan = RenamingPlan(
