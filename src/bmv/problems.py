@@ -70,8 +70,6 @@ If we were to take that approach:
 Details
 ============================================================
 
-Define PROBLEM_FORMATS.
-
 Importing relationships:
 
     __init__.py
@@ -96,21 +94,16 @@ Importing relationships:
     constants.py
         from .data_objects import ...
 
+    problems.py
+        from .data_objects import RenamePair
+
     data_objects.py
         .
 
-    problems.py
-        .
+Drop all problem/failure classes except for:
 
-Drop all Problem classes except for:
-
-    @dataclass(frozen = True)
-    class Problem:
-        msg : str
-
-    @dataclass(frozen = True)
-    class RpProblem(Problem):
-        rp : RenamePair
+    Problem
+    RpProblem
 
 How to configure argparse:
 
@@ -183,17 +176,17 @@ PROBLEM_NAMES = constants('ProblemNames', (
 PN = PROBLEM_NAMES
 
 PROBLEM_FORMATS = constants('ProblemFormats', {
-    PN.equal:              '...',
-    PN.missing:            '...',
-    PN.missing_parent:     '...',
-    PN.existing_new:       '...',
-    PN.colliding_new:      '...',
-    PN.all_filtered:       '...',
-    PN.parsing_no_paths:   '...',
-    PN.parsing_paragraphs: '...',
-    PN.parsing_row:        '...',
-    PN.parsing_imbalance:  '...',
-    PN.user_code_exec:     '...',
+    PN.equal:              'Original path and new path are the same',
+    PN.missing:            'Original path does not exist',
+    PN.missing_parent:     'Parent directory of new path does not exist',
+    PN.existing_new:       'New path exists',
+    PN.colliding_new:      'New path collides with another new path',
+    PN.all_filtered:       'All paths were filtered out by failure control during processing',
+    PN.parsing_no_paths:   'No input paths',
+    PN.parsing_paragraphs: 'The --paragraphs option expects exactly two paragraphs',
+    PN.parsing_row:        'The --rows option expects rows with exactly two cells: {row!r}',
+    PN.parsing_imbalance:  'Got an unequal number of original paths and new paths',
+    PN.user_code_exec:     '{}',
 })
 
 CONTROLS = constants('ProblemControls', (
@@ -216,17 +209,14 @@ VALID_CONTROLS = {
     PN.user_code_exec     : [],
 }
 
+@dataclass(frozen = True)
 class Problem:
+    name: str
+    msg: str
 
-    def __init__(self, name, *xs):
-        self.name = name
-        self.msg = PROBLEM_FORMATS[self.name].format(*xs)
-
-    def __str__(self):
-        return repr(self)
-
-    def __repr__(self):
-        return f'Problem({self.name}, {self.msg!r})'
+    @classmethod
+    def new(cls, name, **xs):
+        return cls(name, PROBLEM_FORMATS[self.name].format(*xs))
 
     @classmethod
     def names_for(cls, control):
@@ -235,4 +225,8 @@ class Problem:
             for fname, controls in cls.VALID_CONTROLS.items()
             if control in controls
         )
+
+@dataclass(frozen = True)
+class RpProblem(Problem):
+    rp : RenamePair
 
