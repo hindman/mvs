@@ -1,7 +1,56 @@
 from dataclasses import dataclass
 from short_con import constants, cons
 
-PNAMES = constants('ProblemNames', (
+'''
+
+Next steps:
+
+    Define FAILURE_FORMATS.
+
+    Then what? Any way to make the transition in incremental steps??
+
+Naming and modeling:
+
+    A Failure has a name that declares its kind/type. In some cases, it has a
+    reason, which does not alter its kind but does determine which
+    format-string it uses to build the the msg of the Failure.
+
+    The user-facing failure-control mechanisms also use the Failure names (eg,
+    missing_parent), prefixed by the desired control (eg, skip_missing_parent
+    for a RenamingPlan or --skip_missing_parent in a command-line context).
+
+Drop all Failure classes except for:
+
+    @dataclass(frozen = True)
+    class Failure:
+        msg : str
+
+    @dataclass(frozen = True)
+    class RpFailure(Failure):
+        rp : RenamePair
+
+Creating the right kind of Failure with the appropriate
+
+    # Usage in code:
+    # - Simple
+    # - With format-args.
+    # - With format-args and reason.
+
+    from .problems import FAILURE_NAMES as FN
+
+    f1 = Failure(FN.equal)
+    f2 = Failure(FN.conflicting_controls, name1, name2)
+    f3 = Failure(FN.rename_fail_invalid, e, rp.orig, reason = REASONS.return_type)
+
+Given a Failure, look up the failure-control, if any:
+
+    f = Failure(...)
+    control = self.fconfig.get(f.name, None)
+
+'''
+
+
+FAILURE_NAMES = constants('FailureNames', (
     'equal',
     'missing',
     'missing_parent',
@@ -18,19 +67,19 @@ PNAMES = constants('ProblemNames', (
     'user_code_exec',
 ))
 
-CONTROLS = constants('ProblemControls', (
+CONTROLS = constants('FailureControls', (
     'skip',
     'keep',
     'create',
     'clobber',
 ))
 
-REASONS = constants('ProblemReasons', (
+REASONS = constants('FailureReasons', (
     'invalid',
     'return_type',
 ))
 
-PFORMATS = cons('ProblemFormats',
+FAILURE_FORMATS = cons('FailureFormats',
     equal                 = '...',
     missing               = '...',
     missing_parent        = '...',
@@ -48,47 +97,34 @@ PFORMATS = cons('ProblemFormats',
     user_code_exec        = '...',
 )
 
-@dataclass(frozen = True)
-class Problem:
-    name: str
-    controls: tuple[str]
-    reasons: tuple[str]
-
-    DEFINITIONS = (
-        (PNAMES.equal, CONTROLS.skip),
-        (PNAMES.missing, CONTROLS.skip),
-        (PNAMES.missing_parent, CONTROLS.skip, CONTROLS.create),
-        (PNAMES.existing_new, CONTROLS.skip, CONTROLS.clobber),
-        (PNAMES.colliding_new, CONTROLS.skip, CONTROLS.clobber),
-        (PNAMES.failed_rename, CONTROLS.skip, REASONS.invalid, REASONS.return_type),
-        (PNAMES.failed_filter, CONTROLS.skip, CONTROLS.keep),
-        (PNAMES.all_filtered),
-        (PNAMES.control_conflict),
-        (PNAMES.parsing_no_paths),
-        (PNAMES.parsing_paragraphs),
-        (PNAMES.parsing_row),
-        (PNAMES.parsing_imbalance),
-        (PNAMES.user_code_exec),
-    )
-
-    @classmethod
-    def new(cls, name, *xs):
-        controls = tuple(x for x in xs if x in CONTROLS)
-        reasons = tuple([x for x in xs if x in REASONS] or [''])
-        return cls(name, controls, reasons)
-
-    @classmethod
-    def generate_all(cls):
-        return tuple(cls.new(*tup) for tup in cls.DEFINITIONS)
-
-PROBLEMS = Problem.generate_all()
-
 class Failure:
+
+    FN = FAILURE_NAMES
+    C = CONTROLS
+    R = REASONS
+
+    DEFINITIONS = {
+        # Failure name          Valid controls        Valid reasons
+        FN.equal              : [[C.skip],            []],
+        FN.missing            : [[C.skip],            []],
+        FN.missing_parent     : [[C.skip, C.create],  []],
+        FN.existing_new       : [[C.skip, C.clobber], []],
+        FN.colliding_new      : [[C.skip, C.clobber], []],
+        FN.failed_rename      : [[C.skip],            [R.invalid, R.return_type]],
+        FN.failed_filter      : [[C.skip, C.keep],    []],
+        FN.all_filtered       : [[],                  []],
+        FN.control_conflict   : [[],                  []],
+        FN.parsing_no_paths   : [[],                  []],
+        FN.parsing_paragraphs : [[],                  []],
+        FN.parsing_row        : [[],                  []],
+        FN.parsing_imbalance  : [[],                  []],
+        FN.user_code_exec     : [[],                  []],
+    }
 
     def __init__(self, name, *xs, reason = ''):
         self.name = name
         self.reason = reason
-        self.msg = PFORMATS[self.fmt_name].format(*xs)
+        self.msg = FAILURE_FORMATS[self.fmt_name].format(*xs)
 
     @property
     def fmt_name(self):
@@ -97,99 +133,35 @@ class Failure:
         else:
             return self.name
 
-CONTROL_OPTS = tuple(
-    f'{c}_{p.name}'
-    for p in PROBLEMS
-    for c in p.controls
-)
+    @classmethod
+    def create_failure_config(cls, x, for_opts = False):
+        fconfig = {}
+        for co_name in cls.control_opt_names():
+            if getattr(x, co_name, None):
+                control, fname = co_name.split('_', 1)
+                if fname in fconfig:
+                    cos = tuple(
+                        cls.control_opt_for_user(fname, c, for_opts)
+                        for c in (control, fconfig[fname])
+                    )
+                    return cls(FAILURE_NAMES.control_conflict, *cos)
+                else:
+                    fconfig[fname] = control
+        return fconfig
 
-def create_failure_config(x, for_opts = False):
-    fconfig = {}
-    for co in CONTROL_OPTS:
-        if getattr(x, co, None):
-            control, fname = co.split('_', 1)
-            if fname in fconfig:
-                cos = tuple(
-                    control_opt(fname, c, for_opts)
-                    for c in (control, fconfig[fname])
-                )
-                return Failure(PNAMES.control_conflict, *cos)
-            else:
-                fconfig[fname] = control
-    return fconfig
+    @classmethod
+    def control_opt_names(cls):
+        return tuple(
+            f'{c}_{p.name}'
+            for fname, (controls, reasons) in cls.DEFINITIONS.items()
+            for c in controls
+        )
 
-def control_opt(fname, control, for_opts):
-    co = f'{control}_{fname}'
-    if for_opts:
-        return '--' + co.replace('_', '-')
-    else:
-        return co
-
-'''
-
-Naming and modeling:
-
-    A Problem in a generic representation of something that can go wrong. A
-    Failure is the specific occurrence of a Problem -- most importantly the msg
-    attribute describing what went wrong, sometimes with specific data values
-    for the case at hand plugged into the msg.
-
-    A specific Failure and its corresponding generic Problem are linked via
-    their name attribute, which declares their kind/type. Failure instances
-    have an additional attribute (reason) that can further classify the Failure
-    when building the specific failure msg.
-
-    The user-facing failure-control mechanisms also use the Failure/Problem
-    names (eg, missing_parent), prefixed by the desired control (eg,
-    skip_missing_parent=True for a RenamingPlan, or --skip_missing_parent in a
-    command-line usage).
-
-    Drop all Failure classes except for:
-
-        @dataclass(frozen = True)
-        class Failure:
-            msg : str
-
-        @dataclass(frozen = True)
-        class RpFailure(Failure):
-            rp : RenamePair
-
-Solved:
-
-    We need the ability to generate all of the control-problem-kinds (as flags).
-
-        See CONTROL_OPTS.
-
-Solved:
-
-    When a problem occurs, we need the ability to create the right kind of
-    Failure with the appropriate message.
-
-    # Usage in code:
-    # - Simple
-    # - With format-args.
-    # - With format-args and reason.
-
-    f1 = Failure(PNAMES.equal)
-    f2 = Failure(PNAMES.conflicting_controls, name1, name2)
-    f3 = Failure(PNAMES.rename_fail_invalid, e, rp.orig, reason = REASONS.return_type)
-
-Solved:
-
-    We need the ability to know when conflicting control-problem-kinds have been set
-    True for the same problem-kind.
-
-        Use create_failure_config(), which validates and creates, for both
-        RenamingPlan and opts.
-
-Solved:
-
-    When a problem occurs, we need the ability to take the Failure and look up
-    up which control (if any) has been requested by user.
-
-        f = Failure(...)
-        control = self.fconfig.get(f.name, None)
-
-'''
-
+    @staticmethod
+    def control_opt_for_user(fname, control, for_opts):
+        co = f'{control}_{fname}'
+        if for_opts:
+            return '--' + co.replace('_', '-')
+        else:
+            return co
 
