@@ -207,6 +207,20 @@ class CLI:
             'default': 4,
             'help': 'Number of spaces for indentation in user-supplied code',
         },
+        {
+            names: '--seq',
+            'metavar': 'N',
+            'type': positive_int,
+            'default': 1,
+            'help': 'Sequence start value [default: 1]',
+        },
+        {
+            names: '--step',
+            'metavar': 'N',
+            'type': positive_int,
+            'default': 1,
+            'help': 'Sequence step value [default: 1]',
+        },
 
         # Renaming behaviors.
         {
@@ -242,23 +256,6 @@ class CLI:
             'metavar': 'N',
             'type': positive_int,
             'help': 'Upper limit on the number of items to display in listings [default: none]',
-        },
-
-        # Sequence numbers.
-        {
-            group: 'Sequence numbers',
-            names: '--seq',
-            'metavar': 'N',
-            'type': positive_int,
-            'default': 1,
-            'help': 'Sequence start value [default: 1]',
-        },
-        {
-            names: '--step',
-            'metavar': 'N',
-            'type': positive_int,
-            'default': 1,
-            'help': 'Sequence step value [default: 1]',
         },
 
         # Failure control.
