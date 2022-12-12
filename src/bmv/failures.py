@@ -3,6 +3,68 @@ from short_con import constants, cons
 
 '''
 
+----------------------------
+Let's take another step back
+----------------------------
+
+The following approach could simplify validation and reduce the bulk of the
+user-interace (proliferation of failure-control options/kwargs).
+
+The argparse help text would look like this:
+
+    Failure control options:
+
+        --skip {all|equal|missing|parent|existing|colliding|rename|filter}...
+                                         Skip paths with failures, but proceed with others.
+        --clobber [all|existing|colliding]
+                                         Rename anyway, in spite of overwriting.
+        --create [parent]                Create missing parent before renaming.
+        --keep [filter]                  Retain the item anyway.
+
+In the epilogue, we could explain how failure control works:
+
+    Before any renaming occurs, each pair of original and new paths is checked
+    for common types of problems. By default, if any occur, the renaming plan
+    is halted and no paths are renamed. The failures and their short names are
+    as follows:
+
+        equal     | Original path and new path are the same.
+        missing   | Original path does not exist.
+        existing  | New path already exists.
+        colliding | Two or more new paths are the same.
+        parent    | Parent directory of new path does not exist.
+        rename    | User's renaming code fails during execution.
+        filter    | User's filtering code fails during execution.
+
+    Users can configure various failure controls to address such issues. That
+    allows the renaming plan to proceed in spite of the problems, either by
+    skipping offending items, taking remedial action, or simply forging ahead
+    in spite of the consequences. As shown is the usage documentation above,
+    some controls are applicable only to a single type of problem, others apply
+    to multiple, and the skip control can be applied to any or all of them.
+    Here are some examples to illustrate usage:
+
+        --skip equal         | Skip items with 'equal' failure.
+        --skip equal missing | Skip items with 'equal' or 'missing' failures.
+        --skip all           | Skip items with any type of failure.
+        --create parent      | Create missing parent before renaming.
+        --create             | Same thing, more compactly.
+
+If we were to take that approach:
+
+    - User interface: better.
+
+    - Validation of options/kwargs: much simpler.
+
+    - Ability to create the right kind of Failure: the same.
+
+    - Ability to look up a control when a Failure occurs: the same [this
+      operation is downstream of the validation logic, which can create the
+      needed lookup data-structure].
+
+============================================================
+
+
 Next steps:
 
     Define FAILURE_FORMATS.
@@ -114,7 +176,7 @@ class Failure:
         FN.failed_filter      : [[C.skip, C.keep],    []],
         FN.all_filtered       : [[],                  []],
         FN.control_conflict   : [[],                  []],
-        FN.parsing_no_paths   : [[],                  []],
+        FN.parsing_no_paths   : [[],                  []],   # Use REASONS instead of 4 parsing definitions?
         FN.parsing_paragraphs : [[],                  []],
         FN.parsing_row        : [[],                  []],
         FN.parsing_imbalance  : [[],                  []],
