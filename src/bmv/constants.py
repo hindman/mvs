@@ -1,18 +1,12 @@
 from textwrap import dedent
 from short_con import constants, cons
 
-from .data_objects import(
-    RpFilterFailure,
-    RpRenameFailure,
-    RpEqualFailure,
-    RpMissingFailure,
-    RpMissingParentFailure,
-    RpExistsFailure,
-    RpCollsionFailure,
-)
+from .problems import Problem, CONTROLS
 
 class CON:
     app_name = 'bmv'
+    all = 'all'
+    all_tup = (all,)
     newline = '\n'
     tab = '\t'
     underscore = '_'
@@ -32,61 +26,6 @@ class CON:
         def {func_name}(o, p, seq, plan):
         {indent}{user_code}
     ''').lstrip()
-
-FAIL = cons('Fails',
-    orig_missing = 'Original path does not exist',
-    new_exists = 'New path exists',
-    new_parent_missing = 'Parent directory of new path does not exist',
-    orig_new_same = 'Original path and new path are the same',
-    new_collision = 'New path collides with another new path',
-    no_input_paths = 'No input paths',
-    no_paths = 'No paths to be renamed',
-    no_paths_after_processing = 'All paths were filtered out by failure control during processing',
-    parsing_no_structures = 'No input structures given',
-    parsing_row = 'The --rows option expects rows with exactly two cells: {row!r}',
-    parsing_paragraphs = 'The --paragraphs option expects exactly two paragraphs',
-    parsing_inequality = 'Got an unequal number of original paths and new paths',
-    opts_require_one = 'One of these options is required',
-    opts_mutex = 'No more than one of these options should be used',
-    prepare_failed = 'RenamingPlan cannot rename paths because failures occurred during preparation',
-    rename_done_already = 'RenamingPlan cannot rename paths because renaming has already been executed',
-    conflicting_controls = 'Conflicting controls specified for a failure type: {} and {}',
-    filter_code_invalid = 'Error in user-supplied filtering code: {} [original path: {}]',
-    rename_code_invalid = 'Error in user-supplied renaming code: {} [original path: {}]',
-    rename_code_bad_return = 'Invalid type from user-supplied renaming code: {} [original path: {}]',
-    prepare_failed_cli = 'Renaming preparation resulted in failures:{}.\n',
-    renaming_raised = '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',
-)
-
-# Failure control mechanisms.
-CONTROLS = constants('Controls', (
-    'skip',
-    'keep',
-    'create',
-    'clobber',
-))
-
-# Mapping from the user-facing failure control names to their:
-# (1) failure-control mechanisms and (2) Failure type.
-#
-#   skip   : The affected RenamePair will be skipped.
-#   keep   : The affected RenamePair will be kept [rather than filtered out].
-#   create : The missing path will be created [parent of RenamePair.new].
-#   clobber: The affected path will be clobbered [existing or colliding RenamePair.new].
-#
-CONTROLLABLES = cons('Controllables',
-    skip_failed_filter    = (CONTROLS.skip, RpFilterFailure),
-    skip_failed_rename    = (CONTROLS.skip, RpRenameFailure),
-    skip_equal            = (CONTROLS.skip, RpEqualFailure),
-    skip_missing          = (CONTROLS.skip, RpMissingFailure),
-    skip_missing_parent   = (CONTROLS.skip, RpMissingParentFailure),
-    skip_existing_new     = (CONTROLS.skip, RpExistsFailure),
-    skip_colliding_new    = (CONTROLS.skip, RpCollsionFailure),
-    clobber_existing_new  = (CONTROLS.clobber, RpExistsFailure),
-    clobber_colliding_new = (CONTROLS.clobber, RpCollsionFailure),
-    keep_failed_filter    = (CONTROLS.keep, RpFilterFailure),
-    create_missing_parent = (CONTROLS.create, RpMissingParentFailure),
- )
 
 # Helper for argparse configuration to check for positive integers.
 def positive_int(x):
@@ -123,6 +62,7 @@ class CLI:
         Renames or moves files in bulk, via user-supplied Python
         code or a data source mapping old paths to new paths.
     '''
+
     epilog = '''
         The user-supplied renaming and filtering code has access to the
         original file path as a str [variable: o], its pathlib.Path
@@ -135,6 +75,34 @@ class CLI:
         first line, but must provide it for subsequent lines. For reference,
         some useful Path components: p.parent, p.name, p.stem, p.suffix.
     '''
+
+    post_epilog = dedent('''
+        Before any renaming occurs, each pair of original and new paths is checked
+        for common types of problems. By default, if any occur, the renaming plan
+        is halted and no paths are renamed. The problems and their short names are
+        as follows:
+
+            equal     | Original path and new path are the same.
+            missing   | Original path does not exist.
+            existing  | New path already exists.
+            colliding | Two or more new paths are the same.
+            parent    | Parent directory of new path does not exist.
+
+        Users can configure various problem controls to address such issues. That
+        allows the renaming plan to proceed in spite of the problems, either by
+        skipping offending items, taking remedial action, or simply forging ahead
+        in spite of the consequences. As shown in the usage documentation above,
+        the --create control applies only to a single type of problem, the
+        --clobber control can apply to multiple, and the --skip control can apply
+        to any or all. Here are some examples to illustrate usage:
+
+            --skip equal         | Skip items with 'equal' problem.
+            --skip equal missing | Skip items with 'equal' or 'missing' problems.
+            --skip all           | Skip items with any type of problem.
+            --clobber all        | Rename in spite of 'existing' and 'colliding' problems.
+            --create parent      | Create missing parent before renaming.
+            --create             | Same thing, more compactly.
+    ''').lstrip()
 
     # Argument configuration for argparse.
     names = 'names'
@@ -260,60 +228,26 @@ class CLI:
 
         # Failure control.
         {
-            group: 'Failure control',
-            names: '--skip-equal',
-            'action': 'store_true',
-            'help': 'If original path equals new, skip rename',
+            group: 'Problem control',
+            names: '--skip',
+            'choices': CON.all_tup + Problem.names_for(CONTROLS.skip),
+            'nargs': '+',
+            'metavar': 'PROB',
+            'help': 'Skip items with the named problems',
         },
         {
-            names: '--skip-missing',
-            'action': 'store_true',
-            'help': 'If original path does not exist, skip rename',
+            names: '--clobber',
+            'choices': CON.all_tup + Problem.names_for(CONTROLS.clobber),
+            'nargs': '+',
+            'metavar': 'PROB',
+            'help': 'Rename anyway, in spite of named overwriting problems',
         },
         {
-            names: '--skip-missing-parent',
-            'action': 'store_true',
-            'help': 'If parent of new path does not exist, skip rename',
-        },
-        {
-            names: '--create-missing-parent',
-            'action': 'store_true',
-            'help': 'If parent of new path does not exist, create parent before renaming',
-        },
-        {
-            names: '--skip-existing-new',
-            'action': 'store_true',
-            'help': 'If new path already exists, skip rename',
-        },
-        {
-            names: '--clobber-existing-new',
-            'action': 'store_true',
-            'help': 'If new path already exists, overwrite during renaming',
-        },
-        {
-            names: '--skip-colliding-new',
-            'action': 'store_true',
-            'help': 'If new paths collide, skip renames',
-        },
-        {
-            names: '--clobber-colliding-new',
-            'action': 'store_true',
-            'help': 'If new paths collide, overwrite during renaming',
-        },
-        {
-            names: '--skip-failed-rename',
-            'action': 'store_true',
-            'help': 'If user renaming code fails when handling path, skip rename',
-        },
-        {
-            names: '--skip-failed-filter',
-            'action': 'store_true',
-            'help': 'If user filtering code fails when handling path, skip rename',
-        },
-        {
-            names: '--keep-failed-filter',
-            'action': 'store_true',
-            'help': 'If user filtering code fails when handling path, retain path',
+            names: '--create',
+            'choices': Problem.names_for(CONTROLS.create),
+            'nargs': '?',
+            'metavar': 'PROB',
+            'help': 'Fix missing parent problem before renaming',
         },
 
         # Program information.

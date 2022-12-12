@@ -12,10 +12,10 @@ from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
 
-from .data_objects import Failure
-from .plan import RenamingPlan, validated_failure_controls
+from .problems import Problem
+from .plan import RenamingPlan
 from .version import __version__
-from .constants import CON, CLI, FAIL, STRUCTURES, CONTROLLABLES
+from .constants import CON, CLI, STRUCTURES
 from .utils import read_from_clipboard, read_from_file, write_to_clipboard
 
 ####
@@ -92,14 +92,16 @@ class CliRenamer:
             filter_code = opts.filter,
             indent = opts.indent,
             file_sys = self.file_sys,
-            **self.fail_controls_kws,
+            skip = opts.skip,
+            clobber = opts.clobber,
+            create = opts.create,
         )
         plan = self.plan
 
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()
         if plan.failed:
-            msg = self.listing_msg(FAIL.prepare_failed_cli, plan.uncontrolled_failures)
+            msg = self.listing_msg(FAIL.prepare_failed_cli, plan.uncontrolled_problems)
             self.wrapup(CON.exit_fail, msg)
             return
 
@@ -212,8 +214,8 @@ class CliRenamer:
         #
         # In event of parsing failure, argparse tries to exit
         # with usage plus error message. We capture that output
-        # to standard error in a StringIO and return the text
-        # in a Failure instance.
+        # to standard error in a StringIO so we can emit the output
+        # via our own machinery.
         try:
             real_stderr = sys.stderr
             sys.stderr = StringIO()
@@ -227,7 +229,12 @@ class CliRenamer:
 
         # Deal with special options that will lead to an early, successful exit.
         if opts.help:
-            msg = 'U' + ap.format_help()[1:]
+            msg = ''.join((
+                'U',
+                ap.format_help()[1:],
+                CON.newline,
+                CLI.post_epilog,
+            ))
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.version:
@@ -238,12 +245,6 @@ class CliRenamer:
         # Validate the options related to input sources and structures.
         self.validate_sources_structures(opts)
         if self.done:
-            return None
-
-        # Validate the failure-control options.
-        result = validated_failure_controls(opts, opts_mode = True)
-        if isinstance(result, Failure):
-            self.wrapup(CON.exit_fail, result.msg)
             return None
         else:
             return opts
@@ -281,7 +282,7 @@ class CliRenamer:
                 if getattr(opts, nm, None)
             ))
 
-            # If there is a problem, first set the failure msg.
+            # If there is a problem, first set the problem msg.
             if n == 0 and not zero_ok:
                 msg = FAIL.opts_require_one
             elif n > 1:
@@ -290,7 +291,7 @@ class CliRenamer:
                 msg = None
                 continue
 
-            # And then register the failure message.
+            # And then register the problem message.
             choices = ', '.join(
                 ('' if nm == CLI.sources.paths else '--') + nm
                 for nm in opt_names
@@ -319,11 +320,4 @@ class CliRenamer:
         subdir = '.' + CON.app_name
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         return Path.home() / subdir / (now + '.json')
-
-    @property
-    def fail_controls_kws(self):
-        return {
-            k : getattr(self.opts, k)
-            for k in CONTROLLABLES.keys()
-        }
 
