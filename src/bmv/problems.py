@@ -4,13 +4,10 @@ Next:
 
     Search all usages of the following, fixing the pname values.
 
-        PROBLEM_NAMES
-        PN
-        FAIL  =>  PROBLEM_FORMATS
+        PROBLEM_NAMES or PN
+        FAILURE_NAMES or FM
 
-    Fix all problem creations:
-
-        Problem(...)  =>  Problem.new(...)
+        FAIL  =>  delete
 
     Try to run:
 
@@ -27,17 +24,12 @@ Files:
 
 '''
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from short_con import constants, cons
 
 from .data_objects import RenamePair
 
-PROBLEM_NAMES = constants('ProblemNames', (
-    'equal',
-    'missing',
-    'existing',
-    'colliding',
-    'parent',
+FAILURE_NAMES = constants('FailureNames', (
     'all_filtered',
     'parsing_no_paths',
     'parsing_paragraphs',
@@ -46,20 +38,31 @@ PROBLEM_NAMES = constants('ProblemNames', (
     'user_code_exec',
 ))
 
+PROBLEM_NAMES = constants('ProblemNames', (
+    'equal',
+    'missing',
+    'existing',
+    'colliding',
+    'parent',
+))
+
+FN = FAILURE_NAMES
 PN = PROBLEM_NAMES
 
-PROBLEM_FORMATS = constants('ProblemFormats', {
+FORMATS = constants('Formats', {
+    # Failure.
+    FN.all_filtered:       'All paths were filtered out by failure control during processing',
+    FN.parsing_no_paths:   'No input paths',
+    FN.parsing_paragraphs: 'The --paragraphs option expects exactly two paragraphs',
+    FN.parsing_row:        'The --rows option expects rows with exactly two cells: {row!r}',
+    FN.parsing_imbalance:  'Got an unequal number of original paths and new paths',
+    FN.user_code_exec:     '{}',
+    # Problem.
     PN.equal:              'Original path and new path are the same',
     PN.missing:            'Original path does not exist',
     PN.parent:             'Parent directory of new path does not exist',
     PN.existing:           'New path exists',
     PN.colliding:          'New path collides with another new path',
-    PN.all_filtered:       'All paths were filtered out by failure control during processing',
-    PN.parsing_no_paths:   'No input paths',
-    PN.parsing_paragraphs: 'The --paragraphs option expects exactly two paragraphs',
-    PN.parsing_row:        'The --rows option expects rows with exactly two cells: {row!r}',
-    PN.parsing_imbalance:  'Got an unequal number of original paths and new paths',
-    PN.user_code_exec:     '{}',
 })
 
 CONTROLS = constants('ProblemControls', (
@@ -68,43 +71,37 @@ CONTROLS = constants('ProblemControls', (
     'create',
 ))
 
-VALID_CONTROLS = {
-    PN.equal:              [CONTROLS.skip],
-    PN.missing:            [CONTROLS.skip],
-    PN.existing:           [CONTROLS.skip, CONTROLS.clobber],
-    PN.colliding:          [CONTROLS.skip, CONTROLS.clobber],
-    PN.parent:             [CONTROLS.skip, CONTROLS.create],
-    PN.all_filtered:       [],
-    PN.parsing_no_paths:   [],
-    PN.parsing_paragraphs: [],
-    PN.parsing_row:        [],
-    PN.parsing_imbalance:  [],
-    PN.user_code_exec:     [],
+CONTROLLABLES = {
+    CONTROLS.skip:    PN.keys(),
+    CONTROLS.clobber: (PN.existing, PN.colliding),
+    CONTROLS.create:  (PN.parent,),
 }
 
-@dataclass(frozen = True)
-class Problem:
+@dataclass(init = False, frozen = True)
+class Failure:
     name: str
     msg: str
 
-    @classmethod
-    def new(cls, name, **xs):
-        return cls(name, PROBLEM_FORMATS[self.name].format(*xs))
-
-    @classmethod
-    def names_for(cls, control):
-        return tuple(
-            fname
-            for fname, controls in VALID_CONTROLS.items()
-            if control in controls
-        )
+    def __init__(self, name, *xs):
+        d = self.__dict__
+        d['name'] = name
+        d['msg'] = FORMATS[self.name].format(*xs)
 
     @property
     def formatted(self):
         return self.msg
 
+@dataclass(init = False, frozen = True)
+class Problem(Failure):
+
+    @classmethod
+    def names_for(cls, control):
+        return CONTROLLABLES[control]
+
 @dataclass(frozen = True)
 class RpProblem(Problem):
+    name : str
+    msg : str
     rp : RenamePair
 
     @property
