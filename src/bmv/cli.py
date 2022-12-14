@@ -12,7 +12,7 @@ from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
 
-from .problems import Problem
+from .failures import Problem, PROBLEM_FORMATS as PF
 from .plan import RenamingPlan
 from .version import __version__
 from .constants import CON, CLI, STRUCTURES
@@ -101,7 +101,7 @@ class CliRenamer:
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()
         if plan.failed:
-            msg = self.listing_msg(FAIL.prepare_failed_cli, plan.uncontrolled_problems)
+            msg = self.listing_msg(PF.prepare_failed_cli, plan.uncontrolled_problems)
             self.wrapup(CON.exit_fail, msg)
             return
 
@@ -138,7 +138,7 @@ class CliRenamer:
             self.wrapup(CON.exit_ok, CON.paths_renamed_msg)
         except Exception as e:
             tb = traceback.format_exc()
-            msg = FAIL.renaming_raised.format(tb)
+            msg = PF.renaming_raised.format(tb)
             self.wrapup(CON.exit_fail, msg)
 
     def wrapup(self, code, msg):
@@ -284,9 +284,9 @@ class CliRenamer:
 
             # If there is a problem, first set the problem msg.
             if n == 0 and not zero_ok:
-                msg = FAIL.opts_require_one
+                msg = PF.opts_require_one
             elif n > 1:
-                msg = FAIL.opts_mutex
+                msg = PF.opts_mutex
             else:
                 msg = None
                 continue

@@ -3,20 +3,24 @@ from itertools import chain
 
 from bmv.plan import RenamingPlan
 
+from bmv.failures import (
+    PROBLEM_NAMES as PN,
+    PROBLEM_FORMATS as PF,
+)
+
 from bmv.constants import (
     CON,
-    FAIL,
     STRUCTURES,
 )
 
-from bmv.data_objects import BmvError, UserCodeExecFailure
+from bmv.data_objects import BmvError
 
 def assert_failed_because(einfo, plan, msg, i = None):
     fmsgs = tuple(
         f.msg[0 : i]
-        for f in plan.uncontrolled_failures
+        for f in plan.uncontrolled_problems
     )
-    assert einfo.value.params['msg'] == FAIL.prepare_failed
+    assert einfo.value.params['msg'] == PF.prepare_failed
     assert msg[0 : i] in fmsgs
 
 def test_structure_none(tr):
@@ -38,7 +42,7 @@ def test_no_inputs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.no_input_paths)
+    assert_failed_because(einfo, plan, PF.parsing_no_paths)
 
 def test_structure_flat(tr):
     origs = ('a', 'b', 'c')
@@ -83,7 +87,7 @@ def test_structure_paragraphs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.parsing_paragraphs)
+    assert_failed_because(einfo, plan, PF.parsing_paragraphs)
 
 def test_structure_pairs(tr):
     # Paths.
@@ -118,7 +122,7 @@ def test_structure_pairs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.parsing_inequality)
+    assert_failed_because(einfo, plan, PF.parsing_imbalance)
 
 def test_structure_rows(tr):
     # Paths.
@@ -144,7 +148,7 @@ def test_structure_rows(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.parsing_row, i = 55)
+    assert_failed_because(einfo, plan, PF.parsing_row, i = 55)
 
 def test_renaming_code(tr):
     origs = ('a', 'b', 'c')
@@ -179,11 +183,11 @@ def test_code_compilation_fails(tr):
     def do_checks(p):
         with pytest.raises(BmvError) as einfo:
             p.rename_paths()
-        assert einfo.value.params['msg'] == FAIL.prepare_failed
-        wf = p.uncontrolled_failures[0]
-        assert wf.failure == 'UserCodeExecFailure'
-        assert bad_code in wf.msg
-        assert 'invalid syntax' in wf.msg
+        assert einfo.value.params['msg'] == PF.prepare_failed
+        f = p.uncontrolled_problems[0]
+        assert f.name == PN.user_code_exec
+        assert bad_code in f.msg
+        assert 'invalid syntax' in f.msg
 
     # Scenario: invalid renaming code.
     plan = RenamingPlan(
@@ -214,7 +218,7 @@ def test_code_execution_fails(tr):
     exp_rp_fails = [False, True, False]
 
     def check(p):
-        fails = p.uncontrolled_failures
+        fails = p.uncontrolled_problems
         assert len(fails) == 1
         assert fails[0].rp.orig == 'b'
 
@@ -227,7 +231,7 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.rename_code_invalid, i = 36)
+    assert_failed_because(einfo, plan, PF.rename_code_invalid, i = 36)
     check(plan)
 
     # Run the other scenario for renaming: return bad data type.
@@ -239,7 +243,7 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.rename_code_bad_return, i = 45)
+    assert_failed_because(einfo, plan, PF.rename_code_bad_return, i = 45)
     check(plan)
 
     # Run the scenario for filtering.
@@ -252,10 +256,12 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.filter_code_invalid, i = 37)
+    assert_failed_because(einfo, plan, PF.filter_code_invalid, i = 37)
     check(plan)
 
     # Run the scenario for filtering, keeping those that fail during filtering.
+    # TODO: need a different scenario. failed-filtering is fatal now.
+    return
     plan = RenamingPlan(
         inputs = origs + news,
         structure = STRUCTURES.flat,
@@ -291,18 +297,10 @@ def test_plan_as_dict(tr):
         'seq_start',
         'seq_step',
         'file_sys',
-        'skip_equal',
-        'skip_missing',
-        'skip_missing_parent',
-        'create_missing_parent',
-        'skip_existing_new',
-        'clobber_existing_new',
-        'skip_colliding_new',
-        'clobber_colliding_new',
-        'skip_failed_rename',
-        'skip_failed_filter',
-        'keep_failed_filter',
-        'failures',
+        'skip',
+        'clobber',
+        'create',
+        'problems',
         'prefix_len',
         'rename_pairs',
     ))
@@ -343,10 +341,13 @@ def test_rename_twice(tr):
     # Second attempt raises and
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert einfo.value.params['msg'] == FAIL.rename_done_already
+    assert einfo.value.params['msg'] == PF.rename_done_already
     assert tuple(plan.file_sys) == news
 
 def test_invalid_controls(tr):
+    # TODO: I think this is obsolete now.
+    return
+
     # Paths.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
@@ -394,7 +395,7 @@ def test_invalid_controls(tr):
         with pytest.raises(BmvError) as einfo:
             plan = RenamingPlan(**common, **controls)
         msg = einfo.value.params['msg']
-        exp = FAIL.conflicting_controls.format(*pair)
+        exp = PF.conflicting_controls.format(*pair)
         assert msg == exp
 
 def test_prepare_rename_multiple_times(tr):
@@ -418,7 +419,7 @@ def test_prepare_rename_multiple_times(tr):
     # Cannot call rename_paths multiple times.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert einfo.value.params['msg'] == FAIL.rename_done_already
+    assert einfo.value.params['msg'] == PF.rename_done_already
 
 def test_equal(tr):
     # Paths.
@@ -440,7 +441,7 @@ def test_equal(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.orig_new_same)
+    assert_failed_because(einfo, plan, PN.equal)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -473,7 +474,7 @@ def test_missing_orig(tr):
     # Renaming will raise.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.orig_missing)
+    assert_failed_because(einfo, plan, PN.missing)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -506,7 +507,7 @@ def test_new_exists(tr):
     # Renaming will raise.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.new_exists)
+    assert_failed_because(einfo, plan, PN.exists)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -551,7 +552,7 @@ def test_new_parent_missing(tr):
     # Renaming will raise.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.new_parent_missing)
+    assert_failed_because(einfo, plan, PN.parent)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -595,7 +596,7 @@ def test_news_collide(tr):
     # Renaming will raise.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.new_collision)
+    assert_failed_because(einfo, plan, PN.colliding)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -634,7 +635,7 @@ def test_failures_skip_all(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, FAIL.no_paths_after_processing)
+    assert_failed_because(einfo, plan, PF.all_filtered)
 
 def test_file_sys_arg(tr):
     # Paths.

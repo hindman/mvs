@@ -17,6 +17,7 @@
 #
 ####
 
+import subprocess
 from invoke import task
 from pathlib import Path
 
@@ -40,6 +41,28 @@ def test(c, cov = False):
     c.run(cmd)
     if cov:
         c.run('open htmlcov/index.html')
+
+@task
+def testone(c, func_name):
+    '''
+    Run pytest against one function.
+    '''
+    # Use ack to find the matching test files.
+    args = ('ack', '-l', func_name, 'tests')
+    result = subprocess.run(args, stdout = subprocess.PIPE)
+    out = result.stdout.decode('utf-8').strip()
+    paths = out.split('\n') if out else []
+    # Run pytest or report problem.
+    n = len(paths)
+    if n == 1:
+        cmd = f'pytest --color yes -s -v {paths[0]}::{func_name}'
+        c.run(cmd)
+    elif n == 0:
+        print('No matching paths')
+    else:
+        print('Too many matching paths:')
+        for p in paths:
+            print(p)
 
 @task
 def tox(c):

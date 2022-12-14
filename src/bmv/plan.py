@@ -10,9 +10,10 @@ from pathlib import Path
 
 from .constants import CON, STRUCTURES
 
-from .problems import (
+from .failures import (
     CONTROLS,
     PROBLEM_NAMES as PN,
+    PROBLEM_FORMATS as PF,
     Problem,
 )
 
@@ -141,7 +142,7 @@ class RenamingPlan:
 
             # Register problem if the step filtered out everything.
             if not self.rps:
-                p = Problem.new(PN.all_filtered)
+                p = Problem(PN.all_filtered)
                 self.handle_problem(p)
 
             # Stop if the plan has failed either directly or via filtering.
@@ -154,8 +155,9 @@ class RenamingPlan:
 
     def parse_inputs(self):
 
-        def prob(pname, *xs):
-            self.handle_problem(Problem.new(pname, *xs))
+        def do_fail(name, *xs):
+            p = Problem(name, *xs)
+            self.handle_problem(p)
             return ()
 
         # If we have rename_code, inputs are just original paths.
@@ -168,7 +170,7 @@ class RenamingPlan:
             if rps:
                 return rps
             else:
-                return prob(PN.no_input_paths)
+                return do_fail(PN.parsing_no_paths)
 
         # Otherwise, organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.paragraphs:
@@ -181,7 +183,7 @@ class RenamingPlan:
             if len(groups) == 2:
                 origs, news = groups
             else:
-                return prob(PN.parsing_paragraphs)
+                return do_fail(PN.parsing_paragraphs)
 
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
@@ -203,7 +205,7 @@ class RenamingPlan:
                         origs.append(cells[0])
                         news.append(cells[1])
                     else:
-                        return prob(PN.parsing_row, row)
+                        return do_fail(PN.parsing_row, row)
 
         else:
             # Flat: like paragraphs without the blank-line delimiter.
@@ -213,9 +215,9 @@ class RenamingPlan:
 
         # Problem if we got no paths or unequal original vs new.
         if not origs and not news:
-            return prob(PN.no_input_paths)
+            return do_fail(PN.parsing_no_paths)
         elif len(origs) != len(news):
-            return prob(PN.parsing_inequality)
+            return do_fail(PN.parsing_imbalance)
 
         # Return the RenamePair instances.
         return tuple(
@@ -254,7 +256,8 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             msg = traceback.format_exc(limit = 0)
-            self.handle_problem(Problem(PN.user_code_exec, msg))
+            p = Problem(PN.user_code_exec, msg)
+            self.handle_problem(p)
             return None
 
     ####
@@ -279,7 +282,7 @@ class RenamingPlan:
             # If not, set rp to the return result.
             result = step(rp, next(seq))
             if isinstance(result, Problem):
-                control = self.handle_problem(result, rp)
+                control = self.handle_problem(result, rp = rp)
             else:
                 control = None
                 rp = result
@@ -332,7 +335,7 @@ class RenamingPlan:
         if self.path_exists(rp.orig):
             return rp
         else:
-            return Problem(PN.orig_missing)
+            return Problem(PN.missing)
 
     def check_orig_new_differ(self, rp, seq_val):
         if rp.equal:
@@ -371,16 +374,16 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
-    def handle_problem(self, prob, rp = None):
+    def handle_problem(self, f, rp = None):
         # Takes a Problem and optionally a RenamePair.
         #
         # - Determines whether a problem-control is active for the Problem type.
-        # - Stores an RpProblem containing the Problem information and the RenamePair.
+        # - Stores an Problem containing the Problem information and the RenamePair.
         # - Returns the control (which might be None).
         #
-        control = self.control_lookup.get(prob.name, None)
-        rprob = RpProblem(prob.msg, rp, type(prob).__name__)
-        self.problems[control].append(rprob)
+        control = self.control_lookup.get(f.name, None)
+        p = Problem(f.name, msg = f.msg, rp = rp)
+        self.problems[control].append(p)
         return control
 
     @property
@@ -442,14 +445,14 @@ class RenamingPlan:
     def rename_paths(self):
         # Don't rename more than once.
         if self.has_renamed:
-            raise BmvError(FAIL.rename_done_already)
+            raise BmvError(PF.rename_done_already)
         else:
             self.has_renamed = True
 
         # Ensure than we have prepare, and raise it failed.
         self.prepare()
         if self.failed:
-            raise BmvError(FAIL.prepare_failed, problems = self.problems[None])
+            raise BmvError(PF.prepare_failed, problems = self.problems[None])
 
         # Rename paths.
         if self.file_sys is None:

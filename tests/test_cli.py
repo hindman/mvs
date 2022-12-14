@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from string import ascii_lowercase
 
-from bmv.constants import CLI, CON, FAIL, STRUCTURES
+from bmv.constants import CLI, CON, STRUCTURES
 
 from bmv.version import __version__
 
