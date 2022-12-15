@@ -12,7 +12,7 @@ from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
 
-from .failures import Problem, PROBLEM_FORMATS as PF
+from .problems import Problem, PROBLEM_FORMATS as PF
 from .plan import RenamingPlan
 from .version import __version__
 from .constants import CON, CLI, STRUCTURES

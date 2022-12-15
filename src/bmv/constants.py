@@ -1,7 +1,7 @@
 from textwrap import dedent
 from short_con import constants, cons
 
-from .failures import Problem, CONTROLS
+from .problems import Problem, CONTROLS
 
 class CON:
     app_name = 'bmv'

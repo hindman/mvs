@@ -3,7 +3,8 @@ from itertools import chain
 
 from bmv.plan import RenamingPlan
 
-from bmv.failures import (
+from bmv.problems import (
+    Problem,
     PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
 )
@@ -15,13 +16,15 @@ from bmv.constants import (
 
 from bmv.data_objects import BmvError
 
-def assert_failed_because(einfo, plan, msg, i = None):
+def assert_failed_because(einfo, plan, pname):
+    exp_msg = Problem.format_for(pname).split('{')[0]
+    i = len(exp_msg)
     fmsgs = tuple(
         f.msg[0 : i]
         for f in plan.uncontrolled_problems
     )
     assert einfo.value.params['msg'] == PF.prepare_failed
-    assert msg[0 : i] in fmsgs
+    assert exp_msg in fmsgs
 
 def test_structure_none(tr):
     origs = ('a', 'b', 'c')
@@ -42,7 +45,7 @@ def test_no_inputs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.parsing_no_paths)
+    assert_failed_because(einfo, plan, PN.parsing_no_paths)
 
 def test_structure_flat(tr):
     origs = ('a', 'b', 'c')
@@ -87,7 +90,7 @@ def test_structure_paragraphs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.parsing_paragraphs)
+    assert_failed_because(einfo, plan, PN.parsing_paragraphs)
 
 def test_structure_pairs(tr):
     # Paths.
@@ -122,7 +125,7 @@ def test_structure_pairs(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.parsing_imbalance)
+    assert_failed_because(einfo, plan, PN.parsing_imbalance)
 
 def test_structure_rows(tr):
     # Paths.
@@ -148,7 +151,7 @@ def test_structure_rows(tr):
     )
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.parsing_row, i = 55)
+    assert_failed_because(einfo, plan, PN.parsing_row)
 
 def test_renaming_code(tr):
     origs = ('a', 'b', 'c')
@@ -231,7 +234,7 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.rename_code_invalid, i = 36)
+    assert_failed_because(einfo, plan, PN.rename_code_invalid)
     check(plan)
 
     # Run the other scenario for renaming: return bad data type.
@@ -243,7 +246,7 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.rename_code_bad_return, i = 45)
+    assert_failed_because(einfo, plan, PN.rename_code_bad_return)
     check(plan)
 
     # Run the scenario for filtering.
@@ -256,7 +259,7 @@ def test_code_execution_fails(tr):
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.filter_code_invalid, i = 37)
+    assert_failed_because(einfo, plan, PN.filter_code_invalid)
     check(plan)
 
     # Run the scenario for filtering, keeping those that fail during filtering.
@@ -448,7 +451,7 @@ def test_equal(tr):
         inputs = inputs,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        skip_equal = True,
+        skip = PN.equal,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys
@@ -481,7 +484,7 @@ def test_missing_orig(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        skip_missing = True,
+        skip = PN.missing,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys
@@ -507,14 +510,14 @@ def test_new_exists(tr):
     # Renaming will raise.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.exists)
+    assert_failed_because(einfo, plan, PN.existing)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        skip_existing_new = True,
+        skip = PN.existing,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys
@@ -524,7 +527,7 @@ def test_new_exists(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        clobber_existing_new = True,
+        clobber = PN.existing,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys[1:]
@@ -559,7 +562,7 @@ def test_new_parent_missing(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        skip_missing_parent = True,
+        skip = PN.parent,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys1
@@ -569,7 +572,7 @@ def test_new_parent_missing(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        create_missing_parent = True,
+        create = PN.parent,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys2
@@ -603,7 +606,7 @@ def test_news_collide(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        skip_colliding_new = True,
+        skip = PN.colliding,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys1
@@ -613,7 +616,7 @@ def test_news_collide(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = file_sys,
-        clobber_colliding_new = True,
+        clobber = PN.colliding,
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == exp_file_sys2
@@ -628,14 +631,14 @@ def test_failures_skip_all(tr):
         inputs = origs + news,
         structure = STRUCTURES.flat,
         file_sys = origs,
-        skip_colliding_new = True,
+        skip = PN.colliding,
     )
 
     # Renaming will raise.
     plan.prepare()
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PF.all_filtered)
+    assert_failed_because(einfo, plan, PN.all_filtered)
 
 def test_file_sys_arg(tr):
     # Paths.

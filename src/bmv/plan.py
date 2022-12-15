@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .constants import CON, STRUCTURES
 
-from .failures import (
+from .problems import (
     CONTROLS,
     PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
@@ -339,7 +339,7 @@ class RenamingPlan:
 
     def check_orig_new_differ(self, rp, seq_val):
         if rp.equal:
-            return Problem(PN.orig_new_same)
+            return Problem(PN.equal)
         else:
             return rp
 
@@ -347,7 +347,7 @@ class RenamingPlan:
         # The problem is conditional on ORIG and NEW being different
         # to avoid pointless reporting of multiple problems in such cases.
         if self.path_exists(rp.new) and not rp.equal:
-            return Problem(PN.new_exists)
+            return Problem(PN.existing)
         else:
             return rp
 
@@ -355,7 +355,7 @@ class RenamingPlan:
         if self.path_exists(str(Path(rp.new).parent)):
             return rp
         else:
-            return Problem(PN.new_parent_missing)
+            return Problem(PN.parent)
 
     def prepare_new_groups(self):
         # Organize rps into dict-of-list, keyed by the new path.
@@ -368,7 +368,7 @@ class RenamingPlan:
         if len(g) == 1:
             return rp
         else:
-            return Problem(PN.new_collision)
+            return Problem(PN.colliding)
 
     ####
     # Methods related to problem control.
@@ -503,6 +503,9 @@ class RenamingPlan:
         )
 
     def validated_pnames(self, control, pnames):
+        if isinstance(pnames, str):
+            pnames = pnames.split()
+
         if not pnames:
             return ()
 

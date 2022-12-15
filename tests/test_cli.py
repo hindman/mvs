@@ -8,7 +8,7 @@ from textwrap import dedent
 from string import ascii_lowercase
 
 from bmv.constants import CLI, CON, STRUCTURES
-
+from bmv.problems import PROBLEM_FORMATS as PF
 from bmv.version import __version__
 
 from bmv.cli import (
@@ -197,7 +197,7 @@ def test_rename_paths_raises(tr):
     cli.do_rename()
     assert cli.failure
     assert cli.err.strip().startswith('Renaming raised an error')
-    assert 'raise BmvError(FAIL.rename_done_already)' in cli.err
+    assert 'raise BmvError(PF.rename_done_already)' in cli.err
 
 def test_sources(tr):
     # Paths and args.
@@ -236,7 +236,7 @@ def test_sources(tr):
     cli = CliRenamerSIO('--clipboard', '--stdin', yes, file_sys = origs)
     cli.run()
     assert cli.failure
-    assert cli.err.startswith(FAIL.opts_mutex)
+    assert cli.err.startswith(PF.opts_mutex)
     assert '--clipboard' in cli.err
     assert '--stdin' in cli.err
 
@@ -265,10 +265,10 @@ def test_some_failed_rps(tr):
     args = origs + news
     file_sys = origs + news[1:3]
     exp_file_sys = ('z2', 'z3', 'A2', 'A3', 'A1', 'A4')
-    opt_skip = '--skip-existing-new'
-    opt_clobber = '--clobber-existing-new'
-    exp_cli_prep = FAIL.prepare_failed_cli.split(':')[0]
-    exp_conflict = FAIL.conflicting_controls.split(':')[0]
+    opt_skip = '--skip existing'
+    opt_clobber = '--clobber existing'
+    exp_cli_prep = PF.prepare_failed_cli.split(':')[0]
+    exp_conflict = PF.conflicting_controls.split(':')[0]
 
     # Initial scenario fails: 2 of the new paths already exist.
     cli = CliRenamerSIO(
@@ -279,7 +279,7 @@ def test_some_failed_rps(tr):
     cli.run()
     assert cli.failure
     assert cli.err.startswith(exp_cli_prep)
-    assert FAIL.new_exists in cli.err
+    assert PF.new_exists in cli.err
 
     # Renaming succeeds if we pass --skip-existing-new.
     cli = CliRenamerSIO(
@@ -312,8 +312,8 @@ def test_filter_all(tr):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     args = origs + news
-    exp_cli_prep = FAIL.prepare_failed_cli.split(':')[0]
-    exp_conflict = FAIL.conflicting_controls.split(':')[0]
+    exp_cli_prep = PF.prepare_failed_cli.split(':')[0]
+    exp_conflict = PF.conflicting_controls.split(':')[0]
 
     # Initial scenario: it works.
     cli = CliRenamerSIO(
@@ -338,7 +338,7 @@ def test_filter_all(tr):
     assert cli.out == ''
     assert cli.log == ''
     assert cli.err.startswith(exp_cli_prep)
-    assert FAIL.no_paths_after_processing in cli.err
+    assert PF.no_paths_after_processing in cli.err
 
 def test_no_input_paths(tr):
     origs = ('a', 'b', 'c')
@@ -367,7 +367,7 @@ def test_no_input_paths(tr):
     assert cli.failure
     assert cli.out == ''
     assert cli.log == ''
-    assert cli.err.startswith(FAIL.opts_require_one)
+    assert cli.err.startswith(PF.opts_require_one)
     for name in CLI.sources.keys():
         assert name in cli.err
 
@@ -382,7 +382,7 @@ def test_no_input_paths(tr):
     assert cli.failure
     assert cli.out == ''
     assert cli.log == ''
-    assert FAIL.no_input_paths in cli.err
+    assert PF.no_input_paths in cli.err
 
 def test_log(tr):
     # Paths and args.

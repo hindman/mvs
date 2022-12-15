@@ -2,14 +2,14 @@
 
 Next:
 
-    Working through remaining problems in test_play.py:
+    Working through remaining problems:
 
-        test_equal
-        test_missing_orig
-        test_new_exists
-        test_new_parent_missing
-        test_news_collide
-        test_failures_skip_all
+        - Resurrect the conflicting_controls msg from Git.
+
+        test_some_failed_rps
+        test_filter_all
+        test_no_input_paths
+        test_log
 
     Full code read with an eye toward problem-related code and messages.
 
@@ -97,7 +97,7 @@ class Problem:
     def __init__(self, name, *xs, msg = None, rp = None):
         d = self.__dict__
         d['name'] = name
-        d['msg'] = msg or PROBLEM_FORMATS[name].format(*xs)
+        d['msg'] = msg or self.format_for(name).format(*xs)
         d['rp'] = rp
 
     @property
@@ -106,6 +106,10 @@ class Problem:
             return self.msg
         else:
             return f'{self.msg}:\n{self.rp.formatted}'
+
+    @classmethod
+    def format_for(cls, name):
+        return PROBLEM_FORMATS[name]
 
     @classmethod
     def names_for(cls, control):
