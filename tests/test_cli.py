@@ -8,7 +8,7 @@ from textwrap import dedent
 from string import ascii_lowercase
 
 from bmv.constants import CLI, CON, STRUCTURES
-from bmv.problems import PROBLEM_FORMATS as PF
+from bmv.problems import CONTROLS, PROBLEM_FORMATS as PF
 from bmv.version import __version__
 
 from bmv.cli import (
@@ -265,10 +265,10 @@ def test_some_failed_rps(tr):
     args = origs + news
     file_sys = origs + news[1:3]
     exp_file_sys = ('z2', 'z3', 'A2', 'A3', 'A1', 'A4')
-    opt_skip = '--skip existing'
-    opt_clobber = '--clobber existing'
+    opt_skip = ('--skip', 'existing')
+    opt_clobber = ('--clobber', 'existing')
     exp_cli_prep = PF.prepare_failed_cli.split(':')[0]
-    exp_conflict = PF.conflicting_controls.split(':')[0]
+    exp_conflict = PF.conflicting_controls.split('{')[0]
 
     # Initial scenario fails: 2 of the new paths already exist.
     cli = CliRenamerSIO(
@@ -279,12 +279,12 @@ def test_some_failed_rps(tr):
     cli.run()
     assert cli.failure
     assert cli.err.startswith(exp_cli_prep)
-    assert PF.new_exists in cli.err
+    assert PF.existing in cli.err
 
     # Renaming succeeds if we pass --skip-existing-new.
     cli = CliRenamerSIO(
         *args,
-        opt_skip,
+        *opt_skip,
         file_sys = file_sys,
         yes = True,
     )
@@ -295,8 +295,8 @@ def test_some_failed_rps(tr):
     # Renaming fails if we pass both failure-control options.
     cli = CliRenamerSIO(
         *args,
-        opt_skip,
-        opt_clobber,
+        *opt_skip,
+        *opt_clobber,
         file_sys = file_sys,
         yes = True,
     )
@@ -305,8 +305,8 @@ def test_some_failed_rps(tr):
     assert cli.out == ''
     assert cli.log == ''
     assert cli.err.startswith(exp_conflict)
-    assert opt_skip in cli.err
-    assert opt_clobber in cli.err
+    assert CONTROLS.skip in cli.err
+    assert CONTROLS.clobber in cli.err
 
 def test_filter_all(tr):
     origs = ('a', 'b', 'c')
@@ -338,7 +338,7 @@ def test_filter_all(tr):
     assert cli.out == ''
     assert cli.log == ''
     assert cli.err.startswith(exp_cli_prep)
-    assert PF.no_paths_after_processing in cli.err
+    assert PF.all_filtered in cli.err
 
 def test_no_input_paths(tr):
     origs = ('a', 'b', 'c')
@@ -382,7 +382,7 @@ def test_no_input_paths(tr):
     assert cli.failure
     assert cli.out == ''
     assert cli.log == ''
-    assert PF.no_input_paths in cli.err
+    assert PF.parsing_no_paths in cli.err
 
 def test_log(tr):
     # Paths and args.
@@ -400,7 +400,7 @@ def test_log(tr):
     # with some of the expected keys.
     got = json.loads(cli.log)
     assert got['version'] == __version__
-    ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'failures']
+    ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'problems']
     for k in ks:
         assert k in got
 

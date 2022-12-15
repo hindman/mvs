@@ -672,6 +672,15 @@ def test_file_sys_arg(tr):
     assert plan.file_sys == file_sys
     assert plan.file_sys is not file_sys
 
+    # Pass non-iterable as a file_sys.
+    with pytest.raises(BmvError) as einfo:
+        plan = RenamingPlan(
+            inputs = origs + news,
+            structure = STRUCTURES.flat,
+            file_sys = 123,
+        )
+    assert einfo.value.params['msg'] == PF.invalid_file_sys
+
 def test_common_prefix(tr):
     # Paths.
     origs = ('blah-a', 'blah-b', 'blah-c')

@@ -17,6 +17,7 @@ from .plan import RenamingPlan
 from .version import __version__
 from .constants import CON, CLI, STRUCTURES
 from .utils import read_from_clipboard, read_from_file, write_to_clipboard
+from .data_objects import BmvError
 
 ####
 # Entry point.
@@ -79,24 +80,29 @@ class CliRenamer:
         else:
             opts = self.opts
 
-        # Collect the input paths.
-        self.inputs = self.collect_input_paths()
-
-        # Initialize RenamingPlan.
-        self.plan = RenamingPlan(
-            inputs = self.inputs,
-            rename_code = opts.rename,
-            structure = self.get_structure(),
-            seq_start = opts.seq,
-            seq_step = opts.step,
-            filter_code = opts.filter,
-            indent = opts.indent,
-            file_sys = self.file_sys,
-            skip = opts.skip,
-            clobber = opts.clobber,
-            create = opts.create,
-        )
-        plan = self.plan
+        # Collect the input paths and initialize the RenamingPlan.
+        try:
+            self.inputs = self.collect_input_paths()
+            self.plan = RenamingPlan(
+                inputs = self.inputs,
+                rename_code = opts.rename,
+                structure = self.get_structure(),
+                seq_start = opts.seq,
+                seq_step = opts.step,
+                filter_code = opts.filter,
+                indent = opts.indent,
+                file_sys = self.file_sys,
+                skip = opts.skip,
+                clobber = opts.clobber,
+                create = opts.create,
+            )
+            plan = self.plan
+        except Exception as e:
+            # e = BmvError.new(e)
+            # print(e.params)
+            # print('HERE')
+            self.wrapup(CON.exit_fail, BmvError.new(e).params['msg'])
+            return
 
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()

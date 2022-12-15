@@ -1,20 +1,3 @@
-'''
-
-Next:
-
-    Working through remaining problems:
-
-        - Resurrect the conflicting_controls msg from Git.
-
-        test_some_failed_rps
-        test_filter_all
-        test_no_input_paths
-        test_log
-
-    Full code read with an eye toward problem-related code and messages.
-
-'''
-
 from dataclasses import dataclass, field
 from short_con import constants, cons
 
@@ -40,6 +23,8 @@ PROBLEM_NAMES = constants('ProblemNames', (
     # BmvError.
     'rename_done_already',
     'prepare_failed',
+    'conflicting_controls',
+    'invalid_file_sys',
     # Command-line messages.
     'prepare_failed_cli',
     'renaming_raised',
@@ -69,6 +54,8 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     # BmvError.
     PN.rename_done_already:    'RenamingPlan cannot rename paths because renaming has already been executed',
     PN.prepare_failed:         'RenamingPlan cannot rename paths because failures occurred during preparation',
+    PN.conflicting_controls:   'Conflicting controls for problem {!r}: {!r} and {!r}',
+    PN.invalid_file_sys:       'Plan.file_sys must be None or an iterable',
     # Command-line messages.
     PN.prepare_failed_cli:     'Renaming preparation resulted in failures:{}.\n',
     PN.renaming_raised:        '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',

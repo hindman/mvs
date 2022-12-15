@@ -16,7 +16,14 @@ todos: TODOs
 
 Remaining issues from testing/refactoring work:
 
-    - Rework failure control.
+    - Cause error in Plan constructor:
+        - See commented-out 1/0
+        - current behavior isn't good:
+            - error disappears.
+        - also need to have separate error-messages if
+          the failure occurs during input-parsing vs contructor call.
+
+    - Full code read with an eye toward problem-related code and messages.
 
     - Real command-line testing scenarios:
         - To exercise currently-uncoverable code.

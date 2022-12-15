@@ -55,12 +55,14 @@ class RenamingPlan:
         self.seq_step = seq_step
         self.file_sys = self.initialize_file_sys(file_sys)
 
+        # Convert the problem-control inputs (skip, clobber, create) into
+        # validated tuples of problem names controlled by each mechanism.
         self.skip = self.validated_pnames(CONTROLS.skip, skip)
         self.clobber = self.validated_pnames(CONTROLS.clobber, clobber)
         self.create = self.validated_pnames(CONTROLS.create, create)
 
-        # Get a dict mapping each Problem name to the user's requested
-        # control mechanism (skip, clobber, create).
+        # From those validated problem-control tuples, build a lookup mapping
+        # each Problem name to the user's requested control mechanism.
         self.control_lookup = self.build_control_lookup()
 
         # Problems that occur during the prepare() phase are stored in a dict.
@@ -87,6 +89,8 @@ class RenamingPlan:
         self.has_prepared = False
         self.has_renamed = False
         self.new_groups = None
+
+        # 1/0
 
     ####
     #
@@ -426,10 +430,13 @@ class RenamingPlan:
         elif isinstance(file_sys, dict):
             return deepcopy(file_sys)
         else:
-            return {
-                path : self.DEFAULT_FILE_SYS_VAL
-                for path in file_sys
-            }
+            try:
+                return {
+                    path : self.DEFAULT_FILE_SYS_VAL
+                    for path in file_sys
+                }
+            except Exception as e:
+                raise BmvError.new(e, msg = Problem.format_for(PN.invalid_file_sys))
 
     def path_exists(self, p):
         if self.file_sys is None:
@@ -526,9 +533,14 @@ class RenamingPlan:
             return tuple(pnames)
 
     def build_control_lookup(self):
-        return {
-            pname : control
-            for control in CONTROLS.keys()
-            for pname in getattr(self, control)
-        }
+        lookup = {}
+        for c in CONTROLS.keys():
+            for pname in getattr(self, c):
+                if pname in lookup:
+                    fmt = Problem.format_for(PN.conflicting_controls)
+                    msg = fmt.format(pname, c, lookup[pname])
+                    raise BmvError(msg)
+                else:
+                    lookup[pname] = c
+        return lookup
 

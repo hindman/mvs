@@ -24,6 +24,18 @@ class Kwexception(Exception):
         d.update(kws)
         super(Kwexception, self).__init__(d)
 
+    @classmethod
+    def new(cls, e, **kws):
+        if isinstance(e, Kwexception):
+            e.params.update(kws)
+            return e
+        else:
+            return cls(
+                orig_error = type(e).__name__,
+                orig_msg = str(e),
+                **kws,
+            )
+
     def __str__(self):
         return str(self.params)
 
