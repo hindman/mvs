@@ -80,9 +80,13 @@ class CliRenamer:
         else:
             opts = self.opts
 
-        # Collect the input paths and initialize the RenamingPlan.
+        # Collect the input paths.
+        self.inputs = self.collect_input_paths()
+        if self.done:
+            return
+
+        # Initialize the RenamingPlan.
         try:
-            self.inputs = self.collect_input_paths()
             self.plan = RenamingPlan(
                 inputs = self.inputs,
                 rename_code = opts.rename,
@@ -97,11 +101,13 @@ class CliRenamer:
                 create = opts.create,
             )
             plan = self.plan
+        except BmvError as e:
+            self.wrapup(CON.exit_fail, e.msg)
+            return
         except Exception as e:
-            # e = BmvError.new(e)
-            # print(e.params)
-            # print('HERE')
-            self.wrapup(CON.exit_fail, BmvError.new(e).params['msg'])
+            tb = traceback.format_exc()
+            msg = PF.plan_creation_failed.format(tb)
+            self.wrapup(CON.exit_fail, msg)
             return
 
         # Prepare the RenamingPlan and halt if it failed.
@@ -178,8 +184,13 @@ class CliRenamer:
         return reply == expected
 
     def write_to_json_file(self, path, d):
-        with open(path, 'w') as fh:
-            json.dump(d, self.logfh or fh, indent = 4)
+        try:
+            with open(path, 'w') as fh:
+                json.dump(d, self.logfh or fh, indent = 4)
+        except Exception as e:
+            tb = traceback.format_exc()
+            msg = PF.log_writing_failed.format(tb)
+            self.wrapup(CON.exit_fail, msg)
 
     def collect_input_paths(self):
         # Get the input path text from the source.
@@ -188,12 +199,18 @@ class CliRenamer:
         if opts.paths:
             paths = opts.paths
         else:
-            if opts.clipboard:
-                text = read_from_clipboard()
-            elif opts.file:
-                text = read_from_file(opts.file)
-            else:
-                text = self.stdin.read()
+            try:
+                if opts.clipboard:
+                    text = read_from_clipboard()
+                elif opts.file:
+                    text = read_from_file(opts.file)
+                else:
+                    text = self.stdin.read()
+            except Exception as e:
+                tb = traceback.format_exc()
+                msg = PF.path_collection_failed.format(tb)
+                self.wrapup(CON.exit_fail, msg)
+                return None
             paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)
 

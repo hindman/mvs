@@ -3,7 +3,7 @@ from short_con import constants, cons
 
 from .data_objects import RenamePair
 
-PROBLEM_NAMES = constants('ProblemNames', (
+PROBLEM_NAMES = PN = constants('ProblemNames', (
     # Controllable.
     'equal',
     'missing',
@@ -23,16 +23,18 @@ PROBLEM_NAMES = constants('ProblemNames', (
     # BmvError.
     'rename_done_already',
     'prepare_failed',
+    'invalid_control',
     'conflicting_controls',
     'invalid_file_sys',
+    'path_collection_failed',
+    'plan_creation_failed',
+    'log_writing_failed',
     # Command-line messages.
     'prepare_failed_cli',
     'renaming_raised',
     'opts_require_one',
     'opts_mutex',
 ))
-
-PN = PROBLEM_NAMES
 
 PROBLEM_FORMATS = constants('ProblemFormats', {
     # Controllable.
@@ -54,8 +56,12 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     # BmvError.
     PN.rename_done_already:    'RenamingPlan cannot rename paths because renaming has already been executed',
     PN.prepare_failed:         'RenamingPlan cannot rename paths because failures occurred during preparation',
+    PN.invalid_control:        'Invalid problem name(s) for {!r} control: {}',
     PN.conflicting_controls:   'Conflicting controls for problem {!r}: {!r} and {!r}',
     PN.invalid_file_sys:       'Plan.file_sys must be None or an iterable',
+    PN.path_collection_failed: 'Collection of input paths failed.\n\n{}',
+    PN.plan_creation_failed:   'Unexpected error during creation of renaming plan.\n\n{}',
+    PN.log_writing_failed:     'Unexpected error during writing to log file.\n\n{}',
     # Command-line messages.
     PN.prepare_failed_cli:     'Renaming preparation resulted in failures:{}.\n',
     PN.renaming_raised:        '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',

@@ -90,8 +90,6 @@ class RenamingPlan:
         self.has_renamed = False
         self.new_groups = None
 
-        # 1/0
-
     ####
     #
     # Preparation before renaming.
@@ -520,12 +518,12 @@ class RenamingPlan:
         invalid = tuple(
             nm
             for nm in pnames
-            if nm not in all_choices
+            if not (nm in all_choices or nm == CON.all)
         )
 
         if invalid:
             pn = ', '.join(pnames)
-            msg = f'Invalid problem names for {control} control: {pn}'
+            msg = PF.invalid_control.format(control, pn)
             raise BmvError(msg)
         elif CON.all in pnames:
             return all_choices
@@ -538,7 +536,7 @@ class RenamingPlan:
             for pname in getattr(self, c):
                 if pname in lookup:
                     fmt = Problem.format_for(PN.conflicting_controls)
-                    msg = fmt.format(pname, c, lookup[pname])
+                    msg = fmt.format(pname, lookup[pname], c)
                     raise BmvError(msg)
                 else:
                     lookup[pname] = c

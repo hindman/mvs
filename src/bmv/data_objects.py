@@ -43,6 +43,10 @@ class Kwexception(Exception):
     def params(self):
         return self.args[0]
 
+    @property
+    def msg(self):
+        return self.params['msg']
+
 class BmvError(Kwexception):
     pass
 

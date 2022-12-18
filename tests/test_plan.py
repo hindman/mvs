@@ -7,6 +7,8 @@ from bmv.problems import (
     Problem,
     PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
+    CONTROLLABLES,
+    CONTROLS,
 )
 
 from bmv.constants import (
@@ -262,20 +264,6 @@ def test_code_execution_fails(tr):
     assert_failed_because(einfo, plan, PN.filter_code_invalid)
     check(plan)
 
-    # Run the scenario for filtering, keeping those that fail during filtering.
-    # TODO: need a different scenario. failed-filtering is fatal now.
-    return
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        filter_code = filter_code,
-        file_sys = origs,
-        keep_failed_filter = True,
-    )
-    plan.prepare()
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
-
 def test_seq(tr):
     origs = ('a', 'b', 'c')
     news = ('a.20', 'b.30', 'c.40')
@@ -348,9 +336,6 @@ def test_rename_twice(tr):
     assert tuple(plan.file_sys) == news
 
 def test_invalid_controls(tr):
-    # TODO: I think this is obsolete now.
-    return
-
     # Paths.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
@@ -362,43 +347,51 @@ def test_invalid_controls(tr):
         file_sys = origs,
     )
 
-    # Failure control args all set to false.
-    all_controls = dict(
-        skip_equal = False,
-        skip_missing = False,
-        skip_missing_parent = False,
-        create_missing_parent = False,
-        skip_existing_new = False,
-        clobber_existing_new = False,
-        skip_colliding_new = False,
-        clobber_colliding_new = False,
-        skip_failed_rename = False,
-        skip_failed_filter = False,
-        keep_failed_filter = False,
-    )
-
-    # The pairs of control flags that can conflict.
-    conflicting_pairs = (
-        ('skip_missing_parent', 'create_missing_parent'),
-        ('skip_existing_new', 'clobber_existing_new'),
-        ('skip_colliding_new', 'clobber_colliding_new'),
-        ('skip_failed_filter', 'keep_failed_filter'),
-    )
-
-    # The renaming scenario works fine.
-    plan = RenamingPlan(**common, **all_controls)
+    # Base scenario: it works fine.
+    plan = RenamingPlan(**common)
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
 
-    # If we try to create a RenamingPlan using any of those
-    # pairs both set to true, we get a an exception.
-    for pair in conflicting_pairs:
-        conflicting = {k : True for k in pair}
-        controls = {**all_controls, **conflicting}
+    # Scenarios: can configure problem-control in various ways.
+    all5 = CONTROLLABLES[CONTROLS.skip]
+    first2 = all5[0:2]
+    checks = (
+        ['all-tuple', all5, all5],
+        ['some-tuple', first2, first2],
+        ['some-str', first2, ' '.join(first2)],
+        ['some-with-all-tuple', all5, first2 + (CON.all,)],
+        ['all-str', all5, CON.all],
+    )
+    for label, exp, skip in checks:
+        plan = RenamingPlan(**common, skip = skip)
+        assert (label, plan.skip) == (label, exp)
+     
+    # But we cannot control the same problem in two different ways.
+    checks = (
+        (PN.parent, CONTROLS.skip, CONTROLS.create),
+        (PN.existing, CONTROLS.skip, CONTROLS.clobber),
+        (PN.colliding, CONTROLS.skip, CONTROLS.clobber),
+    )
+    for pname, *controls in checks:
+        control_params = {c : pname for c in controls}
         with pytest.raises(BmvError) as einfo:
-            plan = RenamingPlan(**common, **controls)
+            plan = RenamingPlan(**common, **control_params)
         msg = einfo.value.params['msg']
-        exp = PF.conflicting_controls.format(*pair)
+        exp = PF.conflicting_controls.format(pname, *controls)
+        assert msg == exp
+
+    # And we cannot control a problem in an inapplicable way.
+    checks = (
+        (PN.equal, CONTROLS.clobber),
+        (PN.missing, CONTROLS.create),
+        (PN.parent, CONTROLS.clobber),
+    )
+    for pname, control in checks:
+        control_params = {control : pname}
+        with pytest.raises(BmvError) as einfo:
+            plan = RenamingPlan(**common, **control_params)
+        msg = einfo.value.params['msg']
+        exp = PF.invalid_control.format(control, pname)
         assert msg == exp
 
 def test_prepare_rename_multiple_times(tr):

@@ -33,7 +33,7 @@ def tags(c):
     c.run('mtags --recipe .bmvtxt --write u --toc order')
 
 @task
-def test(c, func = None, cov = False):
+def test(c, func = None, cov = False, vv = False):
     '''
     Run pytest. optionally opening coverage report.
     '''
@@ -45,7 +45,8 @@ def test(c, func = None, cov = False):
         target = f'{path}::{func}'
     # Build pytest command.
     cov_args = f'--cov {LIB} --cov-report html' if cov else ''
-    cmd = f'pytest --color yes -s -v {cov_args} {target}'
+    verbosity = '-vv' if vv else '-v'
+    cmd = f'pytest --color yes -s {verbosity} {cov_args} {target}'
     # Run and cover.
     c.run(cmd)
     if cov:

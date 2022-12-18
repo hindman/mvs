@@ -16,14 +16,25 @@ todos: TODOs
 
 Remaining issues from testing/refactoring work:
 
-    - Cause error in Plan constructor:
-        - See commented-out 1/0
-        - current behavior isn't good:
-            - error disappears.
-        - also need to have separate error-messages if
-          the failure occurs during input-parsing vs contructor call.
+    - cli.py has some nearly-untestable branches:
+        - They are triggered only by exceptions we don't expect.
+        - Option 1: figure out a way to raise exception in three spots during testing:
+            - plan constructor
+            - log writing
+            - input-path reading
+        - Option 2:
+            - move the logic to CliRenamer.wrapup_with_traceback()
+            - test that method separately.
+            - make sure to use all PF attributes that are ignored with no-cover pragma.
+            - then exclude the branches from coverage:
+
+                except Exception as e: # pragma: no cover
+                    self.wrapup_with_traceback(PF.plan_creation_failed)
+                    return 
 
     - Full code read with an eye toward problem-related code and messages.
+        - when am I raising vs short-circuiting?
+        - is the approach sensible?
 
     - Real command-line testing scenarios:
         - To exercise currently-uncoverable code.
@@ -31,8 +42,6 @@ Remaining issues from testing/refactoring work:
             - renaming
             - clobbering
             - creating parents
-
-    ===========
 
     - Editing pass over code and tests:
         - organization
@@ -42,16 +51,10 @@ Remaining issues from testing/refactoring work:
         - Failure types: assess for consistency, naming, and usage in the code.
         - Reduce testing-code repetition.
 
-    ===========
-
-    - File operations can fail:
-        - collecting input paths (eg, missing or unreadable input file-source).
-        - writing to log
-
 Project name change:
-    - bmv is claimed [emailed maintainer: Nov 2; no reply].
     - Rename to mvs
     - Dependencies: drop attrs; re-create virtualenvs.
+    - bmv is claimed [emailed maintainer: Nov 2; no reply].
 
 --------
 road-map: Road map
