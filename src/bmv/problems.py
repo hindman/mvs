@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from short_con import constants, cons
 
-from .data_objects import RenamePair
+from .utils import RenamePair
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (
     # Controllable.

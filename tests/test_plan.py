@@ -16,7 +16,7 @@ from bmv.constants import (
     STRUCTURES,
 )
 
-from bmv.data_objects import BmvError
+from bmv.utils import BmvError
 
 def assert_failed_because(einfo, plan, pname):
     exp_msg = Problem.format_for(pname).split('{')[0]

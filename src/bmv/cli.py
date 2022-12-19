@@ -12,12 +12,11 @@ from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
 
-from .problems import Problem, PROBLEM_FORMATS as PF
-from .plan import RenamingPlan
-from .version import __version__
 from .constants import CON, CLI, STRUCTURES
-from .utils import read_from_clipboard, read_from_file, write_to_clipboard
-from .data_objects import BmvError
+from .plan import RenamingPlan
+from .problems import PROBLEM_FORMATS as PF
+from .utils import read_from_clipboard, read_from_file, BmvError
+from .version import __version__
 
 ####
 # Entry point.
@@ -82,7 +81,7 @@ class CliRenamer:
 
         # Collect the input paths.
         self.inputs = self.collect_input_paths()
-        if self.done:
+        if self.done: # pragma: no cover
             return
 
         # Initialize the RenamingPlan.
@@ -104,10 +103,8 @@ class CliRenamer:
         except BmvError as e:
             self.wrapup(CON.exit_fail, e.msg)
             return
-        except Exception as e:
-            tb = traceback.format_exc()
-            msg = PF.plan_creation_failed.format(tb)
-            self.wrapup(CON.exit_fail, msg)
+        except Exception as e: # pragma: no cover
+            self.wrapup_with_tb(PF.plan_creation_failed)
             return
 
         # Prepare the RenamingPlan and halt if it failed.
@@ -148,10 +145,8 @@ class CliRenamer:
         try:
             self.plan.rename_paths()
             self.wrapup(CON.exit_ok, CON.paths_renamed_msg)
-        except Exception as e:
-            tb = traceback.format_exc()
-            msg = PF.renaming_raised.format(tb)
-            self.wrapup(CON.exit_fail, msg)
+        except Exception as e: # pragma: no cover
+            self.wrapup_with_tb(PF.renaming_raised)
 
     def wrapup(self, code, msg):
         # Helper for do_prepare() and do_rename().
@@ -160,6 +155,11 @@ class CliRenamer:
         msg = msg if msg.endswith(CON.newline) else msg + CON.newline
         fh.write(msg)
         self.exit_code = code
+
+    def wrapup_with_tb(self, fmt):
+        tb = traceback.format_exc()
+        msg = fmt.format(tb)
+        self.wrapup(CON.exit_fail, msg)
 
     ####
     # Command-line argument handling.
@@ -187,10 +187,8 @@ class CliRenamer:
         try:
             with open(path, 'w') as fh:
                 json.dump(d, self.logfh or fh, indent = 4)
-        except Exception as e:
-            tb = traceback.format_exc()
-            msg = PF.log_writing_failed.format(tb)
-            self.wrapup(CON.exit_fail, msg)
+        except Exception as e: # pragma: no cover
+            self.wrapup_with_tb(PF.log_writing_failed)
 
     def collect_input_paths(self):
         # Get the input path text from the source.
@@ -206,10 +204,8 @@ class CliRenamer:
                     text = read_from_file(opts.file)
                 else:
                     text = self.stdin.read()
-            except Exception as e:
-                tb = traceback.format_exc()
-                msg = PF.path_collection_failed.format(tb)
-                self.wrapup(CON.exit_fail, msg)
+            except Exception as e: # pragma: no cover
+                self.wrapup_with_tb(PF.path_collection_failed)
                 return None
             paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)

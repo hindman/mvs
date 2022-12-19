@@ -9,17 +9,13 @@ from os.path import commonprefix
 from pathlib import Path
 
 from .constants import CON, STRUCTURES
+from .utils import BmvError, RenamePair
 
 from .problems import (
     CONTROLS,
     PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
     Problem,
-)
-
-from .data_objects import (
-    BmvError,
-    RenamePair,
 )
 
 class RenamingPlan:

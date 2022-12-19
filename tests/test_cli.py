@@ -11,11 +11,8 @@ from bmv.constants import CLI, CON, STRUCTURES
 from bmv.problems import CONTROLS, PROBLEM_FORMATS as PF
 from bmv.version import __version__
 
-from bmv.cli import (
-    main,
-    CliRenamer,
-    write_to_clipboard,
-)
+from bmv.cli import main, CliRenamer
+from bmv.utils import write_to_clipboard
 
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer using StringIO instances:
@@ -403,4 +400,30 @@ def test_log(tr):
     ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'problems']
     for k in ks:
         assert k in got
+
+def test_wrapup_with_tb(tr):
+    # Excercises all calls of wrapup_with_tb() and checks for expected side
+    # effects. Those branches are a hassle to reach during testing, are
+    # unlikely to occur in real usage, and do nothing interesting other than
+    # call the method tested here. So they are ignored by test-coverage.
+    origs = ('z1', 'z2', 'z3')
+    news = ('A1', 'A2', 'A3')
+    args = origs + news
+    fmts = (
+        PF.renaming_raised,
+        PF.log_writing_failed,
+        PF.path_collection_failed,
+        PF.plan_creation_failed,
+    )
+    for fmt in fmts:
+        cli = CliRenamerSIO(*args, file_sys = origs, yes = True)
+        assert cli.exit_code is None
+        assert cli.done is False
+        cli.wrapup_with_tb(fmt)
+        assert cli.exit_code == CON.exit_fail
+        assert cli.done is True
+        assert cli.out == ''
+        assert cli.log == ''
+        exp = fmt.split('{')[0]
+        assert exp in cli.err
 
