@@ -41,6 +41,56 @@ class RenamePair:
 
 class Kwexception(Exception):
 
+    '''
+
+    Constructor should take *xs, which is consistent with other Exception classes.
+
+    Whether to set kws['msg']:
+        yes  # The default, conditional on (a) 1 element in xs, (b) 'msg' not in kws.
+        no
+
+    What to pass into super() call: control it via class configuration:
+        kws   # The dict.
+        xs    # Like Python.
+        msg   # Like Python but user can explicitly pass msg as a keyword arg.
+
+    How to stringify: configure with the same settings.
+
+    Some code:
+
+        SET_MSG = True
+        SUPER_ARG = 'kws'
+        STRINGIFY = 'kws'
+
+        def __init__(self, *xs, **kws):
+            if self.SET_MSG and len(xs) == 1 and 'msg' not in kws:
+                d = {'msg': xs[0]}
+                d.update(kws)
+
+            if self.SUPER_ARG == 'kws':
+                xs = kws
+            elif self.SUPER_ARG == 'msg':
+                xs = kws['msg']
+
+            super(Kwexception, self).__init__(*xs)
+
+        def is_msg(self, xs):
+            return len(xs) == 1 and isinstance(xs[0], str)
+
+        def __str__(self):
+            if self.is_msg(self.args):
+            return str(self.params)
+
+        @property
+        def params(self):
+            return self.args[0]
+
+        @property
+        def msg(self):
+            return self.params['msg']
+
+    '''
+
     def __init__(self, msg = '', **kws):
         d = {'msg': msg}
         d.update(kws)
