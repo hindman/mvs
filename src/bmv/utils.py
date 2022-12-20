@@ -64,30 +64,32 @@ class Kwexception(Exception):
 
         def __init__(self, *xs, **kws):
             if self.SET_MSG and len(xs) == 1 and 'msg' not in kws:
-                d = {'msg': xs[0]}
-                d.update(kws)
+                kws['msg'] = xs[0]
 
             if self.SUPER_ARG == 'kws':
-                xs = kws
+                super_args = kws
             elif self.SUPER_ARG == 'msg':
-                xs = kws['msg']
+                super_args = kws['msg']
+            else:
+                super_args = xs
 
-            super(Kwexception, self).__init__(*xs)
-
-        def is_msg(self, xs):
-            return len(xs) == 1 and isinstance(xs[0], str)
+            self.params = kws
+            super().__init__(*super_args)
 
         def __str__(self):
-            if self.is_msg(self.args):
-            return str(self.params)
-
-        @property
-        def params(self):
-            return self.args[0]
+            if self.STRINGIFY == 'kws':
+                return str(self.params)
+            elif self.STRINGIFY == 'msg':
+                return str(self.params['msg'])
+            else:
+                return super().__str__()
 
         @property
         def msg(self):
-            return self.params['msg']
+            if 'msg' in self.params:
+                return self.params['msg']
+            else:
+                return super().__str__()
 
     '''
 
