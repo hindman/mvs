@@ -45,51 +45,65 @@ class Kwexception(Exception):
 
     Constructor should take *xs, which is consistent with other Exception classes.
 
-    Whether to set kws['msg']:
-        yes  # The default, conditional on (a) 1 element in xs, (b) 'msg' not in kws.
-        no
+    Avoid designing the class so that data in xs can be lost.
 
-    What to pass into super() call: control it via class configuration:
-        kws   # The dict.
-        xs    # Like Python.
-        msg   # Like Python but user can explicitly pass msg as a keyword arg.
+    The purposes of Kwexception.new():
 
-    How to stringify: configure with the same settings.
+        - Convert another error type to the error-type known by your project.
+          [see NEW_CONVERT]
+
+        - Augment a Kwexception instance with more keyword args, either in the
+          fashion of dict.update or dict.setdefault. [see NEW_UPDATE]
+
+        - Add some attributes from the initial Exception to the params. [see
+          NEW_INITIAL]
+
+        - But its purposes do not include, replacing or improving upon Python's
+          traceback generation or handling of __context__ and __cause__. Let
+          the user raise-with as needed.
+
+    Is STRINGIFY really needed? Defer for now.
+
+        There might be one valid use case: someone who wants stringification to
+        be just the self.msg (or less compellingly, self.params), but they need
+        the underlying self.args to be a tuple with multiple elements (maybe a
+        named tuple).
+
+        But this could be added later without changing anything else.
 
     Some code:
 
-        SET_MSG = True
-        SUPER_ARG = 'kws'
-        STRINGIFY = 'kws'
+        MOVE = 'move'
+        COPY = 'copy'
+        MSG = 'msg'
+
+        SET_MSG = MOVE            # MOVE|COPY|None
+        SUPER_PARAMS = True       # .
+        NEW_CONVERT = True        # .
+        NEW_UPDATE = True         # If False, will use setdefault instead.
+        NEW_INITIAL = True        # .
 
         def __init__(self, *xs, **kws):
-            if self.SET_MSG and len(xs) == 1 and 'msg' not in kws:
-                kws['msg'] = xs[0]
 
-            if self.SUPER_ARG == 'kws':
-                super_args = kws
-            elif self.SUPER_ARG == 'msg':
-                super_args = kws['msg']
-            else:
-                super_args = xs
+            # Put the msg into kws, as the first key.
+            if xs and self.SET_MSG in (self.MOVE, self.COPY) and self.MSG not in kws:
+                d = {self.MSG: xs[0]}
+                d.update(kws)
+                kws = d
+                if self.SET_MSG == self.MOVE:
+                    xs = xs[1:]
 
+            # Add kws to xs so that it will be included in the super() call.
+            if self.SUPER_PARAMS:
+                xs = xs + (kws,)
+
+            # Set params and make the super() call.
             self.params = kws
-            super().__init__(*super_args)
-
-        def __str__(self):
-            if self.STRINGIFY == 'kws':
-                return str(self.params)
-            elif self.STRINGIFY == 'msg':
-                return str(self.params['msg'])
-            else:
-                return super().__str__()
+            super().__init__(*xs)
 
         @property
         def msg(self):
-            if 'msg' in self.params:
-                return self.params['msg']
-            else:
-                return super().__str__()
+            return self.params.get(self.MSG, None)
 
     '''
 
@@ -105,6 +119,11 @@ class Kwexception(Exception):
             return e
         else:
             return cls(
+                # TODO: switch to these keywords:
+                # initial_error = type(e).__name__,
+                # initial_args = e.args,
+                # initial_str = str(e),
+
                 orig_error = type(e).__name__,
                 orig_msg = str(e),
                 **kws,

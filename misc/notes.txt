@@ -46,9 +46,6 @@ Project name change: bmv => mvs.
 road-map: Road map
 --------
 
-New validation issues to consider:
-    - all paths must be non-empty
-
 Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
