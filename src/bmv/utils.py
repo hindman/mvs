@@ -81,7 +81,7 @@ class Kwexception(Exception):
         SUPER_PARAMS = True       # .
         NEW_CONVERT = True        # .
         NEW_UPDATE = True         # If False, will use setdefault instead.
-        NEW_INITIAL = True        # .
+        NEW_CONTEXT = True        # .
 
         def __init__(self, *xs, **kws):
 
@@ -114,15 +114,15 @@ class Kwexception(Exception):
 
     @classmethod
     def new(cls, e, **kws):
-        if isinstance(e, Kwexception):
+        if isinstance(e, cls):
             e.params.update(kws)
             return e
         else:
             return cls(
                 # TODO: switch to these keywords:
-                # initial_error = type(e).__name__,
-                # initial_args = e.args,
-                # initial_str = str(e),
+                # context_error = type(e).__name__,
+                # context_args = e.args,
+                # context_str = str(e),
 
                 orig_error = type(e).__name__,
                 orig_msg = str(e),
