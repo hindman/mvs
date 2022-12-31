@@ -16,17 +16,11 @@ todos: TODOs
 
 Real command-line testing scenarios:
 
-    - Why? To exercise currently-uncoverable code.
-        - Top level main().
-        - Real path renaming.
-            - renaming
-            - clobbering
-            - creating parents
-
-    - How? Create a work-area test fixture.
-        - rm-rf a test directory that is git-ignored
-        - put some dirs/files in it
-        - include a file_sys attribute
+    x Top level main().
+    - Real path renaming.
+        x renaming
+        x creating parents
+        - clobbering
 
 Editing pass over code and tests:
 
