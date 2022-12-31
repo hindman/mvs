@@ -22,9 +22,9 @@ from .version import __version__
 # Entry point.
 ####
 
-def main(args = None):
+def main(args = None, **kws):
     args = sys.argv[1:] if args is None else args
-    cli = CliRenamer(args)
+    cli = CliRenamer(args, **kws)
     cli.run()
     sys.exit(cli.exit_code)
 

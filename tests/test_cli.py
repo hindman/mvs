@@ -427,3 +427,58 @@ def test_wrapup_with_tb(tr):
         exp = fmt.split('{')[0]
         assert exp in cli.err
 
+def test_e2e_minimal_rename(tr):
+    origs = ('a', 'b')
+    news = ('c', 'd')
+    origs, news = tr.temp_area(origs, news)
+    ex, fhs = execute_main(*origs, *news)
+    assert ex.args[0] == CON.exit_ok
+    check_main_paths(origs, news)
+    check_main_outputs(fhs)
+
+def test_e2e_create_parent(tr):
+    origs = ('a', 'b')
+    news = ('foo/c', 'foo/d')
+    origs, news = tr.temp_area(origs, news)
+    ex, fhs = execute_main(*origs, *news, '--create', 'parent')
+    check_main_paths(origs, news)
+    check_main_outputs(fhs)
+
+def execute_main(*args):
+    fhs = dict(
+        stdout = StringIO(),
+        stderr = StringIO(),
+        stdin = StringIO(),
+        logfh = StringIO(),
+    )
+    args = args + ('--yes', '--pager', '')
+    with pytest.raises(SystemExit) as einfo:
+        main(args, **fhs)
+    fhs = {
+        k : fh.getvalue()
+        for k, fh in fhs.items()
+    }
+    return (einfo.value, fhs)
+
+def check_main_paths(origs, news):
+    checks = (
+        (origs, False),
+        (news, True),
+    )
+    for paths, exp in checks:
+        for p in paths:
+            if p.endswith('/'):
+                assert (p, Path(p).is_dir()) == (p, exp)
+            else:
+                assert (p, Path(p).is_file()) == (p, exp)
+
+def check_main_outputs(fhs):
+    out = fhs['stdout']
+    err = fhs['stderr']
+    assert err == ''
+    assert 'Paths renamed.' in out
+    assert 'Paths to be renamed (total' in out
+    d = json.loads(fhs['logfh'])
+    assert 'version' in d
+    assert 'opts' in d
+

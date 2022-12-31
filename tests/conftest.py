@@ -1,19 +1,21 @@
 import io
 import json
 import pytest
+import shutil
 import sys
 
 from textwrap import dedent
+from pathlib import Path
 
 @pytest.fixture
 def tr():
     return TestResource()
 
+
 class TestResource(object):
 
-    WORK_AREA_ROOT = 'tests/work_area/'
-
-    TEMP_PATH = 'tests/work_area/tempfile'
+    WORK_AREA_ROOT = 'tests/work_area'
+    TEMP_PATH = f'{WORK_AREA_ROOT}/tempfile'
 
     OUTS = dict(
         listing_a2aa = dedent('''
@@ -49,6 +51,24 @@ class TestResource(object):
     def dumpj(self, val = None, label = 'dump()', indent = 4):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
+
+    def temp_area(self, origs, news):
+        # Initialize work area.
+        wa = self.WORK_AREA_ROOT
+        shutil.rmtree(wa, ignore_errors = True)
+        Path(wa).mkdir()
+        # Add work area prefix to the paths.
+        wp = lambda p: f'{wa}/{p}'
+        origs = tuple(map(wp, origs))
+        news = tuple(map(wp, news))
+        # Put original files and subdirs in work area.
+        for p in origs:
+            if p.endswith('/'):
+                Path(p).mkdir()
+            else:
+                Path(p).touch()
+        # Return the prefixed paths.
+        return origs, news
 
 class StdStreams(object):
 

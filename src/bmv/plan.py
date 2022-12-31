@@ -460,8 +460,7 @@ class RenamingPlan:
             # On the real file system.
             for rp in self.rps:
                 if rp.create_parent:
-                    par = Path(rp.new).parent
-                    Path.mkdir(par, parents = True, exists_ok = True)
+                    Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
                 Path(rp.orig).rename(rp.new)
         else:
             # Or in the fake file system.
