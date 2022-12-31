@@ -19,7 +19,7 @@ class CON:
     encoding = 'utf-8'
     no_action_msg = '\nNo action taken.'
     paths_renamed_msg = '\nPaths renamed.'
-    default_pager_cmd = 'less'
+    default_pager_cmd = 'more'
     listing_batch_size = 10
 
     user_code_fmt = dedent('''

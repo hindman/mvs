@@ -39,5 +39,5 @@
 .DS_Store
 
 # Temp file used in testing.
-/tests/work_area/tempfile
+/tests/work_area/
 

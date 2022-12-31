@@ -13,7 +13,7 @@
 #   inv tox
 #   inv workareas
 #   inv bump [--kind <major|minor|patch>] [--local]
-#   # inv dist [--publish] [--test]
+#   inv dist [--publish] [--test]
 #
 ####
 
@@ -95,9 +95,9 @@ def clearlogs(c):
     c.run(f'rm -f {home}/.{LIB}/2*.json')
 
 @task
-def bump(c, kind = 'minor', local = False):
+def bump(c, kind = 'minor', edit_only = False, push = False, suffix = None):
     '''
-    Version bump: minor unless --kind major|patch. Commits/pushes unless --local.
+    Version bump: --kind minor|major|patch [--edit-only] [--push]
     '''
     # Validate.
     assert kind in ('major', 'minor', 'patch')
@@ -125,20 +125,31 @@ def bump(c, kind = 'minor', local = False):
         print(f'Bumped to {version}.')
 
     # Commit and push.
-    if not local:
-        c.run(f"git commit {path} -m 'Version {version}'")
-        c.run('git push origin master')
+    if not edit_only:
+        suffix = '' if suffix is None else f': {suffix}'
+        msg = f'Version {version}{suffix}'
+        c.run(f"git commit {path} -m '{msg}'")
+        if push:
+            c.run('git push origin master')
 
-# @task
-# def dist(c, publish = False, test = False):
-#     '''
-#     Create distribution, optionally publishing to pypi or testpypi.
-#     '''
-#     repo = 'testpypi' if test else 'pypi'
-#     c.run('rm -rf dist')
-#     c.run('python setup.py sdist bdist_wheel')
-#     c.run('echo')
-#     c.run('twine check dist/*')
-#     if publish:
-#         c.run(f'twine upload -r {repo} dist/*')
+@task
+def tox(c):
+    '''
+    Run tox for the project
+    '''
+    d = dict(PYENV_VERSION = '3.11.1:3.10.9:3.9.4:3.8.9:3.7.10:3.6.13:3.5.10')
+    c.run('tox', env = d)
+
+@task
+def dist(c, publish = False, test = False):
+    '''
+    Create distribution, optionally publishing to pypi or testpypi.
+    '''
+    repo = 'testpypi' if test else 'pypi'
+    c.run('rm -rf dist')
+    c.run('python setup.py sdist bdist_wheel')
+    c.run('echo')
+    c.run('twine check dist/*')
+    if publish:
+        c.run(f'twine upload -r {repo} dist/*')
 
