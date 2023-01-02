@@ -3,6 +3,10 @@ from short_con import constants, cons
 
 from .utils import RenamePair
 
+####
+# Problem names and associated messages/formats.
+####
+
 PROBLEM_NAMES = PN = constants('ProblemNames', (
     # Controllable.
     'equal',
@@ -69,6 +73,10 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     PN.opts_mutex:             'No more than one of these options should be used',
 })
 
+####
+# Problem controls.
+####
+
 CONTROLS = constants('ProblemControls', (
     'skip',
     'clobber',
@@ -80,6 +88,10 @@ CONTROLLABLES = {
     CONTROLS.clobber: (PN.existing, PN.colliding),
     CONTROLS.create:  (PN.parent,),
 }
+
+####
+# Data object to represent a problem.
+####
 
 @dataclass(init = False, frozen = True)
 class Problem:

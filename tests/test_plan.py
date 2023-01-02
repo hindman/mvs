@@ -1,8 +1,8 @@
 import pytest
 from itertools import chain
 
-from bmv.plan import RenamingPlan
-
+from bmv import RenamingPlan, BmvError, __version__
+from bmv.utils import CON, STRUCTURES
 from bmv.problems import (
     Problem,
     PROBLEM_NAMES as PN,
@@ -10,13 +10,6 @@ from bmv.problems import (
     CONTROLLABLES,
     CONTROLS,
 )
-
-from bmv.constants import (
-    CON,
-    STRUCTURES,
-)
-
-from bmv.utils import BmvError
 
 def assert_failed_because(einfo, plan, pname):
     exp_msg = Problem.format_for(pname).split('{')[0]
@@ -27,6 +20,11 @@ def assert_failed_because(einfo, plan, pname):
     )
     assert einfo.value.params['msg'] == PF.prepare_failed
     assert exp_msg in fmsgs
+
+def test_top_level_imports(tr):
+    # Just a place to exercise the other top-level imports.
+    assert BmvError('foo', x = 1, y = 2).msg == 'foo'
+    assert isinstance(__version__, str)
 
 def test_structure_none(tr):
     origs = ('a', 'b', 'c')

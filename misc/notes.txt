@@ -14,15 +14,14 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Real command-line testing scenarios:
-
-    x Top level main().
-    - Real path renaming.
-        x renaming
-        x creating parents
-        - clobbering
-
 Editing pass over code and tests:
+
+    x __init__.py
+    x version.py
+    x utils.py
+    x problems.py
+    - plan.py
+    - cli.py
 
     - first pass: problem handling:
         - focus on problem-related code, messages, raising vs short-circuiting

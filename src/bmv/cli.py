@@ -1,22 +1,32 @@
 import argparse
 import json
-import re
-import string
 import subprocess
 import sys
 import traceback
 
 from datetime import datetime
 from io import StringIO
-from itertools import cycle
 from pathlib import Path
 from textwrap import dedent
+from short_con import constants
 
-from .constants import CON, CLI, STRUCTURES
 from .plan import RenamingPlan
-from .problems import PROBLEM_FORMATS as PF
-from .utils import read_from_clipboard, read_from_file, BmvError
 from .version import __version__
+
+from .problems import (
+    Problem,
+    CONTROLS,
+    PROBLEM_FORMATS as PF,
+)
+
+from .utils import (
+    BmvError,
+    CON,
+    STRUCTURES,
+    positive_int,
+    read_from_clipboard,
+    read_from_file,
+)
 
 ####
 # Entry point.
@@ -33,6 +43,10 @@ def main(args = None, **kws):
 ####
 
 class CliRenamer:
+
+    ####
+    # Initializer.
+    ####
 
     def __init__(self,
                  args,
@@ -59,6 +73,10 @@ class CliRenamer:
         self.exit_code = None
         self.has_prepared = False
         self.has_renamed = False
+
+    ####
+    # The top-level run() method and its immediate sub-steps.
+    ####
 
     def run(self):
         self.do_prepare()
@@ -89,7 +107,7 @@ class CliRenamer:
             self.plan = RenamingPlan(
                 inputs = self.inputs,
                 rename_code = opts.rename,
-                structure = self.get_structure(),
+                structure = self.get_structure_from_opts(),
                 seq_start = opts.seq,
                 seq_step = opts.step,
                 filter_code = opts.filter,
@@ -148,6 +166,14 @@ class CliRenamer:
         except Exception as e: # pragma: no cover
             self.wrapup_with_tb(PF.renaming_raised)
 
+    ####
+    # Helpers to finish or cut-short the run() sub-steps.
+    ####
+
+    @property
+    def done(self):
+        return self.exit_code is not None
+
     def wrapup(self, code, msg):
         # Helper for do_prepare() and do_rename().
         # Writes a newline-terminated message and sets exit_code.
@@ -164,66 +190,6 @@ class CliRenamer:
     ####
     # Command-line argument handling.
     ####
-
-    @property
-    def done(self):
-        return self.exit_code is not None
-
-    def paginate(self, text):
-        if self.opts.pager:
-            p = subprocess.Popen(self.opts.pager, stdin = subprocess.PIPE, shell = True)
-            p.stdin.write(text.encode(CON.encoding))
-            p.communicate()
-        else:
-            self.stdout.write(text)
-
-    def get_confirmation(self, prompt, expected = 'y'):
-        msg = prompt + f' [{expected}]? '
-        self.stdout.write(msg)
-        reply = self.stdin.readline().lower().strip()
-        return reply == expected
-
-    def write_to_json_file(self, path, d):
-        try:
-            with open(path, 'w') as fh:
-                json.dump(d, self.logfh or fh, indent = 4)
-        except Exception as e: # pragma: no cover
-            self.wrapup_with_tb(PF.log_writing_failed)
-
-    def collect_input_paths(self):
-        # Get the input path text from the source.
-        # Returns a tuple of stripped lines.
-        opts = self.opts
-        if opts.paths:
-            paths = opts.paths
-        else:
-            try:
-                if opts.clipboard:
-                    text = read_from_clipboard()
-                elif opts.file:
-                    text = read_from_file(opts.file)
-                else:
-                    text = self.stdin.read()
-            except Exception as e: # pragma: no cover
-                self.wrapup_with_tb(PF.path_collection_failed)
-                return None
-            paths = text.split(CON.newline)
-        return tuple(path.strip() for path in paths)
-
-    def msg_with_tallies(self, fmt, xs):
-        # Returns a message followed by two counts in parentheses:
-        # N items; and N items listed based on opts.limit.
-        n = len(xs)
-        lim = n if self.opts.limit is None else self.opts.limit
-        tallies = f' (total {n}, listed {lim})'
-        return fmt.format(tallies)
-
-    def listing_msg(self, fmt, xs):
-        # Returns a message-with-tallies followed by a potentially-limited
-        # listing of RenamePair paths.
-        msg = self.msg_with_tallies(fmt, xs)
-        items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
-        return f'{msg}\n{items}'
 
     def parse_command_line_args(self):
         # Create the parser.
@@ -319,9 +285,40 @@ class CliRenamer:
             self.wrapup(CON.exit_fail, msg)
             return
 
-    def get_structure(self):
-        gen = (s for s in STRUCTURES.keys() if getattr(self.opts, s, None))
-        return next(gen, None)
+    ####
+    # Input path collection.
+    ####
+
+    def collect_input_paths(self):
+        # Get the input path text from the source.
+        # Returns a tuple of stripped lines.
+        opts = self.opts
+        if opts.paths:
+            paths = opts.paths
+        else:
+            try:
+                if opts.clipboard:
+                    text = read_from_clipboard()
+                elif opts.file:
+                    text = read_from_file(opts.file)
+                else:
+                    text = self.stdin.read()
+            except Exception as e: # pragma: no cover
+                self.wrapup_with_tb(PF.path_collection_failed)
+                return None
+            paths = text.split(CON.newline)
+        return tuple(path.strip() for path in paths)
+
+    ####
+    # Logging.
+    ####
+
+    def write_to_json_file(self, path, d):
+        try:
+            with open(path, 'w') as fh:
+                json.dump(d, self.logfh or fh, indent = 4)
+        except Exception as e: # pragma: no cover
+            self.wrapup_with_tb(PF.log_writing_failed)
 
     @property
     def log_data(self):
@@ -339,4 +336,282 @@ class CliRenamer:
         subdir = '.' + CON.app_name
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         return Path.home() / subdir / (now + '.json')
+
+    ####
+    # Listings and pagination.
+    ####
+
+    def msg_with_tallies(self, fmt, xs):
+        # Returns a message followed by two counts in parentheses:
+        # N items; and N items listed based on opts.limit.
+        n = len(xs)
+        lim = n if self.opts.limit is None else self.opts.limit
+        tallies = f' (total {n}, listed {lim})'
+        return fmt.format(tallies)
+
+    def listing_msg(self, fmt, xs):
+        # Returns a message-with-tallies followed by a potentially-limited
+        # listing of RenamePair paths.
+        msg = self.msg_with_tallies(fmt, xs)
+        items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
+        return f'{msg}\n{items}'
+
+    def paginate(self, text):
+        if self.opts.pager:
+            p = subprocess.Popen(self.opts.pager, stdin = subprocess.PIPE, shell = True)
+            p.stdin.write(text.encode(CON.encoding))
+            p.communicate()
+        else:
+            self.stdout.write(text)
+
+    ####
+    # Other.
+    ####
+
+    def get_confirmation(self, prompt, expected = 'y'):
+        # Gets comfirmation from the command-line user.
+        msg = prompt + f' [{expected}]? '
+        self.stdout.write(msg)
+        reply = self.stdin.readline().lower().strip()
+        return reply == expected
+
+    def get_structure_from_opts(self):
+        # Determines the RenamingPlan.structure to use based on opts.
+        for s in STRUCTURES.keys():
+            if getattr(self.opts, s, None):
+                return s
+        return None
+
+####
+# Configuration for command-line argument parsing.
+####
+
+class CLI:
+
+    # Important option names or groups of options.
+    paths = 'paths'
+    sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
+    structures = constants('Structures', ('rename',) + STRUCTURES.keys())
+
+    # Program help text: description and epilog.
+    description = '''
+        Renames or moves files in bulk, via user-supplied Python
+        code or a data source mapping old paths to new paths.
+    '''
+
+    epilog = '''
+        The user-supplied renaming and filtering code has access to the
+        original file path as a str [variable: o], its pathlib.Path
+        representation [variable: p], the current sequence value [variable:
+        seq], some Python libraries or classes [re, Path], and some utility
+        functions [strip_prefix]. The functions should explicitly return a
+        value: for renaming code, the desired new path, either as a str or a
+        Path; for filtering code, any true value to retain the original path or
+        any false value to reject it. The code should omit indentation on its
+        first line, but must provide it for subsequent lines. For reference,
+        some useful Path components: p.parent, p.name, p.stem, p.suffix.
+    '''
+
+    post_epilog = dedent('''
+        Before any renaming occurs, each pair of original and new paths is checked
+        for common types of problems. By default, if any occur, the renaming plan
+        is halted and no paths are renamed. The problems and their short names are
+        as follows:
+
+            equal     | Original path and new path are the same.
+            missing   | Original path does not exist.
+            existing  | New path already exists.
+            colliding | Two or more new paths are the same.
+            parent    | Parent directory of new path does not exist.
+
+        Users can configure various problem controls to address such issues. That
+        allows the renaming plan to proceed in spite of the problems, either by
+        skipping offending items, taking remedial action, or simply forging ahead
+        in spite of the consequences. As shown in the usage documentation above,
+        the --create control applies only to a single type of problem, the
+        --clobber control can apply to multiple, and the --skip control can apply
+        to any or all. Here are some examples to illustrate usage:
+
+            --skip equal         | Skip items with 'equal' problem.
+            --skip equal missing | Skip items with 'equal' or 'missing' problems.
+            --skip all           | Skip items with any type of problem.
+            --clobber all        | Rename in spite of 'existing' and 'colliding' problems.
+            --create parent      | Create missing parent before renaming.
+            --create             | Same thing, more compactly.
+    ''').lstrip()
+
+    # Argument configuration for argparse.
+    names = 'names'
+    group = 'group'
+    opts_config = (
+
+        #
+        # Input path sources.
+        #
+        {
+            group: 'Input path sources',
+            names: 'paths',
+            'nargs': '*',
+            'metavar': 'PATH',
+            'help': 'Input file paths',
+        },
+        {
+            names: '--clipboard',
+            'action': 'store_true',
+            'help': 'Input paths via the clipboard',
+        },
+        {
+            names: '--stdin',
+            'action': 'store_true',
+            'help': 'Input paths via STDIN',
+        },
+        {
+            names: '--file',
+            'metavar': 'PATH',
+            'help': 'Input paths via a text file',
+        },
+
+        #
+        # Options defining the structure of the input path data.
+        #
+        {
+            group: 'Input path structures',
+            names: '--flat',
+            'action': 'store_true',
+            'help': 'Input paths as a list: original paths, then equal number of new paths [default]',
+        },
+        {
+            names: '--paragraphs',
+            'action': 'store_true',
+            'help': 'Input paths in paragraphs: original paths, blank line, new paths',
+        },
+        {
+            names: '--pairs',
+            'action': 'store_true',
+            'help': 'Input paths in line pairs: original, new, original, new, etc.',
+        },
+        {
+            names: '--rows',
+            'action': 'store_true',
+            'help': 'Input paths in tab-delimited rows: original, tab, new',
+        },
+
+        #
+        # User code for renaming and filtering.
+        #
+        {
+            group: 'User code',
+            names: '--rename -r',
+            'metavar': 'CODE',
+            'help': 'Code to convert original path to new path [implies inputs are just original paths]',
+        },
+        {
+            names: '--filter',
+            'metavar': 'CODE',
+            'help': 'Code to filter input paths',
+        },
+        {
+            names: '--indent',
+            'type': positive_int,
+            'metavar': 'N',
+            'default': 4,
+            'help': 'Number of spaces for indentation in user-supplied code',
+        },
+        {
+            names: '--seq',
+            'metavar': 'N',
+            'type': positive_int,
+            'default': 1,
+            'help': 'Sequence start value [default: 1]',
+        },
+        {
+            names: '--step',
+            'metavar': 'N',
+            'type': positive_int,
+            'default': 1,
+            'help': 'Sequence step value [default: 1]',
+        },
+
+        #
+        # Renaming behaviors.
+        #
+        {
+            group: 'Renaming behaviors',
+            names: '--dryrun -d',
+            'action': 'store_true',
+            'help': 'List renamings without performing them',
+        },
+        {
+            names: '--yes',
+            'action': 'store_true',
+            'help': 'Rename files without a user confirmation step',
+        },
+        {
+            names: '--nolog',
+            'action': 'store_true',
+            'help': 'Suppress logging',
+        },
+
+        #
+        # Listing/pagination.
+        #
+        {
+            group: 'Listings',
+            names: '--pager',
+            'metavar': 'CMD',
+            'default': CON.default_pager_cmd,
+            'help': (
+                'Command string for paginating listings [default: '
+                f'`{CON.default_pager_cmd}`; empty string to disable]'
+            ),
+        },
+        {
+            names: '--limit',
+            'metavar': 'N',
+            'type': positive_int,
+            'help': 'Upper limit on the number of items to display in listings [default: none]',
+        },
+
+        #
+        # Failure control.
+        #
+        {
+            group: 'Problem control',
+            names: '--skip',
+            'choices': CON.all_tup + Problem.names_for(CONTROLS.skip),
+            'nargs': '+',
+            'metavar': 'PROB',
+            'help': 'Skip items with the named problems',
+        },
+        {
+            names: '--clobber',
+            'choices': CON.all_tup + Problem.names_for(CONTROLS.clobber),
+            'nargs': '+',
+            'metavar': 'PROB',
+            'help': 'Rename anyway, in spite of named overwriting problems',
+        },
+        {
+            names: '--create',
+            'choices': Problem.names_for(CONTROLS.create),
+            'nargs': '?',
+            'metavar': 'PROB',
+            'help': 'Fix missing parent problem before renaming',
+        },
+
+        #
+        # Program information.
+        #
+        {
+            group: 'Program information',
+            names: '--help -h',
+            'action': 'store_true',
+            'help': 'Display this help message and exit',
+        },
+        {
+            names: '--version',
+            'action': 'store_true',
+            'help': 'Display the version number and exit',
+        },
+
+    )
 

@@ -8,8 +8,12 @@ from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
 
-from .constants import CON, STRUCTURES
-from .utils import BmvError, RenamePair
+from .utils import (
+    BmvError,
+    CON,
+    RenamePair,
+    STRUCTURES,
+)
 
 from .problems import (
     CONTROLS,
@@ -372,6 +376,41 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
+    def validated_pnames(self, control, pnames):
+        if isinstance(pnames, str):
+            pnames = pnames.split()
+
+        if not pnames:
+            return ()
+
+        all_choices = Problem.names_for(control)
+        invalid = tuple(
+            nm
+            for nm in pnames
+            if not (nm in all_choices or nm == CON.all)
+        )
+
+        if invalid:
+            pn = ', '.join(pnames)
+            msg = PF.invalid_control.format(control, pn)
+            raise BmvError(msg)
+        elif CON.all in pnames:
+            return all_choices
+        else:
+            return tuple(pnames)
+
+    def build_control_lookup(self):
+        lookup = {}
+        for c in CONTROLS.keys():
+            for pname in getattr(self, c):
+                if pname in lookup:
+                    fmt = Problem.format_for(PN.conflicting_controls)
+                    msg = fmt.format(pname, lookup[pname], c)
+                    raise BmvError(msg)
+                else:
+                    lookup[pname] = c
+        return lookup
+
     def handle_problem(self, f, rp = None):
         # Takes a Problem and optionally a RenamePair.
         #
@@ -501,39 +540,4 @@ class RenamingPlan:
                 for control, fs in self.problems.items()
             },
         )
-
-    def validated_pnames(self, control, pnames):
-        if isinstance(pnames, str):
-            pnames = pnames.split()
-
-        if not pnames:
-            return ()
-
-        all_choices = Problem.names_for(control)
-        invalid = tuple(
-            nm
-            for nm in pnames
-            if not (nm in all_choices or nm == CON.all)
-        )
-
-        if invalid:
-            pn = ', '.join(pnames)
-            msg = PF.invalid_control.format(control, pn)
-            raise BmvError(msg)
-        elif CON.all in pnames:
-            return all_choices
-        else:
-            return tuple(pnames)
-
-    def build_control_lookup(self):
-        lookup = {}
-        for c in CONTROLS.keys():
-            for pname in getattr(self, c):
-                if pname in lookup:
-                    fmt = Problem.format_for(PN.conflicting_controls)
-                    msg = fmt.format(pname, lookup[pname], c)
-                    raise BmvError(msg)
-                else:
-                    lookup[pname] = c
-        return lookup
 

@@ -52,7 +52,7 @@ class TestResource(object):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
 
-    def temp_area(self, origs, news):
+    def temp_area(self, origs, news, extras = ()):
         # Initialize work area.
         wa = self.WORK_AREA_ROOT
         shutil.rmtree(wa, ignore_errors = True)
@@ -61,14 +61,18 @@ class TestResource(object):
         wp = lambda p: f'{wa}/{p}'
         origs = tuple(map(wp, origs))
         news = tuple(map(wp, news))
+        extras = tuple(map(wp, extras))
         # Put original files and subdirs in work area.
-        for p in origs:
+        for p in origs + extras:
             if p.endswith('/'):
                 Path(p).mkdir()
             else:
                 Path(p).touch()
         # Return the prefixed paths.
-        return origs, news
+        if extras:
+            return (origs, news, extras)
+        else:
+            return (origs, news)
 
 class StdStreams(object):
 

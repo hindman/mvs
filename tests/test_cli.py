@@ -7,12 +7,10 @@ from pathlib import Path
 from textwrap import dedent
 from string import ascii_lowercase
 
-from bmv.constants import CLI, CON, STRUCTURES
+from bmv.cli import main, CliRenamer, CLI
 from bmv.problems import CONTROLS, PROBLEM_FORMATS as PF
+from bmv.utils import write_to_clipboard, CON, STRUCTURES
 from bmv.version import __version__
-
-from bmv.cli import main, CliRenamer
-from bmv.utils import write_to_clipboard
 
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer using StringIO instances:
@@ -442,6 +440,15 @@ def test_e2e_create_parent(tr):
     origs, news = tr.temp_area(origs, news)
     ex, fhs = execute_main(*origs, *news, '--create', 'parent')
     check_main_paths(origs, news)
+    check_main_outputs(fhs)
+
+def test_e2e_clobber(tr):
+    origs = ('a', 'b')
+    news = ('c', 'd')
+    extras = ('c', 'x')
+    origs, news, extras = tr.temp_area(origs, news, extras)
+    ex, fhs = execute_main(*origs, *news, '--clobber', 'existing')
+    check_main_paths(origs, news + extras)
     check_main_outputs(fhs)
 
 def execute_main(*args):
