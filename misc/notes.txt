@@ -16,17 +16,30 @@ todos: TODOs
 
 Editing pass over code and tests:
 
-    x __init__.py
-    x version.py
-    x utils.py
-    x problems.py
-    - plan.py
-    - cli.py
+    x Code organization editing pass:
+        x Structure
+        x imports
+        x top-level labels/comment-blocks
 
-    - first pass: problem handling:
-        - focus on problem-related code, messages, raising vs short-circuiting
+        ## Done except for
+        conftest.py
+        test_cli.py
+        test_plan.py
 
-    - second pass: general editing:
+    - Read-through focusing on problem handling:
+        - messages
+        - short-circuiting
+        - raising
+
+        - utils.py
+        - problems.py
+        - plan.py
+        - cli.py
+        - conftest.py
+        - test_cli.py
+        - test_plan.py
+
+    - Second pass: general editing:
         - clarity, simplicity, naming
         - repetition
         - comments, organization
