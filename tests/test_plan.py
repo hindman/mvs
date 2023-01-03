@@ -11,33 +11,39 @@ from bmv.problems import (
     CONTROLS,
 )
 
+####
+# The packages top-level importables.
+####
+
+def test_top_level_imports(tr):
+    assert 'a' in RenamingPlan(inputs = ('a', 'b')).inputs
+    assert BmvError('foo', x = 1).msg == 'foo'
+    assert isinstance(__version__, str)
+
+####
+# Helper to do confirm failed for the expected reason.
+####
+
 def assert_failed_because(einfo, plan, pname):
+    # Get the portion of the failure message before any string formatting.
     exp_msg = Problem.format_for(pname).split('{')[0]
     i = len(exp_msg)
+    # Grab the plan's uncontrolled failure messages, trimmed to the same size.
     fmsgs = tuple(
         f.msg[0 : i]
         for f in plan.uncontrolled_problems
     )
+    # Check for the expected (a) general failure message
+    # and (b) specific Problem message.
     assert einfo.value.params['msg'] == PF.prepare_failed
     assert exp_msg in fmsgs
 
-def test_top_level_imports(tr):
-    # Just a place to exercise the other top-level imports.
-    assert BmvError('foo', x = 1, y = 2).msg == 'foo'
-    assert isinstance(__version__, str)
-
-def test_structure_none(tr):
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    plan = RenamingPlan(
-        inputs = origs + news,
-        file_sys = origs,
-    )
-    assert plan.structure == STRUCTURES.flat
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+####
+# Inputs and their structures.
+####
 
 def test_no_inputs(tr):
+    # If given no inputs, prepare will fail.
     plan = RenamingPlan(
         inputs = [],
         structure = STRUCTURES.flat,
@@ -47,16 +53,20 @@ def test_no_inputs(tr):
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parsing_no_paths)
 
-def test_structure_flat(tr):
+def test_structure_default(tr):
+    # A RenamingPlan defaults to flat input structure,
+    # or the user can request flat explicitly.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
-    )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    for structure in (None, STRUCTURES.flat):
+        plan = RenamingPlan(
+            inputs = origs + news,
+            structure = structure,
+            file_sys = origs,
+        )
+        assert plan.structure == STRUCTURES.flat
+        plan.rename_paths()
+        assert tuple(plan.file_sys) == news
 
 def test_structure_paragraphs(tr):
     # Paths.
@@ -64,7 +74,7 @@ def test_structure_paragraphs(tr):
     empty = ('', '')
     news = ('a1', 'b1', 'c1')
 
-    # Basic.
+    # Basic use case: blank line(s) between old-paths and new-paths.
     plan = RenamingPlan(
         inputs = origs + empty + news,
         structure = STRUCTURES.paragraphs,
@@ -73,7 +83,7 @@ def test_structure_paragraphs(tr):
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
 
-    # Additional empty lines.
+    # Plus blank lines at start and end.
     plan = RenamingPlan(
         inputs = empty + origs + empty + news + empty,
         structure = STRUCTURES.paragraphs,
@@ -97,9 +107,10 @@ def test_structure_pairs(tr):
     origs = ('a', 'b', 'c')
     empty = ('', '')
     news = ('a1', 'b1', 'c1')
-    inputs = tuple(chain(*zip(origs, news)))
+    pairs = zip(origs, news)
+    inputs = tuple(chain(*pairs))
 
-    # Basic.
+    # Basic use case.
     plan = RenamingPlan(
         inputs = inputs,
         structure = STRUCTURES.pairs,
@@ -108,7 +119,7 @@ def test_structure_pairs(tr):
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
 
-    # Additional empty lines.
+    # Add empty lines in various spots: still works.
     plan = RenamingPlan(
         inputs = empty + inputs[:4] + empty + inputs[4:] + empty,
         structure = STRUCTURES.pairs,
@@ -117,7 +128,7 @@ def test_structure_pairs(tr):
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
 
-    # Odd number of paths.
+    # Odd number of paths: should fail.
     plan = RenamingPlan(
         inputs = inputs[:-1],
         structure = STRUCTURES.pairs,
@@ -134,7 +145,7 @@ def test_structure_rows(tr):
     news = ('a1', 'b1', 'c1')
     inputs = tuple(f'{o}\t{n}' for o, n in zip(origs, news))
 
-    # Basic.
+    # Basic use case.
     plan = RenamingPlan(
         inputs = empty + inputs + empty,
         structure = STRUCTURES.rows,
@@ -153,7 +164,12 @@ def test_structure_rows(tr):
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parsing_row)
 
+####
+# User-supplied code.
+####
+
 def test_renaming_code(tr):
+    # Basic use case: generate new-paths via user-supplied code.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     plan = RenamingPlan(
@@ -165,6 +181,7 @@ def test_renaming_code(tr):
     assert tuple(plan.file_sys) == news
 
 def test_filtering_code(tr):
+    # Basic use case: filter old-paths with user-supplied code.
     origs = ('a', 'b', 'c', 'd', 'dd')
     news = ('aa', 'bb', 'cc')
     plan = RenamingPlan(
@@ -220,12 +237,13 @@ def test_code_execution_fails(tr):
     filter_code = 'return FUBB if seq == 2 else True'
     exp_rp_fails = [False, True, False]
 
-    def check(p):
+    # Helper to check the plan's failures.
+    def do_checks(p):
         fails = p.uncontrolled_problems
         assert len(fails) == 1
         assert fails[0].rp.orig == 'b'
 
-    # Run the scenario for renaming.
+    # Scenario: renaming code raises an exception.
     plan = RenamingPlan(
         inputs = origs,
         rename_code = rename_code1,
@@ -235,9 +253,9 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.rename_code_invalid)
-    check(plan)
+    do_checks(plan)
 
-    # Run the other scenario for renaming: return bad data type.
+    # Scenario: renaming code returns bad data type.
     plan = RenamingPlan(
         inputs = origs,
         rename_code = rename_code2,
@@ -247,9 +265,9 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.rename_code_bad_return)
-    check(plan)
+    do_checks(plan)
 
-    # Run the scenario for filtering.
+    # Scenario: filtering code raises an exception.
     plan = RenamingPlan(
         inputs = origs + news,
         structure = STRUCTURES.flat,
@@ -260,9 +278,10 @@ def test_code_execution_fails(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.filter_code_invalid)
-    check(plan)
+    do_checks(plan)
 
 def test_seq(tr):
+    # User defines a sequence and uses its values in user-supplied code.
     origs = ('a', 'b', 'c')
     news = ('a.20', 'b.30', 'c.40')
     plan = RenamingPlan(
@@ -274,6 +293,63 @@ def test_seq(tr):
     )
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
+
+def test_common_prefix(tr):
+    # User-supplied code exercises strip_prefix() helper.
+    origs = ('blah-a', 'blah-b', 'blah-c')
+    exp_file_sys = ('a', 'b', 'c')
+    plan = RenamingPlan(
+        inputs = origs,
+        rename_code = 'return plan.strip_prefix(o)',
+        file_sys = origs,
+    )
+    plan.rename_paths()
+    assert tuple(plan.file_sys) == exp_file_sys
+
+####
+# RenamingPlan data.
+####
+
+def test_file_sys_arg(tr):
+    # Paths.
+    origs = ('a', 'b', 'c')
+    news = ('a1', 'b1', 'a1')
+
+    # Pass file_sys as a sequence. We do this to generate the
+    # expected file_sys for an ensuing test.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = origs,
+    )
+    file_sys = plan.file_sys
+
+    # Pass file_sys as None: works fine.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = None,
+    )
+    assert plan.file_sys is None
+
+    # Pass file_sys as a dict: we expect an
+    # indepentent dict equal to the original.
+    plan = RenamingPlan(
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
+        file_sys = file_sys,
+    )
+    assert plan.file_sys == file_sys
+    assert plan.file_sys is not file_sys
+
+    # Pass non-iterable as a file_sys.
+    with pytest.raises(BmvError) as einfo:
+        plan = RenamingPlan(
+            inputs = origs + news,
+            structure = STRUCTURES.flat,
+            file_sys = 123,
+        )
+    assert einfo.value.params['msg'] == PF.invalid_file_sys
 
 def test_plan_as_dict(tr):
     # Expected keys in plan.as_dict.
@@ -313,25 +389,36 @@ def test_plan_as_dict(tr):
     assert tuple(plan.file_sys) == news
     assert sorted(plan.as_dict) == exp_keys
 
-def test_rename_twice(tr):
-    # Create a valid plan.
+####
+# Check unexpected usage scenarios.
+####
+
+def test_prepare_rename_multiple_times(tr):
+    # Setup.
     origs = ('a', 'b', 'c')
-    news = ('aa', 'bb', 'cc')
+    news = ('a1', 'b1', 'c1')
     plan = RenamingPlan(
-        inputs = origs,
-        rename_code = 'return o + o',
+        inputs = origs + news,
+        structure = STRUCTURES.flat,
         file_sys = origs,
     )
 
-    # Rename succeeds.
+    # Can call prepare multiple times.
+    plan.prepare()
+    plan.prepare()
+
+    # Renaming plan works.
     plan.rename_paths()
     assert tuple(plan.file_sys) == news
 
-    # Second attempt raises and
+    # Cannot call rename_paths multiple times.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert einfo.value.params['msg'] == PF.rename_done_already
-    assert tuple(plan.file_sys) == news
+
+####
+# Problems and problem-control.
+####
 
 def test_invalid_controls(tr):
     # Paths.
@@ -363,7 +450,7 @@ def test_invalid_controls(tr):
     for label, exp, skip in checks:
         plan = RenamingPlan(**common, skip = skip)
         assert (label, plan.skip) == (label, exp)
-     
+
     # But we cannot control the same problem in two different ways.
     checks = (
         (PN.parent, CONTROLS.skip, CONTROLS.create),
@@ -391,29 +478,6 @@ def test_invalid_controls(tr):
         msg = einfo.value.params['msg']
         exp = PF.invalid_control.format(control, pname)
         assert msg == exp
-
-def test_prepare_rename_multiple_times(tr):
-    # Setup.
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
-    )
-
-    # Can call prepare multiple times.
-    plan.prepare()
-    plan.prepare()
-
-    # Renaming plan works.
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
-
-    # Cannot call rename_paths multiple times.
-    with pytest.raises(BmvError) as einfo:
-        plan.rename_paths()
-    assert einfo.value.params['msg'] == PF.rename_done_already
 
 def test_equal(tr):
     # Paths.
@@ -630,59 +694,4 @@ def test_failures_skip_all(tr):
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.all_filtered)
-
-def test_file_sys_arg(tr):
-    # Paths.
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'a1')
-
-    # Pass file_sys as a sequence. We do this to generate the
-    # expected file_sys for an ensuing test.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
-    )
-    file_sys = plan.file_sys
-
-    # Pass file_sys as None: works fine.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = None,
-    )
-    assert plan.file_sys is None
-
-    # Pass file_sys as a dict: we expect an
-    # indepentent dict equal to the original.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
-    )
-    assert plan.file_sys == file_sys
-    assert plan.file_sys is not file_sys
-
-    # Pass non-iterable as a file_sys.
-    with pytest.raises(BmvError) as einfo:
-        plan = RenamingPlan(
-            inputs = origs + news,
-            structure = STRUCTURES.flat,
-            file_sys = 123,
-        )
-    assert einfo.value.params['msg'] == PF.invalid_file_sys
-
-def test_common_prefix(tr):
-    # Paths.
-    origs = ('blah-a', 'blah-b', 'blah-c')
-    exp_file_sys = ('a', 'b', 'c')
-
-    # Basic.
-    plan = RenamingPlan(
-        inputs = origs,
-        rename_code = 'return plan.strip_prefix(o)',
-        file_sys = origs,
-    )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys
 

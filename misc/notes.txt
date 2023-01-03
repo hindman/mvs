@@ -6,7 +6,6 @@ toc: Table of contents
     todos                | TODOs
     road-map             | Road map
     usage                | Usage
-    renaming-validations | Renaming validations
     dev-notes            | Dev notes
     other-tools          | Other tools
 
@@ -14,44 +13,52 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Editing pass over code and tests:
+Editing pass:
 
-    x Code organization editing pass:
-        x Structure
-        x imports
-        x top-level labels/comment-blocks
+    - Check for:
+        - clarity, simplicity, naming
+        - repetition
+        - comments
+        - problem-handling: short-circuiting, raising, messages.
 
-        ## Done except for
-        conftest.py
-        test_cli.py
-        test_plan.py
-
-    - Read-through focusing on problem handling:
-        - messages
-        - short-circuiting
-        - raising
-
+    - Files:
         - utils.py
         - problems.py
         - plan.py
         - cli.py
-        - conftest.py
         - test_cli.py
         - test_plan.py
 
-    - Second pass: general editing:
-        - clarity, simplicity, naming
-        - repetition
-        - comments, organization
-
 Project name change: bmv => mvs.
-    - Dependencies: drop attrs; re-create virtualenvs.
-    - bmv is claimed [emailed maintainer: Nov 2; no reply].
+    - Edit: setup.py [drop attrs].
+    - Re-create virtualenvs.
 
-MacOS-specific stuff:
-    clipboard: pbpaste/pbcopy
-    pager: more
-    pager: maybe subprocess issues, but I don't know of any
+Logging: bootstrap (create $HOME/.bmv).
+
+Clipboard: generalize to avoid MacOS-specific stuff.
+
+User-supplied code for programmatic use: also accept functions.
+
+Better handling of failures during renaming:
+    - Assume plan.rename_paths() raises somewhere in the middle.
+    - User wants to know what was renamed, what not.
+    - Possible plan:
+        - Log before starting renaming.
+        - Start.
+        - Maintain tracking-data on renamings as they occur.
+        - Failure happens.
+        - Try to log state: failure info and tracking-data.
+        - Assemble an exception summarizing what happened.
+        - Raise the exception.
+        - Tracking-data should be logged regardless of failure or success.
+
+Publish:
+    - Documentation:
+        CLI help text.
+        README covering CLI and programmatic usage [see Usage section in this file].
+    - Make repo public.
+    - Version bump.
+    - Publish.
 
 --------
 road-map: Road map
@@ -61,77 +68,53 @@ Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
 
-Logging: bootstrap (create $HOME/.bmv).
-Logging: list.
-Logging: prune.
-Logging: undo operation.
+Other operations:
+    - copy: given old-paths, copy them to new-paths.
+    - link: given old-paths (sources), create new-paths (links, soft or hard).
+    - chmod: given old-paths, apply "new-path" chmod-specs to old-paths.
+    - times: given old-paths, apply "new-path" time-specs to old-paths.
+    - touch: given old-paths, touch them.
 
-Error handling:
-    - If plan.rename_paths() raises, user has no idea whether/how-many
-      paths were renamed before the failure.
-    - One approach is to count N of paths actually renamed before the fail?
+Additional failure control: backup.
 
-Other operations: copy, backup, link, chmod, touch, timestamps.
+Logging operations: list, prune.
 
-Option: --row-delimiter [default: tab]
-Option: --path-delimiter [default: newline]
-Option: --no-strip [default: paths are stripped]
+Undo renaming, based on log.
 
-Alternative dryrun output styles: should support the same behavior as input structures.
+Support preferences.
+    - switch my pager back to `less`.
+
+Options:
+    --row-delimiter [default: tab]
+    --path-delimiter [default: newline]
+    --no-strip [default: paths are stripped]
+
+Alternative dryrun output styles:
+    - same as input structures
+    - plus json
 
 Complex failure/validation scenarios:
     - prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
-
-Preferences.
-    - switch my pager back to `less`.
 
 --------
 usage: Usage
 --------
 
-Usage components:
-
-    PATHS     : positionals
-    SOURCE    : PATHS | --stdin | --file PATH | --clipboard
-    STRUCTURE : --rename CODE | --paragraphs | --pairs | --rows | --flat
-    OTHER     : all other options
-
-Usage schematic:
+Usage:
 
     bmv SOURCE [STRUCTURE] [OTHER]
 
-Usage notes.
+    PATHS     : positionals
+    SOURCE    : PATHS | --stdin | --file PATH | --clipboard
+    STRUCTURE : --flat | --paragraphs | --pairs | --rows | --rename CODE
+    OTHER     : all other options
 
-    User must provide exactly one source for input paths.
+Notes:
 
-    The user must supply zero or one option defining the structure of the input
-    path data.
+    - Default structure is --flat.
 
-    Structures for input path data:
-
-        - Paragraphs: two Unix-style paragraphs, one for original paths, one for new paths.
-        - Pairs: alternating lines (original, new, original, new, etc).
-        - Rows: tab-delimited rows (original, tab, new).
-        - Flat: original paths, then an equal number of new paths (blank lines irrelevant).
-
-    The --rename option is considered structural:
-
-        - It implies that the input path data consists solely of original paths.
-        - The other structural options imply original-new pairs in one form or another.
-
---------
-renaming-validations: Renaming validations
---------
-
-Old-path and new-path differ for each pair.
-
-Old-paths exist.
-
-New-paths do not exist.
-
-New-paths do not collide among themselves.
-
-Directories of the new-paths exist.
+    - The --rename option is considered structural because it implies that the
+      input path data consists solely of original paths.
 
 --------
 dev-notes: Dev notes

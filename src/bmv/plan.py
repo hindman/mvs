@@ -37,23 +37,38 @@ class RenamingPlan:
                  # Sequence numbering.
                  seq_start = 1,
                  seq_step = 1,
-                 # File system via dependency injection.
-                 file_sys = None,
                  # Problem controls.
                  skip = None,
                  clobber = None,
                  create = None,
+                 # Fake file system.
+                 file_sys = None,
                  ):
 
-        # Basic attributes passed as arguments into the constructor.
+        # Input paths, input structure, and RenamePair instance.
         self.inputs = tuple(inputs)
         self.structure = structure or STRUCTURES.flat
+        self.rps = tuple()
+
+        # User-supplied code.
         self.rename_code = rename_code
         self.filter_code = filter_code
+        self.filter_func = None
+        self.rename_func = None
         self.indent = indent
         self.seq_start = seq_start
         self.seq_step = seq_step
+        self.prefix_len = 0
+
+        # Plan state.
+        self.has_prepared = False
+        self.has_renamed = False
+
+        # Fake file system injected for testing purposes.
         self.file_sys = self.initialize_file_sys(file_sys)
+
+        # Information used when checking RenamePair instance for problems.
+        self.new_groups = None
 
         # Convert the problem-control inputs (skip, clobber, create) into
         # validated tuples of problem names controlled by each mechanism.
@@ -76,19 +91,6 @@ class RenamingPlan:
             for c in CONTROLS.keys()
         }
         self.problems[None] = []
-
-        # The paths to be renamed will be stored as RenamePair instances.
-        self.rps = tuple()
-
-        # Lenth of the longest common prefix string on the original paths.
-        self.prefix_len = 0
-
-        self.filter_func = None
-        self.rename_func = None
-
-        self.has_prepared = False
-        self.has_renamed = False
-        self.new_groups = None
 
     ####
     #

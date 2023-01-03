@@ -456,11 +456,6 @@ class CLI:
             'help': 'Input file paths',
         },
         {
-            names: '--clipboard',
-            'action': 'store_true',
-            'help': 'Input paths via the clipboard',
-        },
-        {
             names: '--stdin',
             'action': 'store_true',
             'help': 'Input paths via STDIN',
@@ -469,6 +464,11 @@ class CLI:
             names: '--file',
             'metavar': 'PATH',
             'help': 'Input paths via a text file',
+        },
+        {
+            names: '--clipboard',
+            'action': 'store_true',
+            'help': 'Input paths via the clipboard',
         },
 
         #

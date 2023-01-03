@@ -1,8 +1,6 @@
-import io
 import json
 import pytest
 import shutil
-import sys
 
 from textwrap import dedent
 from pathlib import Path
@@ -11,11 +9,19 @@ from pathlib import Path
 def tr():
     return TestResource()
 
-
 class TestResource(object):
+
+    ####
+    # Paths in the testing work area used to exercise
+    # the command-line functionality end-to-end.
+    ####
 
     WORK_AREA_ROOT = 'tests/work_area'
     TEMP_PATH = f'{WORK_AREA_ROOT}/tempfile'
+
+    ####
+    # Expected outputs during command-line usage.
+    ####
 
     OUTS = dict(
         listing_a2aa = dedent('''
@@ -43,17 +49,12 @@ class TestResource(object):
         ''').lstrip(),
     )
 
-    def dump(self, val = None, label = 'dump()'):
-        fmt = '\n--------\n{label} =>\n{val}'
-        msg = fmt.format(label = label, val = val)
-        print(msg)
-
-    def dumpj(self, val = None, label = 'dump()', indent = 4):
-        val = json.dumps(val, indent = indent)
-        self.dump(val, label)
+    ####
+    # Helper to set up the work area with various paths.
+    ####
 
     def temp_area(self, origs, news, extras = ()):
-        # Initialize work area.
+        # Initialize an empty work area.
         wa = self.WORK_AREA_ROOT
         shutil.rmtree(wa, ignore_errors = True)
         Path(wa).mkdir()
@@ -62,7 +63,7 @@ class TestResource(object):
         origs = tuple(map(wp, origs))
         news = tuple(map(wp, news))
         extras = tuple(map(wp, extras))
-        # Put original files and subdirs in work area.
+        # Put original paths (plus any extras) in the work area.
         for p in origs + extras:
             if p.endswith('/'):
                 Path(p).mkdir()
@@ -74,43 +75,16 @@ class TestResource(object):
         else:
             return (origs, news)
 
-class StdStreams(object):
+    ####
+    # Data dumping.
+    ####
 
-    def __init__(self):
-        self.orig_stdout = sys.stdout
-        self.orig_stderr = sys.stderr
-        self.reset()
+    def dump(self, val = None, label = 'dump()'):
+        fmt = '\n--------\n{label} =>\n{val}'
+        msg = fmt.format(label = label, val = val)
+        print(msg)
 
-    def reset(self):
-        self.close()
-        io1 = io.StringIO()
-        io2 = io.StringIO()
-        self._stdout = io1
-        self._stderr = io2
-        sys.stdout = io1
-        sys.stderr = io2
-
-    def close(self):
-        if hasattr(self, '_stdout'):
-            self._stdout.close()
-            self._stderr.close()
-
-    def restore(self):
-        sys.stdout = self.orig_stdout
-        sys.stderr = self.orig_stderr
-
-    @property
-    def stdout(self):
-        return self._stdout.getvalue()
-
-    @property
-    def stderr(self):
-        return self._stderr.getvalue()
-
-@pytest.fixture(scope = 'function')
-def std_streams():
-    ss = StdStreams()
-    yield ss
-    ss.close()
-    ss.restore()
+    def dumpj(self, val = None, label = 'dump()', indent = 4):
+        val = json.dumps(val, indent = indent)
+        self.dump(val, label)
 
