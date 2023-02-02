@@ -100,6 +100,9 @@ class Problem:
     rp : RenamePair = None
 
     def __init__(self, name, *xs, msg = None, rp = None):
+        # Custom initializer, because we need a convenience lookup to build
+        # the ultimate message, given a problem name and arguments.
+        # To keep Problem instances frozen, we modify __dict__ directly.
         d = self.__dict__
         d['name'] = name
         d['msg'] = msg or self.format_for(name).format(*xs)

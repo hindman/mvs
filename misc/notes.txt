@@ -22,12 +22,16 @@ Editing pass:
         - problem-handling: short-circuiting, raising, messages.
 
     - Files:
-        - utils.py
-        - problems.py
+        x utils.py
+        x problems.py
         - plan.py
         - cli.py
         - test_cli.py
         - test_plan.py
+
+    - Issues to be resolved:
+        - utils.py: CON: where should these go: "Command-line messages"? [also see: PROBLEM_NAMES]
+        - problems.py: add a short note on what a Problem is.
 
 Project name change: bmv => mvs.
     - Edit: setup.py [drop attrs].

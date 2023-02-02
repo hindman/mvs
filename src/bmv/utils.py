@@ -35,8 +35,8 @@ class CON:
 
     # User-supplied code.
     user_code_fmt = 'def {func_name}(o, p, seq, plan):\n{indent}{user_code}\n'
-    renamer_name = 'do_rename'
-    filterer_name = 'do_filter'
+    renamer_name = '_do_rename'
+    filterer_name = '_do_filter'
 
     # Command-line messages.
     no_action_msg = '\nNo action taken.'
