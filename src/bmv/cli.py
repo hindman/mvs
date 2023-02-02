@@ -13,15 +13,12 @@ from short_con import constants
 from .plan import RenamingPlan
 from .version import __version__
 
-from .problems import (
-    Problem,
-    CONTROLS,
-    PROBLEM_FORMATS as PF,
-)
+from .problems import Problem, CONTROLS
 
 from .utils import (
     BmvError,
     CON,
+    MSG_FORMATS as MF,
     STRUCTURES,
     positive_int,
     read_from_clipboard,
@@ -122,13 +119,13 @@ class CliRenamer:
             self.wrapup(CON.exit_fail, e.msg)
             return
         except Exception as e: # pragma: no cover
-            self.wrapup_with_tb(PF.plan_creation_failed)
+            self.wrapup_with_tb(MF.plan_creation_failed)
             return
 
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()
         if plan.failed:
-            msg = self.listing_msg(PF.prepare_failed_cli, plan.uncontrolled_problems)
+            msg = self.listing_msg(MF.prepare_failed_cli, plan.uncontrolled_problems)
             self.wrapup(CON.exit_fail, msg)
             return
 
@@ -138,14 +135,14 @@ class CliRenamer:
 
         # Stop if dryrun mode.
         if opts.dryrun:
-            self.wrapup(CON.exit_ok, CON.no_action_msg)
+            self.wrapup(CON.exit_ok, MF.no_action_msg)
             return
 
         # User confirmation.
         if not opts.yes:
             msg = self.msg_with_tallies('\nRename paths{}', plan.rps)
             if not self.get_confirmation(msg, expected = 'yes'):
-                self.wrapup(CON.exit_ok, CON.no_action_msg)
+                self.wrapup(CON.exit_ok, MF.no_action_msg)
                 return
 
         # Log the renamings.
@@ -162,9 +159,9 @@ class CliRenamer:
         # Rename paths.
         try:
             self.plan.rename_paths()
-            self.wrapup(CON.exit_ok, CON.paths_renamed_msg)
+            self.wrapup(CON.exit_ok, MF.paths_renamed_msg)
         except Exception as e: # pragma: no cover
-            self.wrapup_with_tb(PF.renaming_raised)
+            self.wrapup_with_tb(MF.renaming_raised)
 
     ####
     # Helpers to finish or cut-short the run() sub-steps.
@@ -238,7 +235,6 @@ class CliRenamer:
         ap = argparse.ArgumentParser(
             prog = CON.app_name,
             description = CLI.description,
-            epilog = CLI.epilog,
             add_help = False,
         )
         g = None
@@ -269,9 +265,9 @@ class CliRenamer:
 
             # If there is a problem, first set the problem msg.
             if n == 0 and not zero_ok:
-                msg = PF.opts_require_one
+                msg = MF.opts_require_one
             elif n > 1:
-                msg = PF.opts_mutex
+                msg = MF.opts_mutex
             else:
                 msg = None
                 continue
@@ -304,7 +300,7 @@ class CliRenamer:
                 else:
                     text = self.stdin.read()
             except Exception as e: # pragma: no cover
-                self.wrapup_with_tb(PF.path_collection_failed)
+                self.wrapup_with_tb(MF.path_collection_failed)
                 return None
             paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)
@@ -318,7 +314,7 @@ class CliRenamer:
             with open(path, 'w') as fh:
                 json.dump(d, self.logfh or fh, indent = 4)
         except Exception as e: # pragma: no cover
-            self.wrapup_with_tb(PF.log_writing_failed)
+            self.wrapup_with_tb(MF.log_writing_failed)
 
     @property
     def log_data(self):
@@ -393,13 +389,13 @@ class CLI:
     sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
     structures = constants('Structures', ('rename',) + STRUCTURES.keys())
 
-    # Program help text: description and epilog.
+    # Program help text: description and explanatory text.
     description = '''
         Renames or moves files in bulk, via user-supplied Python
         code or a data source mapping old paths to new paths.
     '''
 
-    epilog = '''
+    post_epilog = dedent('''
         The user-supplied renaming and filtering code has access to the
         original file path as a str [variable: o], its pathlib.Path
         representation [variable: p], the current sequence value [variable:
@@ -410,13 +406,11 @@ class CLI:
         any false value to reject it. The code should omit indentation on its
         first line, but must provide it for subsequent lines. For reference,
         some useful Path components: p.parent, p.name, p.stem, p.suffix.
-    '''
 
-    post_epilog = dedent('''
-        Before any renaming occurs, each pair of original and new paths is checked
-        for common types of problems. By default, if any occur, the renaming plan
-        is halted and no paths are renamed. The problems and their short names are
-        as follows:
+        Before any renaming occurs, each pair of original and new paths is
+        checked for common types of problems. By default, if any occur, the
+        renaming plan is halted and no paths are renamed. The problems and
+        their short names are as follows:
 
             equal     | Original path and new path are the same.
             missing   | Original path does not exist.
@@ -424,13 +418,13 @@ class CLI:
             colliding | Two or more new paths are the same.
             parent    | Parent directory of new path does not exist.
 
-        Users can configure various problem controls to address such issues. That
-        allows the renaming plan to proceed in spite of the problems, either by
-        skipping offending items, taking remedial action, or simply forging ahead
-        in spite of the consequences. As shown in the usage documentation above,
-        the --create control applies only to a single type of problem, the
-        --clobber control can apply to multiple, and the --skip control can apply
-        to any or all. Here are some examples to illustrate usage:
+        Users can configure various problem controls to address such issues.
+        That allows the renaming plan to proceed in spite of the problems,
+        either by skipping offending items, taking remedial action, or simply
+        forging ahead in spite of the consequences. The --create control
+        applies only to a single type of problem (parent), the --clobber
+        control can apply to two (existing, colliding), and the --skip control
+        can apply to any or all. Here are some examples to illustrate usage:
 
             --skip equal         | Skip items with 'equal' problem.
             --skip equal missing | Skip items with 'equal' or 'missing' problems.
@@ -453,7 +447,7 @@ class CLI:
             names: 'paths',
             'nargs': '*',
             'metavar': 'PATH',
-            'help': 'Input file paths',
+            'help': 'Input paths via arguments',
         },
         {
             names: '--stdin',
@@ -515,7 +509,7 @@ class CLI:
             'type': positive_int,
             'metavar': 'N',
             'default': 4,
-            'help': 'Number of spaces for indentation in user-supplied code',
+            'help': 'Number of spaces for indentation in user-supplied code [default: 4]',
         },
         {
             names: '--seq',

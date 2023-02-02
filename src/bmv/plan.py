@@ -11,6 +11,7 @@ from pathlib import Path
 from .utils import (
     BmvError,
     CON,
+    MSG_FORMATS as MF,
     RenamePair,
     STRUCTURES,
 )
@@ -394,7 +395,7 @@ class RenamingPlan:
 
         if invalid:
             pn = ', '.join(pnames)
-            msg = PF.invalid_control.format(control, pn)
+            msg = MF.invalid_control.format(control, pn)
             raise BmvError(msg)
         elif CON.all in pnames:
             return all_choices
@@ -406,8 +407,7 @@ class RenamingPlan:
         for c in CONTROLS.keys():
             for pname in getattr(self, c):
                 if pname in lookup:
-                    fmt = Problem.format_for(PN.conflicting_controls)
-                    msg = fmt.format(pname, lookup[pname], c)
+                    msg = MF.conflicting_controls.format(pname, lookup[pname], c)
                     raise BmvError(msg)
                 else:
                     lookup[pname] = c
@@ -471,7 +471,7 @@ class RenamingPlan:
                     for path in file_sys
                 }
             except Exception as e:
-                raise BmvError.new(e, msg = Problem.format_for(PN.invalid_file_sys))
+                raise BmvError.new(e, msg = MF.invalid_file_sys)
 
     def path_exists(self, p):
         if self.file_sys is None:
@@ -487,14 +487,14 @@ class RenamingPlan:
     def rename_paths(self):
         # Don't rename more than once.
         if self.has_renamed:
-            raise BmvError(PF.rename_done_already)
+            raise BmvError(MF.rename_done_already)
         else:
             self.has_renamed = True
 
         # Ensure than we have prepare, and raise it failed.
         self.prepare()
         if self.failed:
-            raise BmvError(PF.prepare_failed, problems = self.problems[None])
+            raise BmvError(MF.prepare_failed, problems = self.problems[None])
 
         # Rename paths.
         if self.file_sys is None:

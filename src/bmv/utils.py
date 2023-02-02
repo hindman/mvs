@@ -17,6 +17,27 @@ STRUCTURES = constants('Structures', (
     'rows',
 ))
 
+# Message formats.
+MSG_FORMATS = constants('MsgFormats', dict(
+    # BmvError instances in RenamingPlan.
+    rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
+    prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
+    invalid_control        = 'Invalid problem name(s) for {!r} control: {}',
+    conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
+    invalid_file_sys       = 'Plan.file_sys must be None or an iterable',
+    # Error messages in CliRenamer.
+    path_collection_failed = 'Collection of input paths failed.\n\n{}',
+    plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
+    log_writing_failed     = 'Unexpected error during writing to log file.\n\n{}',
+    prepare_failed_cli     = 'Renaming preparation resulted in failures:{}.\n',
+    renaming_raised        = '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',
+    opts_require_one       = 'One of these options is required',
+    opts_mutex             = 'No more than one of these options should be used',
+    # Other messages in CliRenamer.
+    no_action_msg          = '\nNo action taken.',
+    paths_renamed_msg      = '\nPaths renamed.',
+))
+
 class CON:
     # General constants.
 
@@ -38,10 +59,6 @@ class CON:
     renamer_name = '_do_rename'
     filterer_name = '_do_filter'
 
-    # Command-line messages.
-    no_action_msg = '\nNo action taken.'
-    paths_renamed_msg = '\nPaths renamed.'
-
     # Command-line exit codes.
     exit_ok = 0
     exit_fail = 1
@@ -57,6 +74,27 @@ class CON:
 
 class BmvError(Kwexception):
     pass
+
+####
+# A dataclass to hold a pair of paths: original and corresponding new.
+####
+
+@dataclass(frozen = True)
+class RenamePair:
+    # A data object to hold an original path and the corresponding new path.
+    orig: str
+    new: str
+    exclude: bool = False
+    create_parent: bool = False
+    clobber: bool = False
+
+    @property
+    def equal(self):
+        return self.orig == self.new
+
+    @property
+    def formatted(self):
+        return f'{self.orig}\n{self.new}\n'
 
 ####
 # Read/write: files, clipboard.
@@ -94,21 +132,4 @@ def positive_int(x):
         if x >= 1:
             return x
     raise ValueError
-
-@dataclass(frozen = True)
-class RenamePair:
-    # A data object to hold an original path and the corresponding new path.
-    orig: str
-    new: str
-    exclude: bool = False
-    create_parent: bool = False
-    clobber: bool = False
-
-    @property
-    def equal(self):
-        return self.orig == self.new
-
-    @property
-    def formatted(self):
-        return f'{self.orig}\n{self.new}\n'
 

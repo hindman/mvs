@@ -2,7 +2,7 @@ import pytest
 from itertools import chain
 
 from bmv import RenamingPlan, BmvError, __version__
-from bmv.utils import CON, STRUCTURES
+from bmv.utils import CON, STRUCTURES, MSG_FORMATS as MF
 from bmv.problems import (
     Problem,
     PROBLEM_NAMES as PN,
@@ -35,7 +35,7 @@ def assert_failed_because(einfo, plan, pname):
     )
     # Check for the expected (a) general failure message
     # and (b) specific Problem message.
-    assert einfo.value.params['msg'] == PF.prepare_failed
+    assert einfo.value.params['msg'] == MF.prepare_failed
     assert exp_msg in fmsgs
 
 ####
@@ -203,7 +203,7 @@ def test_code_compilation_fails(tr):
     def do_checks(p):
         with pytest.raises(BmvError) as einfo:
             p.rename_paths()
-        assert einfo.value.params['msg'] == PF.prepare_failed
+        assert einfo.value.params['msg'] == MF.prepare_failed
         f = p.uncontrolled_problems[0]
         assert f.name == PN.user_code_exec
         assert bad_code in f.msg
@@ -349,7 +349,7 @@ def test_file_sys_arg(tr):
             structure = STRUCTURES.flat,
             file_sys = 123,
         )
-    assert einfo.value.params['msg'] == PF.invalid_file_sys
+    assert einfo.value.params['msg'] == MF.invalid_file_sys
 
 def test_plan_as_dict(tr):
     # Expected keys in plan.as_dict.
@@ -414,7 +414,7 @@ def test_prepare_rename_multiple_times(tr):
     # Cannot call rename_paths multiple times.
     with pytest.raises(BmvError) as einfo:
         plan.rename_paths()
-    assert einfo.value.params['msg'] == PF.rename_done_already
+    assert einfo.value.params['msg'] == MF.rename_done_already
 
 ####
 # Problems and problem-control.
@@ -462,7 +462,7 @@ def test_invalid_controls(tr):
         with pytest.raises(BmvError) as einfo:
             plan = RenamingPlan(**common, **control_params)
         msg = einfo.value.params['msg']
-        exp = PF.conflicting_controls.format(pname, *controls)
+        exp = MF.conflicting_controls.format(pname, *controls)
         assert msg == exp
 
     # And we cannot control a problem in an inapplicable way.
@@ -476,7 +476,7 @@ def test_invalid_controls(tr):
         with pytest.raises(BmvError) as einfo:
             plan = RenamingPlan(**common, **control_params)
         msg = einfo.value.params['msg']
-        exp = PF.invalid_control.format(control, pname)
+        exp = MF.invalid_control.format(control, pname)
         assert msg == exp
 
 def test_equal(tr):

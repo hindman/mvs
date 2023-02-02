@@ -8,7 +8,7 @@ from string import ascii_lowercase
 
 from bmv.cli import main, CliRenamer, CLI
 from bmv.problems import CONTROLS, PROBLEM_FORMATS as PF
-from bmv.utils import write_to_clipboard, CON
+from bmv.utils import write_to_clipboard, CON, MSG_FORMATS as MF
 from bmv.version import __version__
 
 ####
@@ -162,7 +162,7 @@ def test_no_input_paths(tr):
     assert cli.failure
     assert cli.out == ''
     assert cli.log == ''
-    assert cli.err.startswith(PF.opts_require_one)
+    assert cli.err.startswith(MF.opts_require_one)
     for name in CLI.sources.keys():
         assert name in cli.err
 
@@ -226,7 +226,7 @@ def test_sources(tr):
     cli = CliRenamerSIO('--clipboard', '--stdin', yes, file_sys = origs)
     cli.run()
     assert cli.failure
-    assert cli.err.startswith(PF.opts_mutex)
+    assert cli.err.startswith(MF.opts_mutex)
     assert '--clipboard' in cli.err
     assert '--stdin' in cli.err
 
@@ -307,14 +307,14 @@ def test_rename_paths_raises(tr):
     cli.do_rename()
     assert cli.failure
     assert cli.err.strip().startswith('Renaming raised an error')
-    assert 'raise BmvError(PF.rename_done_already)' in cli.err
+    assert 'raise BmvError(MF.rename_done_already)' in cli.err
 
 def test_filter_all(tr):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     args = origs + news
-    exp_cli_prep = PF.prepare_failed_cli.split(':')[0]
-    exp_conflict = PF.conflicting_controls.split(':')[0]
+    exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
+    exp_conflict = MF.conflicting_controls.split(':')[0]
 
     # Initial scenario: it works.
     cli = CliRenamerSIO(
@@ -470,8 +470,8 @@ def test_some_failed_rps(tr):
     exp_file_sys = ('z2', 'z3', 'A2', 'A3', 'A1', 'A4')
     opt_skip = ('--skip', 'existing')
     opt_clobber = ('--clobber', 'existing')
-    exp_cli_prep = PF.prepare_failed_cli.split(':')[0]
-    exp_conflict = PF.conflicting_controls.split('{')[0]
+    exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
+    exp_conflict = MF.conflicting_controls.split('{')[0]
 
     # Initial scenario fails: 2 of the new paths already exist.
     cli = CliRenamerSIO(
@@ -524,10 +524,10 @@ def test_wrapup_with_tb(tr):
     news = ('A1', 'A2', 'A3')
     args = origs + news
     fmts = (
-        PF.renaming_raised,
-        PF.log_writing_failed,
-        PF.path_collection_failed,
-        PF.plan_creation_failed,
+        MF.renaming_raised,
+        MF.log_writing_failed,
+        MF.path_collection_failed,
+        MF.plan_creation_failed,
     )
     for fmt in fmts:
         cli = CliRenamerSIO(*args, file_sys = origs, yes = True)
