@@ -186,8 +186,11 @@ def test_odd_number_inputs(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    # TODO: better way to check this string?
-    assert cli.err == 'Renaming preparation resulted in failures: (total 1, listed 1).\n\nGot an unequal number of original paths and new paths\n'
+    got = cli.err
+    exp1 = MF.prepare_failed_cli.split(CON.colon)[0]
+    exp2 = PF.parsing_imbalance
+    assert got.startswith(exp1)
+    assert exp2 in got
 
 def test_sources(tr):
     # Paths and args.

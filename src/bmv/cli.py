@@ -11,9 +11,8 @@ from textwrap import dedent
 from short_con import constants
 
 from .plan import RenamingPlan
-from .version import __version__
-
 from .problems import Problem, CONTROLS
+from .version import __version__
 
 from .utils import (
     BmvError,
@@ -36,7 +35,7 @@ def main(args = None, **kws):
     sys.exit(cli.exit_code)
 
 ####
-# A class to do the work of main() in way amenable to testing.
+# A class to do the work of main() in way amenable to convenient testing.
 ####
 
 class CliRenamer:
@@ -61,12 +60,17 @@ class CliRenamer:
         self.stdin = stdin
         self.logfh = logfh
 
-        # Data attributes that will be set during do_prepare().
+        # Attributes set during do_prepare():
+        # - Command-line arguments and options.
+        # - File path inputs from the user.
+        # - The RenamingPlan instance.
         self.opts = None
         self.inputs = None
         self.plan = None
 
-        # Status tracking attributes.
+        # Status tracking:
+        # - The exit_code attribute governs the self.done property
+        # - The other attributes ensure each run() sub-step executes only once.
         self.exit_code = None
         self.has_prepared = False
         self.has_renamed = False
@@ -125,12 +129,15 @@ class CliRenamer:
         # Prepare the RenamingPlan and halt if it failed.
         plan.prepare()
         if plan.failed:
-            msg = self.listing_msg(MF.prepare_failed_cli, plan.uncontrolled_problems)
+            msg = self.listing_msg(
+                MF.prepare_failed_cli,
+                plan.uncontrolled_problems,
+            )
             self.wrapup(CON.exit_fail, msg)
             return
 
         # Print the renaming listing.
-        listing = self.listing_msg('Paths to be renamed{}.\n', plan.rps)
+        listing = self.listing_msg(MF.paths_to_be_renamed, plan.rps)
         self.paginate(listing)
 
         # Stop if dryrun mode.
@@ -140,8 +147,8 @@ class CliRenamer:
 
         # User confirmation.
         if not opts.yes:
-            msg = self.msg_with_tallies('\nRename paths{}', plan.rps)
-            if not self.get_confirmation(msg, expected = 'yes'):
+            msg = self.msg_with_counts(MF.confirm_prompt, plan.rps)
+            if not self.get_confirmation(msg, expected = CON.yes):
                 self.wrapup(CON.exit_ok, MF.no_action_msg)
                 return
 
@@ -180,6 +187,9 @@ class CliRenamer:
         self.exit_code = code
 
     def wrapup_with_tb(self, fmt):
+        # Called in a raised-exception context.
+        # Takes a message format and builds a wrapup() message
+        # by adding the traceback.
         tb = traceback.format_exc()
         msg = fmt.format(tb)
         self.wrapup(CON.exit_fail, msg)
@@ -211,6 +221,7 @@ class CliRenamer:
 
         # Deal with special options that will lead to an early, successful exit.
         if opts.help:
+            # Capitalize the initial "Usage" and add the post_epilog text.
             msg = ''.join((
                 'U',
                 ap.format_help()[1:],
@@ -220,8 +231,7 @@ class CliRenamer:
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.version:
-            msg = f'{CON.app_name} v{__version__}'
-            self.wrapup(CON.exit_ok, msg)
+            self.wrapup(CON.exit_ok, MF.cli_version_msg)
             return None
 
         # Validate the options related to input sources and structures.
@@ -232,18 +242,23 @@ class CliRenamer:
             return opts
 
     def create_arg_parser(self):
+        # Define parser.
         ap = argparse.ArgumentParser(
             prog = CON.app_name,
             description = CLI.description,
             add_help = False,
         )
-        g = None
+        # Add arguments, in argument-groups.
+        # The presense of CLI.group in the configuration dict (oc)
+        # signals the start of each new argument-group.
+        arg_group = None
         for oc in CLI.opts_config:
             kws = dict(oc)
             if CLI.group in kws:
-                g = ap.add_argument_group(kws.pop(CLI.group))
+                arg_group = ap.add_argument_group(kws.pop(CLI.group))
             xs = kws.pop(CLI.names).split()
-            g.add_argument(*xs, **kws)
+            arg_group.add_argument(*xs, **kws)
+        # Return parser.
         return ap
 
     def validate_sources_structures(self, opts):
@@ -272,9 +287,9 @@ class CliRenamer:
                 msg = None
                 continue
 
-            # And then register the problem message.
-            choices = ', '.join(
-                ('' if nm == CLI.sources.paths else '--') + nm
+            # And then wrapup with the problem message.
+            choices = CON.comma_join.join(
+                ('' if nm == CLI.sources.paths else CON.dash) + nm
                 for nm in opt_names
             )
             msg = f'{msg}: {choices}'
@@ -286,7 +301,7 @@ class CliRenamer:
     ####
 
     def collect_input_paths(self):
-        # Get the input path text from the source.
+        # Gets the input path text from the source.
         # Returns a tuple of stripped lines.
         opts = self.opts
         if opts.paths:
@@ -318,6 +333,9 @@ class CliRenamer:
 
     @property
     def log_data(self):
+        # Returns dict of logging data:
+        # - Top-level CliRenamer info.
+        # - Plus information from the RenamingPlan.
         d = dict(
             version = __version__,
             current_directory = str(Path.cwd()),
@@ -329,32 +347,41 @@ class CliRenamer:
     @property
     def log_file_path(self):
         home = Path.home()
-        subdir = '.' + CON.app_name
-        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        return Path.home() / subdir / (now + '.json')
+        subdir = CON.period + CON.app_name
+        now = datetime.now().strftime(CON.datetime_fmt)
+        return Path.home() / subdir / (now + CON.logfile_ext)
 
     ####
     # Listings and pagination.
     ####
 
-    def msg_with_tallies(self, fmt, xs):
+    def msg_with_counts(self, fmt, xs):
+        # Takes a message format and a sequence of items.
         # Returns a message followed by two counts in parentheses:
-        # N items; and N items listed based on opts.limit.
+        # - N items
+        # - N items listed, based on opts.limit
         n = len(xs)
         lim = n if self.opts.limit is None else self.opts.limit
-        tallies = f' (total {n}, listed {lim})'
-        return fmt.format(tallies)
+        counts = f' (total {n}, listed {lim})'
+        return fmt.format(counts)
 
     def listing_msg(self, fmt, xs):
-        # Returns a message-with-tallies followed by a potentially-limited
-        # listing of RenamePair paths.
-        msg = self.msg_with_tallies(fmt, xs)
+        # Takes a message format and a sequence of items.
+        # Returns a message-with-counts followed by a potentially-limited
+        # listing of those items.
+        msg = self.msg_with_counts(fmt, xs)
         items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
         return f'{msg}\n{items}'
 
     def paginate(self, text):
+        # Takes some text and either send it to the
+        # configured pager or writes it to self.stdout.
         if self.opts.pager:
-            p = subprocess.Popen(self.opts.pager, stdin = subprocess.PIPE, shell = True)
+            p = subprocess.Popen(
+                self.opts.pager,
+                stdin = subprocess.PIPE,
+                shell = True,
+            )
             p.stdin.write(text.encode(CON.encoding))
             p.communicate()
         else:
@@ -372,7 +399,7 @@ class CliRenamer:
         return reply == expected
 
     def get_structure_from_opts(self):
-        # Determines the RenamingPlan.structure to use based on opts.
+        # Determines the RenamingPlan.structure to use, based on opts.
         for s in STRUCTURES.keys():
             if getattr(self.opts, s, None):
                 return s
@@ -385,27 +412,31 @@ class CliRenamer:
 class CLI:
 
     # Important option names or groups of options.
+
     paths = 'paths'
     sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
     structures = constants('Structures', ('rename',) + STRUCTURES.keys())
 
     # Program help text: description and explanatory text.
-    description = '''
+
+    description = dedent('''
         Renames or moves files in bulk, via user-supplied Python
         code or a data source mapping old paths to new paths.
-    '''
+    ''')
 
     post_epilog = dedent('''
         The user-supplied renaming and filtering code has access to the
         original file path as a str [variable: o], its pathlib.Path
         representation [variable: p], the current sequence value [variable:
-        seq], some Python libraries or classes [re, Path], and some utility
-        functions [strip_prefix]. The functions should explicitly return a
-        value: for renaming code, the desired new path, either as a str or a
-        Path; for filtering code, any true value to retain the original path or
-        any false value to reject it. The code should omit indentation on its
-        first line, but must provide it for subsequent lines. For reference,
-        some useful Path components: p.parent, p.name, p.stem, p.suffix.
+        seq], the RenamingPlan instance [variable: plan], some utility methods
+        via than plan [plan.strip_prefix], and some Python libraries or classes
+        [re, Path]. The functions should explicitly return a value: for
+        renaming code, the desired new path, either as a str or a Path; for
+        filtering code, any true value to retain the original path or any false
+        value to reject it. The code should omit indentation on its first line,
+        but must provide it for subsequent lines. For reference, here are some
+        useful Path components in a renaming context: p.parent, p.name, p.stem,
+        p.suffix.
 
         Before any renaming occurs, each pair of original and new paths is
         checked for common types of problems. By default, if any occur, the
@@ -435,8 +466,10 @@ class CLI:
     ''').lstrip()
 
     # Argument configuration for argparse.
+
     names = 'names'
     group = 'group'
+
     opts_config = (
 
         #

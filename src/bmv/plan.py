@@ -25,6 +25,7 @@ from .problems import (
 
 class RenamingPlan:
 
+    # Default value for entries in a fake file system.
     DEFAULT_FILE_SYS_VAL = True
 
     def __init__(self,
@@ -46,7 +47,7 @@ class RenamingPlan:
                  file_sys = None,
                  ):
 
-        # Input paths, input structure, and RenamePair instance.
+        # Input paths, input structure, and RenamePair instances.
         self.inputs = tuple(inputs)
         self.structure = structure or STRUCTURES.flat
         self.rps = tuple()
@@ -71,8 +72,8 @@ class RenamingPlan:
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
 
-        # Convert the problem-control inputs (skip, clobber, create) into
-        # validated tuples of problem names controlled by each mechanism.
+        # Convert the problem-control inputs (skip, clobber, create)
+        # into validated tuples of problem names.
         self.skip = self.validated_pnames(CONTROLS.skip, skip)
         self.clobber = self.validated_pnames(CONTROLS.clobber, clobber)
         self.create = self.validated_pnames(CONTROLS.create, create)
@@ -97,10 +98,14 @@ class RenamingPlan:
     #
     # Preparation before renaming.
     #
-    # This method perform various validations and computations needed before
-    # renaming can occur. The method does not raise; rather, when problems
-    # occur, they are stored in self.problems based whether/how the user
-    # has configured the plan to control them.
+    # This method performs various validations and computations needed before
+    # renaming can occur.
+    #
+    # The method does not return data; it sets self.rps.
+    #
+    # The method does not raise; rather, when problems occur, they are
+    # stored in self.problems based whether/how the user has configured
+    # the plan to control them.
     #
     ####
 
@@ -118,17 +123,17 @@ class RenamingPlan:
 
         # Create the renaming and filtering functions from
         # user-supplied code, if any was given.
-        self.rename_func = self.make_user_defined_func('rename')
-        self.filter_func = self.make_user_defined_func('filter')
+        self.rename_func = self.make_user_defined_func(CON.code_actions.rename)
+        self.filter_func = self.make_user_defined_func(CON.code_actions.filter)
         if self.failed:
             return
 
         # Run various steps that process the RenamePair instances individually:
-        # filtering, computing new paths, or validating.
+        # filtering, computing new paths, and validating.
         #
         # We use the processed_rps() method to execute the step, handle
-        # problems appropriately, and yield a potentially filtered collection
-        # of potentially modified RenamePair instances.
+        # problems appropriately, and yield a potentially-filtered collection
+        # of potentially-modified RenamePair instances.
         #
         rp_steps = (
             (None, self.execute_user_filter),
@@ -159,7 +164,10 @@ class RenamingPlan:
     ####
 
     def parse_inputs(self):
+        # Parses self.inputs. If valid, returns a tuple of RenamePair
+        # instances. Otherwise, registers a Problem and returns empty tuple.
 
+        # Helper to handle a Problem and return empty.
         def do_fail(name, *xs):
             p = Problem(name, *xs)
             self.handle_problem(p)
@@ -180,6 +188,8 @@ class RenamingPlan:
         # Otherwise, organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.paragraphs:
             # Paragraphs: first original paths, then new paths.
+            # - Group into non-empty vs empty lines.
+            # - Ensure exactly two groups of non-empty.
             groups = [
                 list(lines)
                 for g, lines in groupby(self.inputs, key = bool)
@@ -192,13 +202,12 @@ class RenamingPlan:
 
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
-            origs = []
-            news = []
-            current = origs
-            for line in self.inputs:
+            groups = [[], []]
+            for i, line in enumerate(self.inputs):
                 if line:
-                    current.append(line)
-                    current = news if current is origs else origs
+                    groups[i % 2].append(line)
+            origs, news = groups
+
         elif self.structure == STRUCTURES.rows:
             # Rows: original-new path pairs, as tab-delimited rows.
             origs = []
@@ -241,7 +250,7 @@ class RenamingPlan:
             return None
 
         # Define the text of the code.
-        func_name = f'do_{action}'
+        func_name = CON.func_name_fmt.format(action)
         code = CON.user_code_fmt.format(
             func_name = func_name,
             user_code = user_code,
@@ -270,21 +279,29 @@ class RenamingPlan:
     ####
 
     def processed_rps(self, step):
+        # Takes a "step", which is a RenamingPlan method.
+        # Executes that method for each RenamePair.
+        # Yields potentially-modified RenamePair instances,
+        # handling problems along the way.
+
+        # Prepare common-prefix and sequence numbering, which might
+        # be used by the user-suppled renaming/filtering code.
         self.prefix_len = self.compute_prefix_len()
         seq = self.compute_sequence_iterator()
+
         for rp in self.rps:
-            # The step() call returns a potentially modified RenamePair instance.
+            # The step() call returns a potentially-modified
+            # RenamePair instance or a Problem instance.
             #
-            #   - orig: never modified.
-            #   - new: set based on the user's renaming code.
-            #   - exclude: set true if user's filtering code rejected the instance.
-            #   - create_parent: can be set here if a controlled problem occurred.
-            #   - clobber: ditto.
+            # - orig: never modified.
+            # - new: set based on the user's renaming code.
+            # - exclude: set true if user's filtering code rejected the instance.
+            # - create_parent: can be set here if a controlled problem occurred.
+            # - clobber: ditto.
             #
 
-            # Check whether the RenamePair has a problem.
-            # If so, get the problem-control mechanism, if any.
-            # If not, set rp to the return result.
+            # Execute the step. If we get a Problem, handle it.
+            # Otherwise, set rp to the returned RenamePair.
             result = step(rp, next(seq))
             if isinstance(result, Problem):
                 control = self.handle_problem(result, rp = rp)
@@ -308,6 +325,8 @@ class RenamingPlan:
 
     ####
     # The steps that process RenamePair instance individually.
+    # Each step returns a Problem, the orignal RenamePair, or
+    # a modified RenamePair.
     ####
 
     def execute_user_filter(self, rp, seq_val):
@@ -350,19 +369,21 @@ class RenamingPlan:
 
     def check_new_not_exists(self, rp, seq_val):
         # The problem is conditional on ORIG and NEW being different
-        # to avoid pointless reporting of multiple problems in such cases.
+        # to avoid pointless reporting of multiple problems in cases
+        # where ORIG does not exist and where it equals NEW.
         if self.path_exists(rp.new) and not rp.equal:
             return Problem(PN.existing)
         else:
             return rp
 
     def check_new_parent_exists(self, rp, seq_val):
-        if self.path_exists(str(Path(rp.new).parent)):
+        if self.path_exists(Path(rp.new).parent):
             return rp
         else:
             return Problem(PN.parent)
 
     def prepare_new_groups(self):
+        # A preparation-step for check_new_collisions().
         # Organize rps into dict-of-list, keyed by the new path.
         self.new_groups = {}
         for rp in self.rps:
@@ -380,12 +401,20 @@ class RenamingPlan:
     ####
 
     def validated_pnames(self, control, pnames):
+        # Takes a CONTROLS name and a str or sequence of problem names.
+        # Validates that those names are appropropriate for the control.
+        # Also handles the "all" shortcut.
+        # Returns a tuple of validated problem names.
+
+        # Convert str to sequence.
         if isinstance(pnames, str):
             pnames = pnames.split()
 
+        # Stop if no problem names.
         if not pnames:
             return ()
 
+        # Check that the problem names are valid for the given control.
         all_choices = Problem.names_for(control)
         invalid = tuple(
             nm
@@ -393,8 +422,9 @@ class RenamingPlan:
             if not (nm in all_choices or nm == CON.all)
         )
 
+        # Either raise or return the validated tuple of problem names.
         if invalid:
-            pn = ', '.join(pnames)
+            pn = CON.comma_join.join(pnames)
             msg = MF.invalid_control.format(control, pn)
             raise BmvError(msg)
         elif CON.all in pnames:
@@ -403,6 +433,10 @@ class RenamingPlan:
             return tuple(pnames)
 
     def build_control_lookup(self):
+        # Uses the tuples in self.skip, self.create, and self.clobber to return
+        # a dict mapping each Problem name that the user wants to control to
+        # the desired control mechanism. Raises if the user tries to control
+        # the same Problem in different ways.
         lookup = {}
         for c in CONTROLS.keys():
             for pname in getattr(self, c):
@@ -413,15 +447,15 @@ class RenamingPlan:
                     lookup[pname] = c
         return lookup
 
-    def handle_problem(self, f, rp = None):
+    def handle_problem(self, p, rp = None):
         # Takes a Problem and optionally a RenamePair.
         #
-        # - Determines whether a problem-control is active for the Problem type.
-        # - Stores an Problem containing the Problem information and the RenamePair.
+        # - Determines whether a problem-control is active for the problem type.
+        # - Stores a new Problem containing original Problem info, plus the RenamePair.
         # - Returns the control (which might be None).
         #
-        control = self.control_lookup.get(f.name, None)
-        p = Problem(f.name, msg = f.msg, rp = rp)
+        control = self.control_lookup.get(p.name, None)
+        p = Problem(p.name, msg = p.msg, rp = rp)
         self.problems[control].append(p)
         return control
 
@@ -491,7 +525,7 @@ class RenamingPlan:
         else:
             self.has_renamed = True
 
-        # Ensure than we have prepare, and raise it failed.
+        # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
             raise BmvError(MF.prepare_failed, problems = self.problems[None])
@@ -538,8 +572,8 @@ class RenamingPlan:
                 for rp in self.rps
             ],
             problems = {
-                control : [asdict(f) for f in fs]
-                for control, fs in self.problems.items()
+                control : [asdict(p) for p in ps]
+                for control, ps in self.problems.items()
             },
         )
 

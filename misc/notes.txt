@@ -14,23 +14,12 @@ todos: TODOs
 --------
 
 Editing pass:
-
-    - Check for:
-        - clarity, simplicity, naming
-        - repetition
-        - comments
-        - problem-handling: short-circuiting, raising, messages.
-
-    - Files:
-        x utils.py
-        x problems.py
-        - cli.py
-        - plan.py
-        - test_cli.py
-        - test_plan.py
-
-    - Issues to be resolved:
-        ...
+    x utils.py
+    x problems.py
+    x cli.py
+    x plan.py
+    - test_cli.py
+    - test_plan.py
 
 Project name change: bmv => mvs.
     - Edit: setup.py [drop attrs].
@@ -39,6 +28,7 @@ Project name change: bmv => mvs.
 Logging: bootstrap (create $HOME/.bmv).
 
 Clipboard: generalize to avoid MacOS-specific stuff.
+    - Looks like pyperclip is the best option.
 
 User-supplied code for programmatic use: also accept functions.
 
