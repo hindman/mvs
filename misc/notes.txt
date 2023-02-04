@@ -13,14 +13,13 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Logging: bootstrap (create $HOME/.mvs).
+Basic changes before publication:
+    - Logging: bootstrap (create $HOME/.mvs).
+    - Clipboard: switch to pyperclip.
+    - User-supplied code via API: also accept functions.
+    - CLI help text: wrap post-epilog to terminal width.
 
-Clipboard: generalize to avoid MacOS-specific stuff.
-    - Looks like pyperclip is the best option.
-
-User-supplied code for programmatic use: also accept functions.
-
-Better handling of failures during renaming:
+Renaming failure handling:
     - Assume plan.rename_paths() raises somewhere in the middle.
     - User wants to know what was renamed, what not.
     - Possible plan:
@@ -33,11 +32,14 @@ Better handling of failures during renaming:
         - Raise the exception.
         - Tracking-data should be logged regardless of failure or success.
 
+Documentation:
+    - CLI help text
+    - README: CLI usage
+    - README: API usage
+    - Also see Usage section in this file, and eventually delete it.
+
 Publish:
-    - Documentation:
-        CLI help text.
-        README covering CLI and programmatic usage [see Usage section in this file].
-        setup.py classifiers
+    - setup.py: classifiers
     - Make repo public.
     - Version bump.
     - Publish.
@@ -49,6 +51,7 @@ road-map: Road map
 Case-change-only renamings.
     - Path(orig).rename(new): works
     - But existence checks do not respect case.
+    - This will vary by OS.
 
 Other operations:
     - copy: given old-paths, copy them to new-paths.
