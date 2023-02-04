@@ -214,6 +214,8 @@ class CliRenamer:
             opts = ap.parse_args(self.args)
         except SystemExit as e:
             msg = sys.stderr.getvalue()
+            if msg.startswith('usage:'):
+                msg = 'U' + msg[1:]
             self.wrapup(CON.exit_fail, msg)
             return None
         finally:

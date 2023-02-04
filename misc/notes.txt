@@ -13,14 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Editing pass:
-    x utils.py
-    x problems.py
-    x cli.py
-    x plan.py
-    - test_cli.py
-    - test_plan.py
-
 Project name change: bmv => mvs.
     - Edit: setup.py [drop attrs].
     - Re-create virtualenvs.

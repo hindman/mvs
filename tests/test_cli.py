@@ -73,7 +73,7 @@ def test_version_and_help(tr):
     cli.run()
     assert cli.success
     assert cli.err == ''
-    assert cli.out == f'{CON.app_name} v{__version__}\n'
+    assert cli.out == MF.cli_version_msg + CON.newline
 
     # Help.
     cli = CliRenamerSIO('bmv', '--version', '--help')
@@ -84,6 +84,8 @@ def test_version_and_help(tr):
     assert len(cli.out) > 3000
     for opt in ('--clipboard', '--paragraphs', '--rename'):
         assert f'\n  {opt}' in cli.out
+    for oc in CLI.opts_config:
+        assert oc['help'][0:40] in cli.out
 
 def test_indent_and_posint(tr):
     # Paths and args.
@@ -108,7 +110,7 @@ def test_indent_and_posint(tr):
         assert cli.out == ''
         exp = '--indent: invalid positive_int value'
         assert exp in cli.err
-        assert cli.err.startswith(f'usage: {CON.app_name}')
+        assert cli.err.startswith(f'Usage: {CON.app_name}')
 
 ####
 # Basic renaming usage.
@@ -293,7 +295,7 @@ def test_rename_paths_raises(tr):
     assert cli.success
     cli.check_file_sys(*news)
 
-    # Same thing. Calling the methods multiple times has no effect.
+    # Same thing. Calling the methods multiple times has no adverse effect.
     cli = CliRenamerSIO(*args, file_sys = origs)
     cli.do_prepare()
     cli.do_prepare()
@@ -309,7 +311,8 @@ def test_rename_paths_raises(tr):
     cli.plan.has_renamed = True
     cli.do_rename()
     assert cli.failure
-    assert cli.err.strip().startswith('Renaming raised an error')
+    exp = MF.renaming_raised.strip().split(CON.colon)[0]
+    assert cli.err.strip().startswith(exp)
     assert 'raise BmvError(MF.rename_done_already)' in cli.err
 
 def test_filter_all(tr):
@@ -360,7 +363,7 @@ def test_log(tr):
     assert cli.success
     cli.check_file_sys(*news)
 
-    # We can load its log file and check that its a dict
+    # We can load its log file and check that it is a dict
     # with some of the expected keys.
     got = json.loads(cli.log)
     assert got['version'] == __version__
@@ -522,7 +525,7 @@ def test_wrapup_with_tb(tr):
     # Excercises all calls of wrapup_with_tb() and checks for expected side
     # effects. Those branches are a hassle to reach during testing, are
     # unlikely to occur in real usage, and do nothing interesting other than
-    # call the method tested here. So they are ignored by test-coverage.
+    # call the method tested here. So they are pragma-ignored by test-coverage.
     origs = ('z1', 'z2', 'z3')
     news = ('A1', 'A2', 'A3')
     args = origs + news

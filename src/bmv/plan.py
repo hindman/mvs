@@ -214,8 +214,8 @@ class RenamingPlan:
             news = []
             for row in self.inputs:
                 if row:
-                    cells = list(filter(None, row.split(CON.tab)))
-                    if len(cells) == 2:
+                    cells = row.split(CON.tab)
+                    if len(cells) == 2 and all(cells):
                         origs.append(cells[0])
                         news.append(cells[1])
                     else:
