@@ -328,6 +328,7 @@ class CliRenamer:
 
     def write_to_json_file(self, path, d):
         try:
+            Path(path).parent.mkdir(exist_ok = True)
             with open(path, 'w') as fh:
                 json.dump(d, self.logfh or fh, indent = 4)
         except Exception as e: # pragma: no cover

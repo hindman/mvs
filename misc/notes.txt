@@ -14,7 +14,6 @@ todos: TODOs
 --------
 
 Basic changes before publication:
-    - Logging: bootstrap (create $HOME/.mvs).
     - User-supplied code via API: also accept functions.
     - CLI help text: wrap post-epilog to terminal width.
 
