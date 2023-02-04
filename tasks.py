@@ -22,15 +22,15 @@ import sys
 from invoke import task
 from pathlib import Path
 
-LIB = 'bmv'
+LIB = 'mvs'
 
 @task
 def tags(c):
     '''
     Run mtags for the project
     '''
-    c.run('mtags --recipe .bmvpy --write w')
-    c.run('mtags --recipe .bmvtxt --write u --toc order')
+    c.run('mtags --recipe .mvspy --write w')
+    c.run('mtags --recipe .mvstxt --write u --toc order')
 
 @task
 def test(c, func = None, cov = False, vv = False):

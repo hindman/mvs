@@ -13,7 +13,7 @@ from .version import __version__
 
 class CON:
     # Application configuration.
-    app_name = 'bmv'
+    app_name = 'mvs'
     encoding = 'utf-8'
 
     # Characters and simple tokens.
@@ -63,7 +63,7 @@ STRUCTURES = constants('Structures', (
 ####
 
 MSG_FORMATS = constants('MsgFormats', dict(
-    # BmvError instances in RenamingPlan.
+    # MvsError instances in RenamingPlan.
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem name(s) for {!r} control: {}',
@@ -89,7 +89,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
 # An exception class for the project.
 ####
 
-class BmvError(Kwexception):
+class MvsError(Kwexception):
     pass
 
 ####

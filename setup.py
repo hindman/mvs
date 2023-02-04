@@ -8,10 +8,10 @@ import sys
 # Basic project info.
 ####
 
-project_name = 'bmv'
+project_name = 'mvs'
 package_name = project_name.replace('-', '_')
 repo_name    = project_name
-description  = 'Bulk file renamer'
+description  = 'Because one mv is rarely enough'
 url          = 'https://github.com/hindman/' + repo_name
 author       = 'Monty Hindman'
 author_email = 'mhindman@gmail.com'
@@ -24,7 +24,6 @@ project_dir  = dirname(realpath(__file__))
 ####
 
 reqs = (
-    'attrs',
     'short-con',
     'kwexception',
 )
@@ -82,7 +81,7 @@ package_data = {
 
 entry_points = {
     'console_scripts': [
-        'bmv = bmv.cli:main',
+        f'{project_name} = {project_name}.cli:main',
     ],
 }
 

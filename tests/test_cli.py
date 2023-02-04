@@ -6,10 +6,10 @@ from io import StringIO
 from pathlib import Path
 from string import ascii_lowercase
 
-from bmv.cli import main, CliRenamer, CLI
-from bmv.problems import CONTROLS, PROBLEM_FORMATS as PF
-from bmv.utils import write_to_clipboard, CON, MSG_FORMATS as MF
-from bmv.version import __version__
+from mvs.cli import main, CliRenamer, CLI
+from mvs.problems import CONTROLS, PROBLEM_FORMATS as PF
+from mvs.utils import write_to_clipboard, CON, MSG_FORMATS as MF
+from mvs.version import __version__
 
 ####
 # Helper class to test CliRenamer instances.
@@ -69,14 +69,14 @@ class CliRenamerSIO(CliRenamer):
 
 def test_version_and_help(tr):
     # Version.
-    cli = CliRenamerSIO('bmv', '--version')
+    cli = CliRenamerSIO('mvs', '--version')
     cli.run()
     assert cli.success
     assert cli.err == ''
     assert cli.out == MF.cli_version_msg + CON.newline
 
     # Help.
-    cli = CliRenamerSIO('bmv', '--version', '--help')
+    cli = CliRenamerSIO('mvs', '--version', '--help')
     cli.run()
     assert cli.success
     assert cli.err == ''
@@ -313,7 +313,7 @@ def test_rename_paths_raises(tr):
     assert cli.failure
     exp = MF.renaming_raised.strip().split(CON.colon)[0]
     assert cli.err.strip().startswith(exp)
-    assert 'raise BmvError(MF.rename_done_already)' in cli.err
+    assert 'raise MvsError(MF.rename_done_already)' in cli.err
 
 def test_filter_all(tr):
     origs = ('a', 'b', 'c')

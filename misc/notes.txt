@@ -13,11 +13,19 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Project name change: bmv => mvs.
-    - Edit: setup.py [drop attrs].
+Project name change:
+
+    - Dir renames:
+        projectdir
+        src
+        $HOME/.mvs
+        git repo
+        git remotes
+        vim setup
+
     - Re-create virtualenvs.
 
-Logging: bootstrap (create $HOME/.bmv).
+Logging: bootstrap (create $HOME/.mvs).
 
 Clipboard: generalize to avoid MacOS-specific stuff.
     - Looks like pyperclip is the best option.
@@ -41,6 +49,7 @@ Publish:
     - Documentation:
         CLI help text.
         README covering CLI and programmatic usage [see Usage section in this file].
+        setup.py classifiers
     - Make repo public.
     - Version bump.
     - Publish.
@@ -87,7 +96,7 @@ usage: Usage
 
 Usage:
 
-    bmv SOURCE [STRUCTURE] [OTHER]
+    mvs SOURCE [STRUCTURE] [OTHER]
 
     PATHS     : positionals
     SOURCE    : PATHS | --stdin | --file PATH | --clipboard
@@ -110,7 +119,7 @@ Creating a new virtualenv:
     v='3.9.4'
     deactivate
     pyenv shell $v && pyenv versions
-    mkvirtualenv bmv-$v
+    mkvirtualenv mvs-$v
     pip install -U pip
     pip install -e .[dev,test] && pip list
 
@@ -118,7 +127,7 @@ Activate and run tests:
 
     - Basic:
 
-        workon bmv-3.9.4
+        workon mvs-3.9.4
         pytest -s -v tests/
 
     - With invoke:
@@ -143,9 +152,7 @@ Publish:
 
 Installing from test pypi:
 
-    pip install --index-url https://test.pypi.org/simple/ bmv
-    pip uninstall attrs short-con
-    pip install attrs short-con
+    pip install --index-url https://test.pypi.org/simple/ mvs
 
 Tag file creation:
 

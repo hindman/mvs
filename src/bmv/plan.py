@@ -9,7 +9,7 @@ from os.path import commonprefix
 from pathlib import Path
 
 from .utils import (
-    BmvError,
+    MvsError,
     CON,
     MSG_FORMATS as MF,
     RenamePair,
@@ -426,7 +426,7 @@ class RenamingPlan:
         if invalid:
             pn = CON.comma_join.join(pnames)
             msg = MF.invalid_control.format(control, pn)
-            raise BmvError(msg)
+            raise MvsError(msg)
         elif CON.all in pnames:
             return all_choices
         else:
@@ -442,7 +442,7 @@ class RenamingPlan:
             for pname in getattr(self, c):
                 if pname in lookup:
                     msg = MF.conflicting_controls.format(pname, lookup[pname], c)
-                    raise BmvError(msg)
+                    raise MvsError(msg)
                 else:
                     lookup[pname] = c
         return lookup
@@ -505,7 +505,7 @@ class RenamingPlan:
                     for path in file_sys
                 }
             except Exception as e:
-                raise BmvError.new(e, msg = MF.invalid_file_sys)
+                raise MvsError.new(e, msg = MF.invalid_file_sys)
 
     def path_exists(self, p):
         if self.file_sys is None:
@@ -521,14 +521,14 @@ class RenamingPlan:
     def rename_paths(self):
         # Don't rename more than once.
         if self.has_renamed:
-            raise BmvError(MF.rename_done_already)
+            raise MvsError(MF.rename_done_already)
         else:
             self.has_renamed = True
 
         # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
-            raise BmvError(MF.prepare_failed, problems = self.problems[None])
+            raise MvsError(MF.prepare_failed, problems = self.problems[None])
 
         # Rename paths.
         if self.file_sys is None:

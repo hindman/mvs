@@ -1,7 +1,9 @@
 
-# bmv
+# mvs
 
 ## Bulk file renamer
+
+Because one mv is rarely enough.
 
 --------
 

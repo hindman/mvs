@@ -15,7 +15,7 @@ from .problems import Problem, CONTROLS
 from .version import __version__
 
 from .utils import (
-    BmvError,
+    MvsError,
     CON,
     MSG_FORMATS as MF,
     STRUCTURES,
@@ -119,7 +119,7 @@ class CliRenamer:
                 create = opts.create,
             )
             plan = self.plan
-        except BmvError as e:
+        except MvsError as e:
             self.wrapup(CON.exit_fail, e.msg)
             return
         except Exception as e: # pragma: no cover

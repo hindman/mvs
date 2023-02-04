@@ -2,11 +2,11 @@ import pytest
 from itertools import chain
 
 # Top-level package imports.
-from bmv import RenamingPlan, BmvError, __version__
+from mvs import RenamingPlan, MvsError, __version__
 
 # Imports for testing.
-from bmv.utils import CON, STRUCTURES, MSG_FORMATS as MF
-from bmv.problems import (
+from mvs.utils import CON, STRUCTURES, MSG_FORMATS as MF
+from mvs.problems import (
     CONTROLLABLES,
     CONTROLS,
     PROBLEM_NAMES as PN,
@@ -20,7 +20,7 @@ from bmv.problems import (
 def test_top_level_imports(tr):
     # Do something simple with each top-level import.
     assert 'a' in RenamingPlan(inputs = ('a', 'b')).inputs
-    assert BmvError('foo', x = 1).msg == 'foo'
+    assert MvsError('foo', x = 1).msg == 'foo'
     assert isinstance(__version__, str)
 
 ####
@@ -54,7 +54,7 @@ def test_no_inputs(tr):
         structure = STRUCTURES.flat,
         file_sys = [],
     )
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parsing_no_paths)
 
@@ -103,7 +103,7 @@ def test_structure_paragraphs(tr):
         structure = STRUCTURES.paragraphs,
         file_sys = origs,
     )
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parsing_paragraphs)
 
@@ -139,7 +139,7 @@ def test_structure_pairs(tr):
         structure = STRUCTURES.pairs,
         file_sys = origs,
     )
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parsing_imbalance)
 
@@ -166,7 +166,7 @@ def test_structure_rows(tr):
             structure = STRUCTURES.rows,
             file_sys = origs,
         )
-        with pytest.raises(BmvError) as einfo:
+        with pytest.raises(MvsError) as einfo:
             plan.rename_paths()
         assert_failed_because(einfo, plan, PN.parsing_row)
 
@@ -207,7 +207,7 @@ def test_code_compilation_fails(tr):
 
     # Helper to check the plan's failures.
     def do_checks(p):
-        with pytest.raises(BmvError) as einfo:
+        with pytest.raises(MvsError) as einfo:
             p.rename_paths()
         assert einfo.value.params['msg'] == MF.prepare_failed
         f = p.uncontrolled_problems[0]
@@ -246,7 +246,7 @@ def test_code_execution_fails(tr):
     # Helper try to rename paths and then check the plan's failures.
     def do_checks(plan, pname):
         plan.prepare()
-        with pytest.raises(BmvError) as einfo:
+        with pytest.raises(MvsError) as einfo:
             plan.rename_paths()
         assert_failed_because(einfo, plan, pname)
         fails = plan.uncontrolled_problems
@@ -341,7 +341,7 @@ def test_file_sys_arg(tr):
     assert plan.file_sys is not file_sys
 
     # Pass non-iterable as a file_sys.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan = RenamingPlan(
             inputs = origs + news,
             structure = STRUCTURES.flat,
@@ -410,7 +410,7 @@ def test_prepare_rename_multiple_times(tr):
     assert tuple(plan.file_sys) == news
 
     # Cannot call rename_paths multiple times.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert einfo.value.params['msg'] == MF.rename_done_already
 
@@ -457,7 +457,7 @@ def test_invalid_controls(tr):
     )
     for pname, *controls in checks:
         control_params = {c : pname for c in controls}
-        with pytest.raises(BmvError) as einfo:
+        with pytest.raises(MvsError) as einfo:
             plan = RenamingPlan(**common, **control_params)
         msg = einfo.value.params['msg']
         exp = MF.conflicting_controls.format(pname, *controls)
@@ -471,7 +471,7 @@ def test_invalid_controls(tr):
     )
     for pname, control in checks:
         control_params = {control : pname}
-        with pytest.raises(BmvError) as einfo:
+        with pytest.raises(MvsError) as einfo:
             plan = RenamingPlan(**common, **control_params)
         msg = einfo.value.params['msg']
         exp = MF.invalid_control.format(control, pname)
@@ -495,7 +495,7 @@ def test_equal(tr):
 
     # Renaming will raise.
     plan.prepare()
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.equal)
 
@@ -528,7 +528,7 @@ def test_missing_orig(tr):
     assert plan.failed
 
     # Renaming will raise.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.missing)
 
@@ -561,7 +561,7 @@ def test_new_exists(tr):
     assert plan.failed
 
     # Renaming will raise.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.existing)
 
@@ -606,7 +606,7 @@ def test_new_parent_missing(tr):
     assert plan.failed
 
     # Renaming will raise.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.parent)
 
@@ -650,7 +650,7 @@ def test_news_collide(tr):
     assert plan.failed
 
     # Renaming will raise.
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.colliding)
 
@@ -689,7 +689,7 @@ def test_failures_skip_all(tr):
 
     # Renaming will raise because everything is skipped.
     plan.prepare()
-    with pytest.raises(BmvError) as einfo:
+    with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_failed_because(einfo, plan, PN.all_filtered)
 

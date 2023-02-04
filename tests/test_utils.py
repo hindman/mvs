@@ -1,6 +1,6 @@
 import pytest
 
-from bmv.utils import RenamePair
+from mvs.utils import RenamePair
 
 def test_rename_pair(tr):
     rp = RenamePair('a', 'b')
