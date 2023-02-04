@@ -24,8 +24,9 @@ project_dir  = dirname(realpath(__file__))
 ####
 
 reqs = (
-    'short-con',
     'kwexception',
+    'pyperclip',
+    'short-con',
 )
 
 extras = {

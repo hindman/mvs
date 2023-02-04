@@ -1,4 +1,4 @@
-import subprocess
+import pyperclip
 
 from dataclasses import dataclass
 from kwexception import Kwexception
@@ -122,21 +122,10 @@ def read_from_file(path):
         return fh.read()
 
 def read_from_clipboard():
-    cp = subprocess.run(
-        [CON.default_paste_cmd],
-        capture_output = True,
-        check = True,
-        text = True,
-    )
-    return cp.stdout
+    return pyperclip.paste()
 
 def write_to_clipboard(text):
-    subprocess.run(
-        [CON.default_copy_cmd],
-        check = True,
-        text = True,
-        input = text,
-    )
+    pyperclip.copy(text)
 
 ####
 # Other.
