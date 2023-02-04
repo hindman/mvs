@@ -18,6 +18,8 @@ class CON:
 
     # Characters and simple tokens.
     newline = '\n'
+    para_break = newline + newline
+    space = ' '
     tab = '\t'
     colon = ':'
     period = '.'
@@ -138,4 +140,42 @@ def positive_int(x):
         if x >= 1:
             return x
     raise ValueError
+
+def wrap_text(text, width):
+    # Takes some text and a max width.
+    # Wraps the text to the desired width and returns it.
+
+    # Convenience vars.
+    NL = CON.newline
+    SP = CON.space
+
+    # Split text into words. If none, return immediately.
+    words = [
+        w
+        for line in text.split(NL)
+        for w in line.strip().split(SP)
+    ]
+    if not words: # pragma: no cover
+        return ''
+
+    # Assemble the words into a list-of-list, where each
+    # inner list will become a line within the width limit.
+    lines = [[]]
+    tot = 0
+    for w in words:
+        n = len(w)
+        if n == 0: # pragma: no cover
+            continue
+        elif tot + n + 1 <= width:
+            lines[-1].append(w)
+            tot += n + 1
+        else:
+            lines.append([w])
+            tot = n
+
+    # Join the words back into a paragraph of text.
+    return NL.join(
+        SP.join(line)
+        for line in lines
+    )
 

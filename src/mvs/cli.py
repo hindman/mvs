@@ -22,6 +22,7 @@ from .utils import (
     positive_int,
     read_from_clipboard,
     read_from_file,
+    wrap_text,
 )
 
 ####
@@ -223,13 +224,12 @@ class CliRenamer:
 
         # Deal with special options that will lead to an early, successful exit.
         if opts.help:
-            # Capitalize the initial "Usage" and add the post_epilog text.
-            msg = ''.join((
-                'U',
-                ap.format_help()[1:],
-                CON.newline,
-                CLI.post_epilog,
-            ))
+            # Capitalize the initial "Usage".
+            msg = 'U' + ap.format_help()[1:]
+            self.wrapup(CON.exit_ok, msg)
+            return None
+        elif opts.details:
+            msg = self.wrapped_post_eplilog(ap)
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.version:
@@ -297,6 +297,22 @@ class CliRenamer:
             msg = f'{msg}: {choices}'
             self.wrapup(CON.exit_fail, msg)
             return
+
+    def wrapped_post_eplilog(self, ap):
+        # Use the argparse help text to compute the desired width.
+        lines = ap.format_help().split(CON.newline)
+        width = max(len(line) for line in lines)
+
+        # Split the post-epilog into paragraphs.
+        # Wrap the paragraph unless it is a heading or indented.
+        paras = []
+        for p in CLI.post_epilog.split(CON.para_break):
+            if not p.startswith('  ') and not p.endswith('----'):
+                p = wrap_text(p, width)
+            paras.append(p)
+
+        # Join the paragraphs back into a block of text.
+        return CON.para_break.join(paras)
 
     ####
     # Input path collection.
@@ -428,44 +444,76 @@ class CLI:
     ''')
 
     post_epilog = dedent('''
-        The user-supplied renaming and filtering code has access to the
-        original file path as a str [variable: o], its pathlib.Path
-        representation [variable: p], the current sequence value [variable:
-        seq], the RenamingPlan instance [variable: plan], some utility methods
-        via than plan [plan.strip_prefix], and some Python libraries or classes
-        [re, Path]. The functions should explicitly return a value: for
-        renaming code, the desired new path, either as a str or a Path; for
-        filtering code, any true value to retain the original path or any false
-        value to reject it. The code should omit indentation on its first line,
-        but must provide it for subsequent lines. For reference, here are some
-        useful Path components in a renaming context: p.parent, p.name, p.stem,
-        p.suffix.
+        User-supplied code
+        ------------------
+
+        The user-supplied renaming and filtering code receives the following
+        variables as arguments:
+
+          o     Original path.
+          p     Original path, as a pathlib.Path instance.
+          seq   Current sequence value.
+          plan  RenamingPlan instance.
+
+        The code also has access to these Python libraries or classes:
+
+          re    Python re library.
+          Path  Python pathlib.Path class.
+
+        The RenamingPlan provides the strip_prefix() method, which takes a str
+        (presumably the original path) and returns a new str with the common
+        prefix (across all original paths) removed.
+
+        User-supplied code should explictly return a value, as follows:
+
+          Renaming   New path, as a str or Path.
+          Filtering  True to retain original path, False to reject
+
+        The code text does not require indentation for its first line,
+        but does require it for any subsequent lines.
+
+        For reference, here are some useful Path components in a renaming
+        context: p.parent, p.name, p.stem, p.suffix.
+
+        Problem control
+        ---------------
 
         Before any renaming occurs, each pair of original and new paths is
         checked for common types of problems. By default, if any occur, the
         renaming plan is halted and no paths are renamed. The problems and
         their short names are as follows:
 
-            equal     | Original path and new path are the same.
-            missing   | Original path does not exist.
-            existing  | New path already exists.
-            colliding | Two or more new paths are the same.
-            parent    | Parent directory of new path does not exist.
+          equal      Original path and new path are the same.
+          missing    Original path does not exist.
+          existing   New path already exists.
+          colliding  Two or more new paths are the same.
+          parent     Parent directory of new path does not exist.
 
         Users can configure various problem controls to address such issues.
         That allows the renaming plan to proceed in spite of the problems,
-        either by skipping offending items, taking remedial action, or simply
-        forging ahead in spite of the consequences. The --create control
-        applies only to a single type of problem (parent), the --clobber
-        control can apply to two (existing, colliding), and the --skip control
-        can apply to any or all. Here are some examples to illustrate usage:
+        either by skipping offending items, taking remedial action (creating a
+        missing parent for a new path), or simply forging ahead in spite of the
+        consequences (clobbering).
 
-            --skip equal         | Skip items with 'equal' problem.
-            --skip equal missing | Skip items with 'equal' or 'missing' problems.
-            --skip all           | Skip items with any type of problem.
-            --clobber all        | Rename in spite of 'existing' and 'colliding' problems.
-            --create parent      | Create missing parent before renaming.
-            --create             | Same thing, more compactly.
+        The controls and their applicable problems:
+
+          skip     All of them.
+          create   parent.
+          clobber  existing, colliding.
+
+        Examples:
+
+          # Skipping items with specific problems.
+          --skip equal
+          --skip equal missing
+
+          # Shortcut to control all applicable problems.
+          --skip all
+          --clobber all
+
+          # Creating missing parents before renaming.
+          --create parent
+          --create
     ''').lstrip()
 
     # Argument configuration for argparse.
@@ -636,6 +684,11 @@ class CLI:
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
+        },
+        {
+            names: '--details',
+            'action': 'store_true',
+            'help': 'Display additional help details and exit',
         },
         {
             names: '--version',

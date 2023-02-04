@@ -81,11 +81,18 @@ def test_version_and_help(tr):
     assert cli.success
     assert cli.err == ''
     assert cli.out.startswith(f'Usage: {CON.app_name}')
-    assert len(cli.out) > 3000
+    assert len(cli.out) > 2000
     for opt in ('--clipboard', '--paragraphs', '--rename'):
         assert f'\n  {opt}' in cli.out
     for oc in CLI.opts_config:
         assert oc['help'][0:40] in cli.out
+
+    # Details.
+    cli = CliRenamerSIO('mvs', '--details')
+    cli.run()
+    assert cli.success
+    assert cli.err == ''
+    assert cli.out.split() == CLI.post_epilog.split()
 
 def test_indent_and_posint(tr):
     # Paths and args.

@@ -13,9 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Basic changes before publication:
-    - CLI help text: wrap post-epilog to terminal width.
-
 Renaming failure handling:
     - Assume plan.rename_paths() raises somewhere in the middle.
     - User wants to know what was renamed, what not.
