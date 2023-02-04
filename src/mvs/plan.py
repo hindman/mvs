@@ -249,6 +249,10 @@ class RenamingPlan:
         if not user_code:
             return None
 
+        # If the user code is already a callable, just return it.
+        if callable(user_code):
+            return user_code
+
         # Define the text of the code.
         func_name = CON.func_name_fmt.format(action)
         code = CON.user_code_fmt.format(

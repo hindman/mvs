@@ -116,22 +116,47 @@ def test_indent_and_posint(tr):
 # Basic renaming usage.
 ####
 
-def test_basic_use_case(tr):
+def test_basic_use_cases(tr):
+    # Paths and arguments.
     origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    kws = dict(file_sys = origs, yes = True)
+
+    # Helper to run the renaming and check stuff.
+    def do_checks(cli):
+        cli.run()
+        assert cli.success
+        cli.check_file_sys(*news)
+        assert cli.err == ''
+        got = cli.out.replace(' \n', '\n\n', 1)
+        exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
+        assert got == exp
+
+    # Basic use case: renaming via code.
     cli = CliRenamerSIO(
         '--rename',
         'return o + o',
         *origs,
-        file_sys = origs,
-        yes = True,
+        **kws,
     )
-    cli.run()
-    assert cli.success
-    cli.check_file_sys('aa', 'bb', 'cc')
-    assert cli.err == ''
-    got = cli.out.replace(' \n', '\n\n', 1)
-    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
-    assert got == exp
+    do_checks(cli)
+
+    # Basic use case: flat structure passed explicitly.
+    cli = CliRenamerSIO(
+        '--flat',
+        *origs,
+        *news,
+        **kws,
+    )
+    do_checks(cli)
+
+    # Basic use case: flat structure as the default.
+    cli = CliRenamerSIO(
+        *origs,
+        *news,
+        **kws,
+    )
+    do_checks(cli)
 
 ####
 # Input paths and sources.

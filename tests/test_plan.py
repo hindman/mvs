@@ -175,16 +175,22 @@ def test_structure_rows(tr):
 ####
 
 def test_renaming_code(tr):
-    # Basic use case: generate new-paths via user-supplied code.
+    # Paths and three variants of renaming code.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    plan = RenamingPlan(
-        inputs = origs,
-        rename_code = 'return o + o',
-        file_sys = origs,
-    )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    code_str = 'return o + o'
+    code_lambda = lambda o, p, seq, plan: o + o
+    def code_func(o, p, seq, plan): return o + o
+
+    # Basic use case: generate new-paths via user-supplied code.
+    for code in (code_str, code_lambda, code_func):
+        plan = RenamingPlan(
+            inputs = origs,
+            rename_code = code,
+            file_sys = origs,
+        )
+        plan.rename_paths()
+        assert tuple(plan.file_sys) == news
 
 def test_filtering_code(tr):
     # Basic use case: filter orig-paths with user-supplied code.

@@ -14,7 +14,6 @@ todos: TODOs
 --------
 
 Basic changes before publication:
-    - User-supplied code via API: also accept functions.
     - CLI help text: wrap post-epilog to terminal width.
 
 Renaming failure handling:
