@@ -13,18 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Project name change:
-
-    - Dir renames:
-        projectdir
-        src
-        $HOME/.mvs
-        git repo
-        git remotes
-        vim setup
-
-    - Re-create virtualenvs.
-
 Logging: bootstrap (create $HOME/.mvs).
 
 Clipboard: generalize to avoid MacOS-specific stuff.
