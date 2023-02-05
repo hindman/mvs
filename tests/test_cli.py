@@ -1,3 +1,8 @@
+
+# test_e2e_basic_rename
+# test_e2e_create_parent
+# test_e2e_clobber
+
 import json
 import pytest
 import re
@@ -56,12 +61,30 @@ class CliRenamerSIO(CliRenamer):
     def err(self):
         return self.stderr.getvalue()
 
-    @property
-    def log(self):
-        return self.logfh.getvalue()
+    def log(self, log_type = None):
+        text = self.logfh.getvalue()
+        if log_type is None:
+            return text
+        else:
+            return parse_log(text, log_type)
 
     def check_file_sys(self, *paths):
         assert tuple(self.plan.file_sys) == paths
+
+def parse_log(text, log_type):
+    # Find the index of the divider between the two logging calls.
+    try:
+        i = text.index('\n}{\n') + 2
+    except ValueError:
+        i = len(text)
+
+    # Partition the text into the two logs and return
+    # the requested one.
+    logs = {
+        CliRenamer.LOG_TYPE.plan:     text[0 : i],
+        CliRenamer.LOG_TYPE.tracking: text[i : None],
+    }
+    return logs[log_type]
 
 ####
 # Command-line arguments and options.
@@ -195,7 +218,7 @@ def test_no_input_paths(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    assert cli.log == ''
+    assert cli.log() == ''
     assert cli.err.startswith(MF.opts_require_one)
     for name in CLI.sources.keys():
         assert name in cli.err
@@ -210,7 +233,7 @@ def test_no_input_paths(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    assert cli.log == ''
+    assert cli.log() == ''
     assert PF.parsing_no_paths in cli.err
 
 def test_odd_number_inputs(tr):
@@ -310,8 +333,8 @@ def test_no_confirmation(tr):
 
 def test_rename_paths_raises(tr):
     # Paths and args.
-    origs = ('z1', 'z2')
-    news = ('z1x', 'z2x')
+    origs = ('z1', 'z2', 'z3')
+    news = ('ZZ1', 'ZZ2', 'ZZ3')
     args = origs + news + ('--yes',)
 
     # A working scenario.
@@ -320,14 +343,14 @@ def test_rename_paths_raises(tr):
     assert cli.success
     cli.check_file_sys(*news)
 
-    # Same thing, but using do_prepare() and do_rename().
+    # Same scenario, but using do_prepare() and do_rename().
     cli = CliRenamerSIO(*args, file_sys = origs)
     cli.do_prepare()
     cli.do_rename()
     assert cli.success
     cli.check_file_sys(*news)
 
-    # Same thing. Calling the methods multiple times has no adverse effect.
+    # Same scenario. Calling the methods multiple times has no adverse effect.
     cli = CliRenamerSIO(*args, file_sys = origs)
     cli.do_prepare()
     cli.do_prepare()
@@ -336,16 +359,36 @@ def test_rename_paths_raises(tr):
     assert cli.success
     cli.check_file_sys(*news)
 
-    # Same thing, but we will set plan.has_renamed to trigger an exception
-    # when plan.rename_paths() is called.
+    # Helper to format expected error text for subsequent checks.
+    def exp_err_text(tracking_index):
+        msg = MF.renaming_raised.format(tracking_index)
+        return msg.strip().split(CON.colon)[0]
+
+    # Same scenario, but we will set plan.has_renamed to trigger
+    # an exception when plan.rename_paths() is called.
     cli = CliRenamerSIO(*args, file_sys = origs)
     cli.do_prepare()
     cli.plan.has_renamed = True
     cli.do_rename()
     assert cli.failure
-    exp = MF.renaming_raised.strip().split(CON.colon)[0]
+    exp = exp_err_text(cli.plan.TRACKING.not_started)
     assert cli.err.strip().startswith(exp)
     assert 'raise MvsError(MF.rename_done_already)' in cli.err
+
+    # Same scenario, but this time we will trigger the exception via
+    # the raise_at attribute, so we can check the tracking_index in
+    # the tracking log and in the command-line error message.
+    n = 1
+    cli = CliRenamerSIO(*args, file_sys = origs)
+    cli.do_prepare()
+    cli.plan.raise_at = n
+    cli.do_rename()
+    assert cli.failure
+    got = json.loads(cli.log(cli.LOG_TYPE.tracking))
+    assert got == dict(tracking_index = n)
+    exp = exp_err_text(n)
+    assert cli.err.strip().startswith(exp)
+    assert 'ZeroDivisionError: SIMULATED_ERROR' in cli.err
 
 def test_filter_all(tr):
     origs = ('a', 'b', 'c')
@@ -375,7 +418,7 @@ def test_filter_all(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    assert cli.log == ''
+    assert cli.log() == ''
     assert cli.err.startswith(exp_cli_prep)
     assert PF.all_filtered in cli.err
 
@@ -397,11 +440,15 @@ def test_log(tr):
 
     # We can load its log file and check that it is a dict
     # with some of the expected keys.
-    got = json.loads(cli.log)
+    got = json.loads(cli.log(cli.LOG_TYPE.plan))
     assert got['version'] == __version__
     ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'problems']
     for k in ks:
         assert k in got
+
+    # Also check the tracking log.
+    got = json.loads(cli.log(cli.LOG_TYPE.tracking))
+    assert tuple(got) == ('tracking_index',)
 
 def test_pagination(tr):
     # Paths.
@@ -462,9 +509,13 @@ def check_main_outputs(fhs):
     assert err == ''
     assert 'Paths renamed.' in out
     assert 'Paths to be renamed (total' in out
-    d = json.loads(fhs['logfh'])
+    log_plan = parse_log(fhs['logfh'], CliRenamer.LOG_TYPE.plan)
+    log_tracking = parse_log(fhs['logfh'], CliRenamer.LOG_TYPE.tracking)
+    d = json.loads(log_plan)
     assert 'version' in d
     assert 'opts' in d
+    d = json.loads(log_tracking)
+    assert 'tracking_index' in d
 
 def test_e2e_basic_rename(tr):
     # End to end: basic renaming scenario.
@@ -544,7 +595,7 @@ def test_some_failed_rps(tr):
     cli.run()
     assert cli.failure
     assert cli.out == ''
-    assert cli.log == ''
+    assert cli.log() == ''
     assert cli.err.startswith(exp_conflict)
     assert CONTROLS.skip in cli.err
     assert CONTROLS.clobber in cli.err
@@ -575,7 +626,7 @@ def test_wrapup_with_tb(tr):
         assert cli.exit_code == CON.exit_fail
         assert cli.done is True
         assert cli.out == ''
-        assert cli.log == ''
+        assert cli.log() == ''
         exp = fmt.split('{')[0]
         assert exp in cli.err
 

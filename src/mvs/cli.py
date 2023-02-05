@@ -41,6 +41,11 @@ def main(args = None, **kws):
 
 class CliRenamer:
 
+    LOG_TYPE = constants('LogType', (
+        'plan',
+        'tracking',
+    ))
+
     ####
     # Initializer.
     ####
@@ -71,8 +76,10 @@ class CliRenamer:
 
         # Status tracking:
         # - The exit_code attribute governs the self.done property
-        # - The other attributes ensure each run() sub-step executes only once.
+        # - Datetime when first log file was written.
+        # - Attributes ensure each run() sub-step executes only once.
         self.exit_code = None
+        self.logged_at = None
         self.has_prepared = False
         self.has_renamed = False
 
@@ -154,8 +161,7 @@ class CliRenamer:
                 return
 
         # Log the renamings.
-        if not opts.nolog:
-            self.write_to_json_file(self.log_file_path, self.log_data)
+        self.write_to_json_file(self.LOG_TYPE.plan)
 
     def do_rename(self):
         # Don't execute more than once.
@@ -169,7 +175,10 @@ class CliRenamer:
             self.plan.rename_paths()
             self.wrapup(CON.exit_ok, MF.paths_renamed_msg)
         except Exception as e: # pragma: no cover
-            self.wrapup_with_tb(MF.renaming_raised)
+            msg = MF.renaming_raised.format(self.plan.tracking_index)
+            self.wrapup_with_tb(msg)
+        finally:
+            self.write_to_json_file(self.LOG_TYPE.tracking)
 
     ####
     # Helpers to finish or cut-short the run() sub-steps.
@@ -342,7 +351,19 @@ class CliRenamer:
     # Logging.
     ####
 
-    def write_to_json_file(self, path, d):
+    def write_to_json_file(self, log_type):
+        # Bail if we aren't logging. Otherwise, prepare the log
+        # file path and logging data. On the first logging call
+        # we also set self.logged_at (the datetime to used
+        # in both logging calls).
+        if self.opts.nolog: # pragma: no cover
+            return
+        else:
+            self.logged_at = self.logged_at or datetime.now()
+            path = self.log_file_path(log_type)
+            d = self.log_data(log_type)
+
+        # Try to write the logging data.
         try:
             Path(path).parent.mkdir(exist_ok = True)
             with open(path, 'w') as fh:
@@ -350,25 +371,26 @@ class CliRenamer:
         except Exception as e: # pragma: no cover
             self.wrapup_with_tb(MF.log_writing_failed)
 
-    @property
-    def log_data(self):
-        # Returns dict of logging data:
-        # - Top-level CliRenamer info.
-        # - Plus information from the RenamingPlan.
-        d = dict(
-            version = __version__,
-            current_directory = str(Path.cwd()),
-            opts = vars(self.opts),
-        )
-        d.update(**self.plan.as_dict)
-        return d
-
-    @property
-    def log_file_path(self):
+    def log_file_path(self, log_type):
         home = Path.home()
         subdir = CON.period + CON.app_name
-        now = datetime.now().strftime(CON.datetime_fmt)
-        return Path.home() / subdir / (now + CON.logfile_ext)
+        now = self.logged_at.strftime(CON.datetime_fmt)
+        return Path.home() / subdir / f'{now}-{log_type}.{CON.logfile_ext}'
+
+    def log_data(self, log_type):
+        # Returns a dict of logging data containing either:
+        # (1) the RenamingPlan tracking index or
+        # (2) the top-level CliRenamer info plus the RenamingPlan info.
+        if log_type == self.LOG_TYPE.tracking:
+            return dict(tracking_index = self.plan.tracking_index)
+        else:
+            d = dict(
+                version = __version__,
+                current_directory = str(Path.cwd()),
+                opts = vars(self.opts),
+            )
+            d.update(**self.plan.as_dict)
+            return d
 
     ####
     # Listings and pagination.

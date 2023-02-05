@@ -13,23 +13,9 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Renaming failure handling:
-    - Assume plan.rename_paths() raises somewhere in the middle.
-    - User wants to know what was renamed, what not.
-    - Possible plan:
-        - Log before starting renaming.
-        - Start.
-        - Maintain tracking-data on renamings as they occur.
-        - Failure happens.
-        - Try to log state: failure info and tracking-data.
-        - Assemble an exception summarizing what happened.
-        - Raise the exception.
-        - Tracking-data should be logged regardless of failure or success.
-        - Complication: logging is done by CliRenamer, not RenamingPlan.
-            - That implies that RenamingPlan should manage tracking-data.
-            - And CliRenamer should use the data for its logging.
-            - In API use case, it's up to the programmer to catch
-              MvsError and do something with tracking-data if they care to.
+Logging: what is creating all of the empty log files?
+
+CLI: --clobber all is rejected by argparse.
 
 Documentation:
     - CLI help text

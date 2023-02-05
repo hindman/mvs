@@ -372,6 +372,7 @@ def test_plan_as_dict(tr):
         'problems',
         'prefix_len',
         'rename_pairs',
+        'tracking_index',
     ))
 
     # Set up plan.

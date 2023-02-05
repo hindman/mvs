@@ -7,6 +7,7 @@ from dataclasses import asdict, replace as clone
 from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
+from short_con import constants
 
 from .utils import (
     MvsError,
@@ -27,6 +28,21 @@ class RenamingPlan:
 
     # Default value for entries in a fake file system.
     DEFAULT_FILE_SYS_VAL = True
+
+    # Special values used by self.tracking_index.
+    #
+    # During rename_paths(), we track progress via self.tracking_index. It has
+    # two special values (shown below in TRACKING). Otherwise, a non-negative
+    # value indicates which RenamePair we are currently trying to rename. If an
+    # unexpected failure occurs, that index tells us which RenamePair failed.
+    # API users of RenamingPlan who care can catch the exception and infer
+    # which paths were renamed and which were not. Similarly, CliRenamer logs
+    # the necessary information to figure that out.
+    #
+    TRACKING = constants('Tracking', dict(
+        not_started = -1,
+        done = None,
+    ))
 
     def __init__(self,
                  # Path inputs and their structure.
@@ -65,6 +81,8 @@ class RenamingPlan:
         # Plan state.
         self.has_prepared = False
         self.has_renamed = False
+        self.tracking_index = self.TRACKING.not_started
+        self.raise_at = None
 
         # Fake file system injected for testing purposes.
         self.file_sys = self.initialize_file_sys(file_sys)
@@ -535,19 +553,31 @@ class RenamingPlan:
             raise MvsError(MF.prepare_failed, problems = self.problems[None])
 
         # Rename paths.
-        if self.file_sys is None:
-            # On the real file system.
-            for rp in self.rps:
-                if rp.create_parent:
-                    Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
-                Path(rp.orig).rename(rp.new)
+        use_real_fs = self.file_sys is None
+        for i, rp in enumerate(self.rps):
+            self.tracking_index = i
+            self.do_rename(rp, use_real_fs)
+        self.tracking_index = self.TRACKING.done
+
+    def do_rename(self, rp, use_real_fs):
+        # Takes a RenamePair and executes its renaming, either on the
+        # real file system or the fake one.
+
+        # For testing purposes, raise a simulated error at
+        # the desired tracking_index.
+        if self.tracking_index == self.raise_at:
+            raise ZeroDivisionError('SIMULATED_ERROR')
+
+        # Rename.
+        if use_real_fs:
+            if rp.create_parent:
+                Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
+            Path(rp.orig).rename(rp.new)
         else:
-            # Or in the fake file system.
-            for rp in self.rps:
-                if rp.create_parent:
-                    for par in Path(rp.new).parents:
-                        self.file_sys[str(par)] = self.DEFAULT_FILE_SYS_VAL
-                self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
+            if rp.create_parent:
+                for par in Path(rp.new).parents:
+                    self.file_sys[str(par)] = self.DEFAULT_FILE_SYS_VAL
+            self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
 
     ####
     # The RenamingPlan as a dict.
@@ -575,6 +605,7 @@ class RenamingPlan:
                 asdict(rp)
                 for rp in self.rps
             ],
+            tracking_index = self.tracking_index,
             problems = {
                 control : [asdict(p) for p in ps]
                 for control, ps in self.problems.items()

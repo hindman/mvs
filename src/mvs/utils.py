@@ -42,7 +42,7 @@ class CON:
 
     # Logging.
     datetime_fmt = '%Y-%m-%d_%H-%M-%S'
-    logfile_ext = '.json'
+    logfile_ext = 'json'
 
     # Executables.
     default_pager_cmd = 'more'
@@ -76,7 +76,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
     log_writing_failed     = 'Unexpected error during writing to log file.\n\n{}',
     prepare_failed_cli     = 'Renaming preparation resulted in problems:{}.\n',
-    renaming_raised        = '\nRenaming raised an error; some paths might have been renamed; traceback follows:\n\n{}',
+    renaming_raised        = '\nRenaming raised an error at tracking_index={}. Traceback follows:\n\n{{}}',
     opts_require_one       = 'One of these options is required',
     opts_mutex             = 'No more than one of these options should be used',
     # Other messages in CliRenamer.
