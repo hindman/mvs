@@ -25,6 +25,11 @@ Renaming failure handling:
         - Assemble an exception summarizing what happened.
         - Raise the exception.
         - Tracking-data should be logged regardless of failure or success.
+        - Complication: logging is done by CliRenamer, not RenamingPlan.
+            - That implies that RenamingPlan should manage tracking-data.
+            - And CliRenamer should use the data for its logging.
+            - In API use case, it's up to the programmer to catch
+              MvsError and do something with tracking-data if they care to.
 
 Documentation:
     - CLI help text
