@@ -365,9 +365,12 @@ class CliRenamer:
 
         # Try to write the logging data.
         try:
+            json_text = json.dumps(d, indent = 4)
+            if self.logfh:
+                self.logfh.write(json_text)
             Path(path).parent.mkdir(exist_ok = True)
             with open(path, 'w') as fh:
-                json.dump(d, self.logfh or fh, indent = 4)
+                fh.write(json_text)
         except Exception as e: # pragma: no cover
             self.wrapup_with_tb(MF.log_writing_failed)
 
@@ -692,7 +695,7 @@ class CLI:
         },
         {
             names: '--create',
-            'choices': Problem.names_for(CONTROLS.create),
+            'choices': CON.all_tup + Problem.names_for(CONTROLS.create),
             'nargs': '?',
             'metavar': 'PROB',
             'help': 'Fix missing parent problem before renaming',

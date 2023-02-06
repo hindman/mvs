@@ -13,15 +13,49 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Logging: what is creating all of the empty log files?
-
-CLI: --clobber all is rejected by argparse.
-
 Documentation:
+
     - CLI help text
-    - README: CLI usage
-    - README: API usage
-    - Also see Usage section in this file, and eventually delete it.
+        - Quick reading pass.
+
+    - README:
+        - General documentation.
+        - CLI usage.
+        - Also see Usage section in this file, and eventually delete it.
+        - API usage.
+
+    - User-facing API:
+
+        - Imports.
+            __version__
+            RenamingPlan
+            MvsError
+
+        - RenamingPlan parameters.
+            # Path inputs and their structure.
+            inputs
+            structure = None
+            # User code for renaming and filtering.
+            rename_code = None
+            filter_code = None
+            indent = 4
+            # Sequence numbering.
+            seq_start = 1
+            seq_step = 1
+            # Problem controls.
+            skip = None
+            clobber = None
+            create = None
+
+        - RenamingPlan methods.
+            prepare()
+            rename_paths()
+
+        - RenamingPlan attributes and properties.
+            as_dict
+            failed
+            uncontrolled_problems
+            tracking_index
 
 Publish:
     - setup.py: classifiers
