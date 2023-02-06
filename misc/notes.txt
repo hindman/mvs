@@ -15,9 +15,6 @@ todos: TODOs
 
 Documentation:
 
-    - CLI help text
-        - Quick reading pass.
-
     - README:
         - General documentation.
         - CLI usage.
@@ -82,6 +79,42 @@ Other operations:
 Additional failure control: backup.
 
 Logging operations: list, prune.
+
+Convenience renaming operations: evaluate:
+
+    - In the classic rename script, these were call "rules".
+    - Multiple could be applied via command-line options and parameters.
+
+    - The rule I used almost exclusively:
+
+        --expr PERLCODE
+
+    - But note that classic rename usage looked more like this, where the
+      PERLCODE was the first positional argument and the other positionals were
+      orignal paths:
+
+        rename PERLCODE PATH...
+
+    - Most performed common string changes. Here are the long options on
+      the `rename` installed on my MacOS. The classic rename scripts
+      from the past were different.
+
+        --append SUFFIX
+        --prepend PREFIX
+        --lower-case
+        --upper-case
+        --pipe COMMAND       # Pipe orig path to COMMAND; output becomes new path
+        --subst FROM TO      # Text substitution, once per orig path.
+        --subst-all FROM TO  # Same, but potentially multiple times per orig path.
+        --remove-extension
+        --keep-extension     # Remove ext; apply all other rules; then append ext.
+        --camelcase          # Capitalize every word in the orig path.
+        --urlesc             # Decode URL-escaped orig path.
+        --nows               # Replace whitespace sequences with a single underscore.
+        --rews               # Replace each underscore with single space.
+        --noctrl             # Replace control char sequences with single underscore.
+        --nometa             # Replace each shell meta-character with underscore.
+        --trim               # Remove whitespace and underscores from ends of orig path.
 
 Undo renaming, based on log.
 

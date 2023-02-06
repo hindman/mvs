@@ -464,8 +464,10 @@ class CLI:
     # Program help text: description and explanatory text.
 
     description = dedent('''
-        Renames or moves files in bulk, via user-supplied Python
-        code or a data source mapping old paths to new paths.
+        Renames file and directory paths in bulk, via user-supplied
+        Python code or a data source mapping old paths to new paths.
+        No renaming occurs until all of the proposed changes have
+        been checked for common types of problems.
     ''')
 
     post_epilog = dedent('''
@@ -473,7 +475,7 @@ class CLI:
         ------------------
 
         The user-supplied renaming and filtering code receives the following
-        variables as arguments:
+        variables as function arguments:
 
           o     Original path.
           p     Original path, as a pathlib.Path instance.
@@ -498,7 +500,13 @@ class CLI:
         but does require it for any subsequent lines.
 
         For reference, here are some useful Path components in a renaming
-        context: p.parent, p.name, p.stem, p.suffix.
+        context:
+
+          p         Path('/parent/dir/foo-bar.fubb')
+          p.parent  Path('/parent/dir')
+          p.name    'foo-bar.fubb'
+          p.step    'foo-bar'
+          p.suffix  '.fubb'
 
         Problem control
         ---------------
@@ -581,7 +589,7 @@ class CLI:
             group: 'Input path structures',
             names: '--flat',
             'action': 'store_true',
-            'help': 'Input paths as a list: original paths, then equal number of new paths [default]',
+            'help': 'Input paths: original paths, then equal number of new paths [the default]',
         },
         {
             names: '--paragraphs',
@@ -591,7 +599,7 @@ class CLI:
         {
             names: '--pairs',
             'action': 'store_true',
-            'help': 'Input paths in line pairs: original, new, original, new, etc.',
+            'help': 'Input paths in alternating lines: original, new, original, new, etc.',
         },
         {
             names: '--rows',
