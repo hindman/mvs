@@ -12,14 +12,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Add plan.tracking_rp.
-
-Add --edit: receive original paths; open editor; user defines new paths.
-    from subprocess import run
-    cmd = ('mvim', 'foobar.txt')
-    p = run(cmd)
-    print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
-
 Documentation.
     - Spelling check.
     - Editing pass.
@@ -30,14 +22,26 @@ Publish:
     - Version bump.
     - Publish.
 
+Next batch:
+
+    Add --edit: receive original paths; open editor; user defines new paths.
+        from subprocess import run
+        cmd = ('mvim', 'foobar.txt')
+        p = run(cmd)
+        print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
+
+    Support preferences.
+        - switch my pager back to `less`.
+        - set my editor to `mvim`.
+
+    Case-change-only renamings.
+        - Path(orig).rename(new): works
+        - But existence checks do not respect case.
+        - This will vary by OS.
+
 --------
 road-map: Road map
 --------
-
-Case-change-only renamings.
-    - Path(orig).rename(new): works
-    - But existence checks do not respect case.
-    - This will vary by OS.
 
 Other operations:
     - copy: given old-paths, copy them to new-paths.
@@ -87,9 +91,6 @@ Convenience renaming operations: evaluate:
         --trim               # Remove whitespace and underscores from ends of orig path.
 
 Undo renaming, based on log.
-
-Support preferences.
-    - switch my pager back to `less`.
 
 Options:
     --row-delimiter [default: tab]

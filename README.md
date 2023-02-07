@@ -11,21 +11,21 @@ installable on most Unix-inspired operating systems since the early 1990s.
 The core idea of the `rename` script was excellent. The user supplied a snippet
 of Perl code as a command-line argument, followed by the original paths. Each
 original path was pumped through the code snippet to generate the corresponding
-new path. Because Perl had been designed to make it easy to manipulte strings
-with very little code, users could efficiently rename paths in a variety of
-ways directly on the command line. Even if you knew very little Perl but at
-least undersood how to operate its compact regular-expression substitution
-syntax, you could be quite adept at bulk path renaming.
+new path. Because Perl was designed to make it easy to manipulate strings with
+very little code, users could efficiently rename paths in a variety of ways
+directly on the command line. Even if you knew very little Perl but at least
+understood how to operate its compact regular-expression substitution syntax,
+you could become quite adept at bulk path renaming.
 
 ```bash
 $ rename 's/foo/bar/' *.txt
 ```
 
-Unfortunately, the script was a chainsaw -- undeniably useful, but able to
+Unfortunately, the script was a chainsaw – undeniably useful, but able to
 inflict devastation with a single false move. As a result, I rarely used
 `rename` directly for my bulk-renaming needs, which were extensive on several
 projects I worked on. Instead, I wrote my own Perl script to the job. Its
-operation was roughly the same, but it included obvious checks to help me avoid
+operation was roughly the same, but it included precautions to help me avoid
 disastrous mistakes, most importantly checking that the new paths did not
 collide with existing paths on the file system and including a user inspection
 and confirmation step by default.
@@ -43,34 +43,34 @@ original-to-new computation, or (2) user provides both original paths and new
 paths directly.
 
 Either way, before any renaming occurs, the following checks occur: are the
-original paths different than their corresponding new paths; do all the
+original paths different than their corresponding new paths; do all of the
 original paths exist; do any new paths already exist; do any new paths collide
 with each other; and are the parent directories of any new paths missing? If
 those checks look alright, the proposed renamings are listed for inspection by
-the user. Renaming occurs after user confirmation.
+the user, and renaming occurs only after confirmation.
 
-The script provides command-line options to customize the command's behavior:
+The script provides command-line options to customize its behavior:
 
 - Supply input paths in various ways: positional arguments, STDIN, a text data
   file, or the clipboard.
 
-- Organize the original and new paths in various structures: a flat sequence,
-  in Unix-style paragraphs, as alternating pairs of lines, or as delimited
-  rows.
+- Organize the original and new paths in various structures: as a flat
+  sequence, in Unix-style paragraphs, as alternating pairs of lines, or as
+  delimited rows.
 
 - Use a snippet of Python code to filter out original paths before renaming,
   which can be handy if you want to supply paths via a command-line glob
   pattern but you don't want to rename all of them.
 
-- Specify in advance how the program should respond to any of the validation
-  problems listed above: skip the item with the problem, rename in spite of the
-  problem (even it that means overwriting other paths), or take remedial action
-  (create a missing parent directory).
+- Specify in advance how the program should respond to the validation problems
+  listed above: skip the item with the problem, rename in spite of the problem
+  (even it that means overwriting other paths), or take remedial action (create
+  a missing parent).
 
 - Define a sequence number for use in the renaming code snippet.
 
-- Execute in dryrun mode, which executes the command's renaming, filtering,
-  checking, and listing behavior but does not rename anything.
+- Execute in dryrun mode, which runs the filtering, checking, and listing
+  behavior but does not rename anything.
 
 #### Installation and examples
 
@@ -87,9 +87,9 @@ $ mvs --help
 $ mvs --details
 ```
 
-In general terms, the command has the following usage. Note that the default
-structure is flat and that the `--rename` option is consisered structual
-because in implies that the input path data consists solely of original paths.
+In general terms, the executable has the following usage. Note that the default
+structure is flat and that the `--rename` option is considered structural
+because it implies that the input path data consists solely of original paths.
 
 ```text
 mvs SOURCE [STRUCTURE] [OTHER]
@@ -97,13 +97,13 @@ mvs SOURCE [STRUCTURE] [OTHER]
 PATHS     : positionals
 SOURCE    : PATHS | --stdin | --file PATH | --clipboard
 STRUCTURE : --flat | --paragraphs | --pairs | --rows | --rename CODE
-OTHER     : all other options
+OTHER     : other options
 ```
 
 The different input structures can be illustrated with a simple renaming
-scenario where we just want to add a file extension to the original paths. Note
-that if the paths were supplied via a source other than positional arguments,
-each path should be on its own line.
+scenario that adds a file extension to the original paths. Note that if the
+paths were supplied via a source other than positional arguments, each path
+should be on its own line.
 
 ```bash
 # The default: a flat sequence of paths.
@@ -117,10 +117,10 @@ $ mvs a a.new b b.new --pairs
 $ mvs a b '' a.new b.new --paragraphs
 ```
 
-The same renaming scenario could also be performed via a code snippet. The code
+The same renaming scenario could also be performed via a code snippet. The
 snippet will be compiled into a function that receives the original path as the
-local variable `o` and it should explicitly return the new path. See the
-program's help text for additional details about user-supplied code.
+local variable `o`. See the program's help text for additional details about
+user-supplied code.
 
 ```bash
 $ mvs a b --rename 'return r"{o}.new"'
@@ -129,16 +129,16 @@ $ mvs a b --rename 'return r"{o}.new"'
 #### Library usage
 
 The mvs package also supports bulk renaming via a programmatic API. The first
-step is to configure a `RenamingPlan` (initialization parameters and their
-defaults are shown below).
+step is to configure a `RenamingPlan`. Initialization parameters and their
+defaults are as follows.
 
 ```python
 from mvs import RenamingPlan
 
 plan = RenamingPlan(
-    # Sequence of paths and their structure (default: 'flat').
+    # Sequence of paths and their structure.
     inputs,
-    structure = None,
+    structure = 'flat',
 
     # User-supplied renaming and filtering code (str or callable).
     rename_code = None,
@@ -162,10 +162,11 @@ plan.rename_paths()
 ```
 
 If you don't want to rename paths immediately but do want to prepare everything
-for renaming, including performing the checks for problems, you use the library
-in a more deliberative fashion: first prepare; then check the information
-provided by the plan; if desired, proceed with renaming; and in the event of
-unexpected failure, get information on which item failed.
+for renaming, including performing the checks for problems, you can use the
+library in a more deliberative fashion: first prepare; then check the
+information provided by the plan; if desired, proceed with renaming; and in the
+event of unexpected failure, get information about which item led to the
+exception.
 
 ```python
 # The library's supported imports.
@@ -180,7 +181,7 @@ plan.prepare()
 # Information about the plan and its original-new path pairs.
 print(plan.as_dict)
 
-# Whether preparation failed due to problems.
+# Whether preparation failed due to problems and what they are.
 print(plan.failed)
 print(plan.uncontrolled_problems)
 

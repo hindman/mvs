@@ -355,9 +355,11 @@ def test_rename_paths_raises(tr):
     cli.do_prepare()
     cli.do_prepare()
     cli.do_rename()
+    assert cli.plan.tracking_rp is None
     cli.do_rename()
     assert cli.success
     cli.check_file_sys(*news)
+    assert cli.plan.tracking_rp is None
 
     # Helper to format expected error text for subsequent checks.
     def exp_err_text(tracking_index):
@@ -381,11 +383,13 @@ def test_rename_paths_raises(tr):
     n = 1
     cli = CliRenamerSIO(*args, file_sys = origs)
     cli.do_prepare()
+    assert cli.plan.tracking_rp is None
     cli.plan.raise_at = n
     cli.do_rename()
     assert cli.failure
     got = json.loads(cli.log(cli.LOG_TYPE.tracking))
     assert got == dict(tracking_index = n)
+    assert cli.plan.tracking_rp.orig == 'z2'
     exp = exp_err_text(n)
     assert cli.err.strip().startswith(exp)
     assert 'ZeroDivisionError: SIMULATED_ERROR' in cli.err

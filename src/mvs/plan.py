@@ -580,11 +580,22 @@ class RenamingPlan:
             self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
 
     ####
-    # The RenamingPlan as a dict.
+    # Other info.
     ####
 
     @property
+    def tracking_rp(self):
+        # The RenamePair that was being renamed when rename_paths()
+        # raised an exception.
+        ti = self.tracking_index
+        if ti in (self.TRACKING.not_started, self.TRACKING.done):
+            return None
+        else:
+            return self.rps[ti]
+
+    @property
     def as_dict(self):
+        # The plan as a dict.
         return dict(
             # Primary arguments from user.
             inputs = self.inputs,
