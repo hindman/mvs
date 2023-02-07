@@ -5,7 +5,6 @@ toc: Table of contents
     toc         | Table of contents
     todos       | TODOs
     road-map    | Road map
-    usage       | Usage
     dev-notes   | Dev notes
     other-tools | Other tools
 
@@ -13,46 +12,17 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Documentation:
+Add plan.tracking_rp.
 
-    - README:
-        - General documentation.
-        - CLI usage.
-        - Also see Usage section in this file, and eventually delete it.
-        - API usage.
+Add --edit: receive original paths; open editor; user defines new paths.
+    from subprocess import run
+    cmd = ('mvim', 'foobar.txt')
+    p = run(cmd)
+    print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
 
-    - User-facing API:
-
-        - Imports.
-            __version__
-            RenamingPlan
-            MvsError
-
-        - RenamingPlan parameters.
-            # Path inputs and their structure.
-            inputs
-            structure = None
-            # User code for renaming and filtering.
-            rename_code = None
-            filter_code = None
-            indent = 4
-            # Sequence numbering.
-            seq_start = 1
-            seq_step = 1
-            # Problem controls.
-            skip = None
-            clobber = None
-            create = None
-
-        - RenamingPlan methods.
-            prepare()
-            rename_paths()
-
-        - RenamingPlan attributes and properties.
-            as_dict
-            failed
-            uncontrolled_problems
-            tracking_index
+Documentation.
+    - Spelling check.
+    - Editing pass.
 
 Publish:
     - setup.py: classifiers
@@ -132,26 +102,6 @@ Alternative dryrun output styles:
 
 Complex failure/validation scenarios:
     - prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
-
---------
-usage: Usage
---------
-
-Usage:
-
-    mvs SOURCE [STRUCTURE] [OTHER]
-
-    PATHS     : positionals
-    SOURCE    : PATHS | --stdin | --file PATH | --clipboard
-    STRUCTURE : --flat | --paragraphs | --pairs | --rows | --rename CODE
-    OTHER     : all other options
-
-Notes:
-
-    - Default structure is --flat.
-
-    - The --rename option is considered structural because it implies that the
-      input path data consists solely of original paths.
 
 --------
 dev-notes: Dev notes
