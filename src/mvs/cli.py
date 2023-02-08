@@ -594,7 +594,7 @@ class CLI:
         {
             names: '--paragraphs',
             'action': 'store_true',
-            'help': 'Input paths in paragraphs: original paths, blank line, new paths',
+            'help': 'Input paths in paragraphs: original paths, blank line(s), new paths',
         },
         {
             names: '--pairs',

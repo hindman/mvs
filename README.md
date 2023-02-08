@@ -8,26 +8,26 @@ Command-line tools to perform such tasks are numerous. Perhaps the most classic
 example was the Perl [rename][perl_rename] script, which has been available or
 installable on most Unix-inspired operating systems since the early 1990s.
 
-The core idea of the `rename` script was excellent. The user supplied a snippet
-of Perl code as a command-line argument, followed by the original paths. Each
-original path was pumped through the code snippet to generate the corresponding
-new path. Because Perl was designed to make it easy to manipulate strings with
-very little code, users could efficiently rename paths in a variety of ways
-directly on the command line. Even if you knew very little Perl but at least
-understood how to operate its compact regular-expression substitution syntax,
-you could become quite adept at bulk path renaming.
+The core idea of `rename` was excellent. The user supplied a snippet of Perl
+code as a command-line argument, followed by the original paths. Each original
+path was pumped through the code snippet to generate the corresponding new
+path. Because Perl was designed to make it easy to manipulate strings with very
+little code, users could efficiently rename paths in a variety of ways directly
+on the command line. Even if you knew very little Perl but at least understood
+how to operate its compact regular-expression substitution syntax, you could
+become quite adept at bulk path renaming.
 
 ```bash
-$ rename 's/foo/bar/' *.txt
+$ rename 's/foo/bar/' *
 ```
 
 Unfortunately, the script was a chainsaw – undeniably useful, but able to
-inflict devastation with a single false move. As a result, I rarely used
+inflict devastation after a single false move. As a result, I rarely used
 `rename` directly for my bulk-renaming needs, which were extensive on several
 projects I worked on. Instead, I wrote my own Perl script to the job. Its
 operation was roughly the same, but it included precautions to help me avoid
-disastrous mistakes, most importantly checking that the new paths did not
-collide with existing paths on the file system and including a user inspection
+disastrous mistakes. The most important were checking that the new paths did
+not collide with existing paths on the file system and including an inspection
 and confirmation step by default.
 
 The `mvs` library is an updated and enhanced version of those ideas, but
@@ -110,10 +110,10 @@ should be on its own line.
 $ mvs a b a.new b.new
 $ mvs a b a.new b.new --flat
 
-# Alternating pairs.
+# Alternating pairs: old, new, etc.
 $ mvs a a.new b b.new --pairs
 
-# Paragraphs delimited by one or more blank lines.
+# Paragraphs delimited by at least one blank.
 $ mvs a b '' a.new b.new --paragraphs
 ```
 
@@ -141,10 +141,11 @@ plan = RenamingPlan(
     structure = 'flat',
 
     # User-supplied renaming and filtering code (str or callable).
+    # See mvs --details for additional information.
     rename_code = None,
     filter_code = None,
 
-    # Other details regarding user-supplied code.
+    # Other parameters related to user-supplied code.
     indent = 4,
     seq_start = 1,
     seq_step = 1,

@@ -6,6 +6,7 @@ toc: Table of contents
     todos       | TODOs
     road-map    | Road map
     dev-notes   | Dev notes
+    misc-notes  | Misc notes
     other-tools | Other tools
 
 --------
@@ -13,7 +14,6 @@ todos: TODOs
 --------
 
 Documentation.
-    - Spelling check.
     - Editing pass.
 
 Publish:
@@ -23,6 +23,8 @@ Publish:
     - Publish.
 
 Next batch:
+
+    Add --enforce and make --skip=equal the default.
 
     Add --edit: receive original paths; open editor; user defines new paths.
         from subprocess import run
@@ -151,6 +153,60 @@ Installing from test pypi:
 Tag file creation:
 
     inv tags
+
+--------
+misc-notes: Misc notes
+--------
+
+The purpose of the --paragraphs structure:
+
+    - It does not provide any user flexibility.
+
+    - Rather, it applies an extra component of strictness to the input parsing.
+
+    - The paragraphs structure is the same as flat, plus the additional
+      requirement that at least one blank existings between the original and
+      new paths.
+
+Adding --enforce and making --skip=equal the default:
+
+    - What the --enforce mechanism means:
+
+        - If the user applies --enforce=X it removes any upstream configuations
+          setting a control for X.
+
+        - The upstream configuations are the application defaults and the user
+          defaults (mvs.conf).
+
+    - Demonstration that we can achieve all configurations:
+
+        - Assume that Problem X has applicable controls skip, parent.
+
+        - Under every combination of application default (either no control or
+          having a default control) and user default (either no change or
+          applying a setting), the command-line user can still achieve all of
+          the possible behaviors (enforce, skip, parent).
+
+        App default | User default | Command-line
+        ===========================================
+        No control  | .            | --skip X
+        "           | .            | --parent X
+        -------------------------------------------
+        "           | skip = X     | --parent X
+        "           | skip = X     | --enforce X
+        -------------------------------------------
+        "           | parent = X   | --skip X
+        "           | parent = X   | --enforce X
+        ===========================================
+        skip = X    | .            | --parent X
+        "           | .            | --enforce X
+        -------------------------------------------
+        "           | parent = X   | --skip X
+        "           | parent = X   | --enforce X
+        -------------------------------------------
+        "           | enforce = X  | --skip X
+        "           | enforce = X  | --parent X
+        ===========================================
 
 --------
 other-tools: Other tools
