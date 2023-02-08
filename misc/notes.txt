@@ -13,11 +13,7 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Documentation.
-    - Editing pass.
-
 Publish:
-    - setup.py: classifiers
     - Make repo public.
     - Version bump.
     - Publish.

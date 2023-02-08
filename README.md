@@ -12,10 +12,10 @@ The core idea of `rename` was excellent. The user supplied a snippet of Perl
 code as a command-line argument, followed by the original paths. Each original
 path was pumped through the code snippet to generate the corresponding new
 path. Because Perl was designed to make it easy to manipulate strings with very
-little code, users could efficiently rename paths in a variety of ways directly
-on the command line. Even if you knew very little Perl but at least understood
-how to operate its compact regular-expression substitution syntax, you could
-become quite adept at bulk path renaming.
+little code, users could efficiently rename paths directly on the command line.
+Even if you hardly knew Perl but at least understood how to operate its compact
+regular-expression substitution syntax, you could become quite adept at bulk
+path renaming.
 
 ```bash
 $ rename 's/foo/bar/' *
@@ -23,7 +23,7 @@ $ rename 's/foo/bar/' *
 
 Unfortunately, the script was a chainsaw – undeniably useful, but able to
 inflict devastation after a single false move. As a result, I rarely used
-`rename` directly for my bulk-renaming needs, which were extensive on several
+`rename` directly for my bulk renaming needs, which were extensive on several
 projects I worked on. Instead, I wrote my own Perl script to the job. Its
 operation was roughly the same, but it included precautions to help me avoid
 disastrous mistakes. The most important were checking that the new paths did
@@ -32,15 +32,15 @@ and confirmation step by default.
 
 The `mvs` library is an updated and enhanced version of those ideas, but
 implemented in a language I use regularly (Python) rather than one in which
-I've become rusty (Perl).
+I have become rusty (Perl).
 
 #### The mvs executable
 
 The primary use case envisioned for the library is its executable. In broad
-terms, there are two ways to perform bulk-renaming with the `mvs` command: (1)
-user provides original file paths and a snippet of Python code to perform the
-original-to-new computation, or (2) user provides both original paths and new
-paths directly.
+terms, there are two ways to perform bulk renaming with the `mvs` command: (1)
+the user provides original file paths and a snippet of Python code to perform
+the original-to-new computation, or (2) the user provides both original paths
+and new paths directly.
 
 Either way, before any renaming occurs, the following checks occur: are the
 original paths different than their corresponding new paths; do all of the
@@ -54,22 +54,22 @@ The script provides command-line options to customize its behavior:
 - Supply input paths in various ways: positional arguments, STDIN, a text data
   file, or the clipboard.
 
-- Organize the original and new paths in various structures: as a flat
-  sequence, in Unix-style paragraphs, as alternating pairs of lines, or as
-  delimited rows.
+- Specify the structure of the input paths data: a flat sequence, two
+  blank-delimited paragraphs, alternating pairs of lines, or delimited rows.
 
 - Use a snippet of Python code to filter out original paths before renaming,
   which can be handy if you want to supply paths via a command-line glob
-  pattern but you don't want to rename all of them.
+  pattern but do not want to rename all of them.
 
 - Specify in advance how the program should respond to the validation problems
   listed above: skip the item with the problem, rename in spite of the problem
   (even it that means overwriting other paths), or take remedial action (create
   a missing parent).
 
-- Define a sequence number for use in the renaming code snippet.
+- Customize the start and skip values for a sequence number that can be used in
+  the renaming code snippet.
 
-- Execute in dryrun mode, which runs the filtering, checking, and listing
+- Request dryrun mode, which executes the filtering, checking, and listing
   behavior but does not rename anything.
 
 #### Installation and examples
@@ -126,7 +126,7 @@ user-supplied code.
 $ mvs a b --rename 'return r"{o}.new"'
 ```
 
-#### Library usage
+#### Programmatic usage
 
 The mvs package also supports bulk renaming via a programmatic API. The first
 step is to configure a `RenamingPlan`. Initialization parameters and their
@@ -162,9 +162,9 @@ plan = RenamingPlan(
 plan.rename_paths()
 ```
 
-If you don't want to rename paths immediately but do want to prepare everything
-for renaming, including performing the checks for problems, you can use the
-library in a more deliberative fashion: first prepare; then check the
+If you do not want to rename paths immediately but do want to prepare
+everything for renaming, including performing the checks for problems, you can
+use the library in a more deliberative fashion: first prepare; then check the
 information provided by the plan; if desired, proceed with renaming; and in the
 event of unexpected failure, get information about which item led to the
 exception.
@@ -179,7 +179,7 @@ plan = RenamingPlan(...)
 # Prepare for renaming.
 plan.prepare()
 
-# Information about the plan and its original-new path pairs.
+# All relevant information about the plan and its original-new path pairs.
 print(plan.as_dict)
 
 # Whether preparation failed due to problems and what they are.

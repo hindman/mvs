@@ -55,20 +55,19 @@ readme_file = join(project_dir, 'README.md')
 long_desc = open(readme_file).read()
 long_desc_type = 'text/markdown'
 
-# classifiers = [
-#     'Development Status :: 3 - Alpha',
-#     'Environment :: Console',
-#     'Intended Audience :: Developers',
-#     'License :: OSI Approved :: MIT License',
-#     'Operating System :: OS Independent',
-#     'Programming Language :: Python :: 3.5',
-#     'Programming Language :: Python :: 3.6',
-#     'Programming Language :: Python :: 3.7',
-#     'Programming Language :: Python :: 3.8',
-#     'Programming Language :: Python :: 3.9',
-#     'Programming Language :: Python :: 3.10',
-#     'Topic :: Software Development',
-# ]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python :: 3',
+    'Topic :: Software Development',
+    'Topic :: System :: Shells',
+    'Topic :: Terminals',
+    'Topic :: Text Processing',
+    'Topic :: Utilities',
+]
 
 ####
 # Packages and scripts.
@@ -107,7 +106,7 @@ setup(
     license = license,
     long_description = long_desc,
     long_description_content_type = long_desc_type,
-    # classifiers = classifiers,
+    classifiers = classifiers,
     entry_points = entry_points,
 )
 
