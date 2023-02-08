@@ -14,16 +14,110 @@ todos: TODOs
 --------
 
 Support preferences.
-    - switch my pager back to `less`.
-    - set my editor to `mvim`.
 
-Add --enforce and make --skip=equal the default.
+    - General approach:
+        - Start with application-defaults for CLI usage.
+        - Overlay user-defaults.
+        - Overlay command-line options.
+
+    - Questions:
+
+        - Should --help text express application-defaults or resulting user-defaults?
+            - The former is probably acceptable.
+            - Would be tedious to implement.
+            - And it some cases it would be messy.
+                - For example, if user-default is yes=True.
+                - How would you convey that in help text?
+                    --yes  Rename files without a user confirmation step [on]
+                - Seems awkward.
+
+        - How does user disable to switch option on the command line?
+            - Mutually exclusive:
+                - Supply a different one.
+                - Applies to:
+                    - input sources
+                    - structures
+            - Independent switches:
+                - Option 1: negative switches:
+
+                    - I dislike this because it spawns lots of new options
+                      that presumably also appear in the help text?
+
+                    - Argparse does not support this type of thing until Python 3.9.
+
+                    - Applies to:
+
+                        # Plausible.
+                        --yes       --no-yes
+                        --no-log    --log
+
+                        # Implausible in user-preferences.
+                        --dryrun    --no-dryrun
+                        --help      --no-help
+                        --details   --no-details
+                        --version   --no-version
+
+                - Option 2: disable feature:
+                    - Add one new option that can disable user-preference flags.
+                    - It would take a delimited string holding option names:
+
+                        --disable yes,nolog
+
+    - File name and type:
+        - Config files don't support data types very well.
+        - YAML is not in standard library.
+        - Go with JSON: $HOME/.mvs/config.json
+
+    - Which command-line options to support in user-defaults:
+        - Several don't make much sense as user-defaults.
+        - But it's probably simpler just to support everything.
+
+    - Current options:
+
+        Key        | Value | Note
+        --------------------------------------
+        paths      | []    | .
+        stdin      | True  | .
+        file       | PATH  | .
+        clipboard  | True  | .
+        --------------------------------------
+        flat       | True  | .
+        paragraphs | True  | .
+        pairs      | True  | .
+        rows       | True  | .
+        --------------------------------------
+        rename     | CODE  | .
+        filter     | CODE  | .
+        indent     | N     | .
+        seq        | N     | .
+        step       | N     | .
+        --------------------------------------
+        dryrun     | True  | .
+        yes        | True  | .
+        nolog      | True  | .
+        --------------------------------------
+        pager      | CMD   | .
+        limit      | N     | .
+        --------------------------------------
+        skip       | NAMES | .
+        clobber    | NAMES | .
+        create     | NAMES | .
+        --------------------------------------
+        help       | True  | .
+        details    | True  | .
+        version    | True  | .
 
 Add --edit: receive original paths; open editor; user defines new paths.
     from subprocess import run
     cmd = ('mvim', 'foobar.txt')
     p = run(cmd)
     print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
+
+My settings after I get preferences and --edit working:
+    - pager = less
+    - editor = mvim
+
+Add --enforce and make --skip=equal the default.
 
 Case-change-only renamings.
     - Path(orig).rename(new): works
