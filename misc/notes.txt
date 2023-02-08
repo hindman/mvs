@@ -13,29 +13,22 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Publish:
-    - Make repo public.
-    - Version bump.
-    - Publish.
+Support preferences.
+    - switch my pager back to `less`.
+    - set my editor to `mvim`.
 
-Next batch:
+Add --enforce and make --skip=equal the default.
 
-    Add --enforce and make --skip=equal the default.
+Add --edit: receive original paths; open editor; user defines new paths.
+    from subprocess import run
+    cmd = ('mvim', 'foobar.txt')
+    p = run(cmd)
+    print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
 
-    Add --edit: receive original paths; open editor; user defines new paths.
-        from subprocess import run
-        cmd = ('mvim', 'foobar.txt')
-        p = run(cmd)
-        print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
-
-    Support preferences.
-        - switch my pager back to `less`.
-        - set my editor to `mvim`.
-
-    Case-change-only renamings.
-        - Path(orig).rename(new): works
-        - But existence checks do not respect case.
-        - This will vary by OS.
+Case-change-only renamings.
+    - Path(orig).rename(new): works
+    - But existence checks do not respect case.
+    - This will vary by OS.
 
 --------
 road-map: Road map
