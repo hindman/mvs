@@ -15,10 +15,14 @@ from .problems import Problem, CONTROLS
 from .version import __version__
 
 from .utils import (
-    MvsError,
     CON,
     MSG_FORMATS as MF,
+    MvsError,
+    PrefType,
     STRUCTURES,
+    list_of_str,
+    list_or_str,
+    posint_pref,
     positive_int,
     read_from_clipboard,
     read_from_file,
@@ -161,7 +165,7 @@ class CliRenamer:
                 return
 
         # Log the renamings.
-        self.write_to_json_file(self.LOG_TYPE.plan)
+        self.write_log_file(self.LOG_TYPE.plan)
 
     def do_rename(self):
         # Don't execute more than once.
@@ -178,7 +182,7 @@ class CliRenamer:
             msg = MF.renaming_raised.format(self.plan.tracking_index)
             self.wrapup_with_tb(msg)
         finally:
-            self.write_to_json_file(self.LOG_TYPE.tracking)
+            self.write_log_file(self.LOG_TYPE.tracking)
 
     ####
     # Helpers to finish or cut-short the run() sub-steps.
@@ -191,6 +195,7 @@ class CliRenamer:
     def wrapup(self, code, msg):
         # Helper for do_prepare() and do_rename().
         # Writes a newline-terminated message and sets exit_code.
+        # The latter is use in those methods to short-circuit.
         fh = self.stdout if code == CON.exit_ok else self.stderr
         msg = msg if msg.endswith(CON.newline) else msg + CON.newline
         fh.write(msg)
@@ -231,6 +236,16 @@ class CliRenamer:
         finally:
             sys.stderr = real_stderr
 
+        # Load user preferences.
+        prefs = self.load_preferences()
+        if self.done:
+            return None
+
+        # Merge the preferences into the opts.
+        opts = self.merge_opts_prefs(opts, prefs)
+        if self.done:
+            return None
+
         # Deal with special options that will lead to an early, successful exit.
         if opts.help:
             # Capitalize the initial "Usage".
@@ -252,6 +267,108 @@ class CliRenamer:
         else:
             return opts
 
+    # HERE ===========================================================
+
+    def load_preferences(self):
+        # Return empty if there is no user-preferences file.
+        path = self.user_prefs_path
+        if not path.is_file():
+            return {}
+
+        # Try to read the preferences.
+        try:
+            with open(path) as fh:
+                return json.load(fh)
+        except Exception as e: # pragma: no cover
+            msg = MF.prefs_reading_failed.format(str(path))
+            self.wrapup_with_tb(msg)
+
+    def merge_opts_prefs(self, opts, prefs):
+
+        '''
+
+        Key        | Value | Note
+        --------------------------------------
+        paths      | []    | .
+        stdin      | True  | .
+        file       | PATH  | .
+        clipboard  | True  | .
+        --------------------------------------
+        flat       | True  | .
+        paragraphs | True  | .
+        pairs      | True  | .
+        rows       | True  | .
+        --------------------------------------
+        rename     | CODE  | .
+        filter     | CODE  | .
+        indent     | N     | .
+        seq        | N     | .
+        step       | N     | .
+        --------------------------------------
+        dryrun     | True  | .
+        yes        | True  | .
+        nolog      | True  | .
+        --------------------------------------
+        pager      | CMD   | .
+        limit      | N     | .
+        --------------------------------------
+        skip       | NAMES | .
+        clobber    | NAMES | .
+        create     | NAMES | .
+        --------------------------------------
+        help       | True  | .
+        details    | True  | .
+        version    | True  | .
+
+        '''
+
+        # Use the command-line options configuration data to
+        # create a dict of PrefType instances.
+        ptypes = tuple(
+            self.oc_to_preftype(oc)
+            for oc in CLI.opts_config
+        )
+        ptypes = {
+            pt.name : pt
+            for pt in ptypes
+        }
+
+        # Confirm that the prefs keys are valid.
+        invalid = set(prefs) - set(ptypes)
+        if invalid:
+            invalid = CON.comma_space.join(invalid)
+            msg = MF.invalid_pref_keys.format(invalid)
+            self.wrapup(CON.exit_fail, msg)
+            return
+
+        # Check data types of the prefs.
+        for name, val in prefs.items():
+            pt = ptypes[name]
+            expected = pt.check_value(val)
+            if expected:
+                msg = MF.invalid_pref_val.format(pt.name, expected, val)
+                self.wrapup(CON.exit_fail, msg)
+                return
+
+        # Merge preferences into opts.
+
+        return opts
+
+        opts.fubb = 1235
+        print(opts)
+        quit()
+
+    def oc_to_preftype(self, oc):
+        name = oc[CLI.names].split()[0].lstrip(CON.hyphen)
+        valid = oc[CLI.dtype]
+        return PrefType(name, valid)
+
+    @property
+    def user_prefs_path(self):
+        return self.app_directory / CON.prefs_file_name
+
+    # HERE ===========================================================
+
     def create_arg_parser(self):
         # Define parser.
         ap = argparse.ArgumentParser(
@@ -265,6 +382,7 @@ class CliRenamer:
         arg_group = None
         for oc in CLI.opts_config:
             kws = dict(oc)
+            kws.pop(CLI.dtype)
             if CLI.group in kws:
                 arg_group = ap.add_argument_group(kws.pop(CLI.group))
             xs = kws.pop(CLI.names).split()
@@ -351,7 +469,7 @@ class CliRenamer:
     # Logging.
     ####
 
-    def write_to_json_file(self, log_type):
+    def write_log_file(self, log_type):
         # Bail if we aren't logging. Otherwise, prepare the log
         # file path and logging data. On the first logging call
         # we also set self.logged_at (the datetime to used
@@ -374,11 +492,13 @@ class CliRenamer:
         except Exception as e: # pragma: no cover
             self.wrapup_with_tb(MF.log_writing_failed)
 
+    @property
+    def app_directory(self):
+        return Path.home() / (CON.period + CON.app_name)
+
     def log_file_path(self, log_type):
-        home = Path.home()
-        subdir = CON.period + CON.app_name
         now = self.logged_at.strftime(CON.datetime_fmt)
-        return Path.home() / subdir / f'{now}-{log_type}.{CON.logfile_ext}'
+        return self.app_directory / f'{now}-{log_type}.{CON.logfile_ext}'
 
     def log_data(self, log_type):
         # Returns a dict of logging data containing either:
@@ -553,6 +673,7 @@ class CLI:
 
     names = 'names'
     group = 'group'
+    dtype = 'dtype'
 
     opts_config = (
 
@@ -565,21 +686,25 @@ class CLI:
             'nargs': '*',
             'metavar': 'PATH',
             'help': 'Input paths via arguments',
+            dtype: list_of_str,
         },
         {
             names: '--stdin',
             'action': 'store_true',
             'help': 'Input paths via STDIN',
+            dtype: bool,
         },
         {
             names: '--file',
             'metavar': 'PATH',
             'help': 'Input paths via a text file',
+            dtype: str,
         },
         {
             names: '--clipboard',
             'action': 'store_true',
             'help': 'Input paths via the clipboard',
+            dtype: bool,
         },
 
         #
@@ -590,21 +715,25 @@ class CLI:
             names: '--flat',
             'action': 'store_true',
             'help': 'Input paths: original paths, then equal number of new paths [the default]',
+            dtype: bool,
         },
         {
             names: '--paragraphs',
             'action': 'store_true',
             'help': 'Input paths in paragraphs: original paths, blank line(s), new paths',
+            dtype: bool,
         },
         {
             names: '--pairs',
             'action': 'store_true',
             'help': 'Input paths in alternating lines: original, new, original, new, etc.',
+            dtype: bool,
         },
         {
             names: '--rows',
             'action': 'store_true',
             'help': 'Input paths in tab-delimited rows: original, tab, new',
+            dtype: bool,
         },
 
         #
@@ -615,11 +744,13 @@ class CLI:
             names: '--rename -r',
             'metavar': 'CODE',
             'help': 'Code to convert original path to new path [implies inputs are just original paths]',
+            dtype: str,
         },
         {
             names: '--filter',
             'metavar': 'CODE',
             'help': 'Code to filter input paths',
+            dtype: str,
         },
         {
             names: '--indent',
@@ -627,6 +758,7 @@ class CLI:
             'metavar': 'N',
             'default': 4,
             'help': 'Number of spaces for indentation in user-supplied code [default: 4]',
+            dtype: posint_pref,
         },
         {
             names: '--seq',
@@ -634,6 +766,7 @@ class CLI:
             'type': positive_int,
             'default': 1,
             'help': 'Sequence start value [default: 1]',
+            dtype: posint_pref,
         },
         {
             names: '--step',
@@ -641,6 +774,7 @@ class CLI:
             'type': positive_int,
             'default': 1,
             'help': 'Sequence step value [default: 1]',
+            dtype: posint_pref,
         },
 
         #
@@ -651,16 +785,19 @@ class CLI:
             names: '--dryrun -d',
             'action': 'store_true',
             'help': 'List renamings without performing them',
+            dtype: bool,
         },
         {
             names: '--yes',
             'action': 'store_true',
             'help': 'Rename files without a user confirmation step',
+            dtype: bool,
         },
         {
             names: '--nolog',
             'action': 'store_true',
             'help': 'Suppress logging',
+            dtype: bool,
         },
 
         #
@@ -675,12 +812,14 @@ class CLI:
                 'Command string for paginating listings [default: '
                 f'`{CON.default_pager_cmd}`; empty string to disable]'
             ),
+            dtype: str,
         },
         {
             names: '--limit',
             'metavar': 'N',
             'type': positive_int,
             'help': 'Upper limit on the number of items to display in listings [default: none]',
+            dtype: posint_pref,
         },
 
         #
@@ -693,6 +832,7 @@ class CLI:
             'nargs': '+',
             'metavar': 'PROB',
             'help': 'Skip items with the named problems',
+            dtype: list_or_str,
         },
         {
             names: '--clobber',
@@ -700,6 +840,7 @@ class CLI:
             'nargs': '+',
             'metavar': 'PROB',
             'help': 'Rename anyway, in spite of named overwriting problems',
+            dtype: list_or_str,
         },
         {
             names: '--create',
@@ -707,6 +848,7 @@ class CLI:
             'nargs': '?',
             'metavar': 'PROB',
             'help': 'Fix missing parent problem before renaming',
+            dtype: list_or_str,
         },
 
         #
@@ -717,16 +859,19 @@ class CLI:
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
+            dtype: bool,
         },
         {
             names: '--details',
             'action': 'store_true',
             'help': 'Display additional help details and exit',
+            dtype: bool,
         },
         {
             names: '--version',
             'action': 'store_true',
             'help': 'Display the version number and exit',
+            dtype: bool,
         },
 
     )

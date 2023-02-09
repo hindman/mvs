@@ -619,6 +619,7 @@ def test_wrapup_with_tb(tr):
     fmts = (
         MF.renaming_raised,
         MF.log_writing_failed,
+        MF.prefs_reading_failed,
         MF.path_collection_failed,
         MF.plan_creation_failed,
     )

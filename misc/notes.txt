@@ -15,97 +15,63 @@ todos: TODOs
 
 Support preferences.
 
-    - General approach:
-        - Start with application-defaults for CLI usage.
-        - Overlay user-defaults.
-        - Overlay command-line options.
+    - Since user-prefs and opts need similar validation, should I load
+      user-prefs and convert them to arguments and just let argparse validate?
 
-    - Questions:
+        - It sort of works.
 
-        - Should --help text express application-defaults or resulting user-defaults?
-            - The former is probably acceptable.
-            - Would be tedious to implement.
-            - And it some cases it would be messy.
-                - For example, if user-default is yes=True.
-                - How would you convey that in help text?
-                    --yes  Rename files without a user confirmation step [on]
-                - Seems awkward.
+        - But it fails as far as required args go. If something is required
+          (either outright or because of the presence of other options), then
+          arg-parsing will complain.
 
-        - How does user disable to switch option on the command line?
-            - Mutually exclusive:
-                - Supply a different one.
-                - Applies to:
-                    - input sources
-                    - structures
-            - Independent switches:
-                - Option 1: negative switches:
+    - ISSUE both here and in optopus:
 
-                    - I dislike this because it spawns lots of new options
-                      that presumably also appear in the help text?
+        - After parsing occurs, how does the user tell if an opts attribute was
+          (1) supplied in the command-line args vs (2) obtain from the default.
 
-                    - Argparse does not support this type of thing until Python 3.9.
+        - This an annoying problem with no good argparse solutions.
 
-                    - Applies to:
+    - ISSUE for optopus:
 
-                        # Plausible.
-                        --yes       --no-yes
-                        --no-log    --log
+        - How to merge user-preferences and opts.
 
-                        # Implausible in user-preferences.
-                        --dryrun    --no-dryrun
-                        --help      --no-help
-                        --details   --no-details
-                        --version   --no-version
+        - I'm doing it in mvs and it's tedious:
 
-                - Option 2: disable feature:
-                    - Add one new option that can disable user-preference flags.
-                    - It would take a delimited string holding option names:
+            - Some of the hassle is that the mvs options prioritize clarity
+              of usage over ease of validation, so there are various
+              mutually exclusive options.
 
-                        --disable yes,nolog
+            - optopus will solve that via grammars.
 
-    - File name and type:
-        - Config files don't support data types very well.
-        - YAML is not in standard library.
-        - Go with JSON: $HOME/.mvs/config.json
+            - But here are other tedious aspects:
+                
+                - Both user-preferences and opts tend to have the same
+                  validation needs.
 
-    - Which command-line options to support in user-defaults:
-        - Several don't make much sense as user-defaults.
-        - But it's probably simpler just to support everything.
+                - And then merge them can be tricky.
 
-    - Current options:
+                    - Maybe this isn't too bad if we could solve the argparse
+                      deficiency where you don't know if the opt was supplied
+                      or was the default.
 
-        Key        | Value | Note
-        --------------------------------------
-        paths      | []    | .
-        stdin      | True  | .
-        file       | PATH  | .
-        clipboard  | True  | .
-        --------------------------------------
-        flat       | True  | .
-        paragraphs | True  | .
-        pairs      | True  | .
-        rows       | True  | .
-        --------------------------------------
-        rename     | CODE  | .
-        filter     | CODE  | .
-        indent     | N     | .
-        seq        | N     | .
-        step       | N     | .
-        --------------------------------------
-        dryrun     | True  | .
-        yes        | True  | .
-        nolog      | True  | .
-        --------------------------------------
-        pager      | CMD   | .
-        limit      | N     | .
-        --------------------------------------
-        skip       | NAMES | .
-        clobber    | NAMES | .
-        create     | NAMES | .
-        --------------------------------------
-        help       | True  | .
-        details    | True  | .
-        version    | True  | .
+                    - If we knew that, then the merge logic would be simpler, I think[?].
+
+                        for K, V in prefs.items():
+                            if opts.K was not set by user:
+                                opts.K = V
+
+    - ISSUE for optopus:
+        - negatable options are complicated
+        - whether/how to display in help text
+        - how to represent data
+
+    - File name and type: $HOME/.mvs/config.json
+
+    - Which command-line options to support in user-defaults: all of them.
+
+    - Should help text show app-defaults or user-preferences: former.
+
+    - How to disable flags set in user-preferences: --disable FLAG [FLAG]
 
 Add --edit: receive original paths; open editor; user defines new paths.
     from subprocess import run

@@ -26,6 +26,7 @@ class CON:
     comma_join = ', '
     underscore = '_'
     hyphen = '-'
+    comma_space = ', '
     dash = hyphen + hyphen
     all = 'all'
     all_tup = (all,)
@@ -43,6 +44,7 @@ class CON:
     # Logging.
     datetime_fmt = '%Y-%m-%d_%H-%M-%S'
     logfile_ext = 'json'
+    prefs_file_name = 'config.json'
 
     # Executables.
     default_pager_cmd = 'more'
@@ -75,10 +77,13 @@ MSG_FORMATS = constants('MsgFormats', dict(
     path_collection_failed = 'Collection of input paths failed.\n\n{}',
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
     log_writing_failed     = 'Unexpected error during writing to log file.\n\n{}',
+    prefs_reading_failed   = 'Unexpected error during reading of user preferences {!r}.\n\n{{}}',
     prepare_failed_cli     = 'Renaming preparation resulted in problems:{}.\n',
     renaming_raised        = '\nRenaming raised an error at tracking_index={}. Traceback follows:\n\n{{}}',
     opts_require_one       = 'One of these options is required',
     opts_mutex             = 'No more than one of these options should be used',
+    invalid_pref_val       = 'User preferences: invalid value for {}: expected {}: got {!r}',
+    invalid_pref_keys      = 'User preferences: invalid key(s): {}',
     # Other messages in CliRenamer.
     paths_to_be_renamed    = 'Paths to be renamed{}.\n',
     confirm_prompt         = '\nRename paths{}',
@@ -130,16 +135,63 @@ def write_to_clipboard(text):
     pyperclip.copy(text)
 
 ####
-# Other.
+# Functions to validate command-line arguments and user preferences.
+#
+# The preferences checkers return None on success or the expected type
+# as a str for use in error messages.
 ####
 
 def positive_int(x):
-    # Helper for argparse configuration to check for positive integers.
     if x.isdigit():
         x = int(x)
         if x >= 1:
             return x
     raise ValueError
+
+def posint_pref(x):
+    ok = (
+        isinstance(x, int) and
+        x >= 1 and
+        not isinstance(x, bool)
+    )
+    if ok:
+        return None
+    else:
+        return 'positive int'
+
+def list_or_str(x):
+    if isinstance(x, (str, list)):
+        return None
+    else:
+        return 'list or str'
+
+def list_of_str(xs):
+    if isinstance(xs, list) and all(isinstance(x, str) for x in xs):
+        return None
+    else:
+        return 'list[str]'
+
+@dataclass(frozen = True)
+class PrefType:
+    name: str
+    validator: object
+
+    def check_value(self, val):
+        # If the validator is already a type (bool, int, etc), just
+        # check the value's type and return None or the expected type name.
+        # Otherwise, the validator is a function that returns what we need.
+        f = self.validator
+        if isinstance(f, type):
+            if isinstance(val, f):
+                return None
+            else:
+                return f.__name__
+        else:
+            return f(val)
+
+####
+# Text wrapping.
+####
 
 def wrap_text(text, width):
     # Takes some text and a max width.
