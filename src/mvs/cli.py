@@ -666,7 +666,6 @@ class CLI:
 
           # Creating missing parents before renaming.
           --create parent
-          --create
     ''').lstrip()
 
     # Argument configuration for argparse.
@@ -845,7 +844,7 @@ class CLI:
         {
             names: '--create',
             'choices': CON.all_tup + Problem.names_for(CONTROLS.create),
-            'nargs': '?',
+            'nargs': '+',
             'metavar': 'PROB',
             'help': 'Fix missing parent problem before renaming',
             dtype: list_or_str,
