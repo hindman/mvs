@@ -446,10 +446,13 @@ class CliRenamer:
 
         # If the user wants to use an editor, run the text through that process.
         if opts.edit:
+            if not opts.editor:
+                self.wrapup(CON.exit_fail, MF.no_editor)
+                return None
             try:
                 text = edit_text(opts.editor, text)
             except Exception as e:
-                self.wrapup_with_tb(MF.path_editing_failed)
+                self.wrapup_with_tb(MF.edit_failed_unexpected)
                 return None
 
         # Split, strip, return.
@@ -577,7 +580,7 @@ class CLI:
 
     paths = 'paths'
     sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
-    structures = constants('Structures', ('rename', 'edit') + STRUCTURES.keys())
+    structures = constants('Structures', ('rename',) + STRUCTURES.keys())
 
     # Program help text: description and explanatory text.
 
@@ -797,10 +800,11 @@ class CLI:
         },
         {
             names: '--editor',
-            'default': CON.default_editor_cmd,
             'metavar': 'CMD',
+            'default': None,
+            real_default: CON.default_editor_cmd,
             'help': f'Command string for editor used by --edit [default: {CON.default_editor_cmd}]',
-            dtype: bool,
+            dtype: str,
         },
 
         #

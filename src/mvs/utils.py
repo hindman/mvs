@@ -88,7 +88,9 @@ MSG_FORMATS = constants('MsgFormats', dict(
     opts_mutex             = 'No more than one of these options should be used',
     invalid_pref_val       = 'User preferences: invalid value for {}: expected {}: got {!r}',
     invalid_pref_keys      = 'User preferences: invalid key(s): {}',
-    no_editor              = 'The --edit option requires an --editor to be set',
+    no_editor              = 'The --edit option requires an --editor',
+    editor_cmd_nonzero     = 'Editor process exited unsuccessfully: editor={!r}, path={!r}',
+    edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
     # Other messages in CliRenamer.
     paths_to_be_renamed    = 'Paths to be renamed{}.\n',
     confirm_prompt         = '\nRename paths{}',
@@ -139,6 +141,7 @@ def edit_text(editor, text):
         now = str(time()).replace(CON.period, '')
         path = Path(gettempdir()) / f'{CON.app_name}.{now}.txt'
         if not path.is_file():
+            path = str(path)
             break
 
     # Write current text to it.
@@ -154,7 +157,7 @@ def edit_text(editor, text):
         with open(path) as fh:
             return fh.read()
     else:
-        raise MvsError(MF.editor_cmd_failed)
+        raise MvsError(MSG_FORMATS.editor_cmd_nonzero.format(editor, path))
 
 def read_from_clipboard():
     return pyperclip.paste()

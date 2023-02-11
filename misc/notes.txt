@@ -13,37 +13,19 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Support preferences.
-    - Tests
-    - Editing pass for this work: check code organization and comments.
+Tests:
+    - User-prefs
+    - The --edit option.
 
-Add --edit:
-
-    - Started implementation.
-    - Have not tried to run it yet.
-    - Some needed constants are still undefined.
-
-    - Receive original paths.
-    - Open editor.
-    - User defines new paths and quits.
-    - Text of original and new paths is loaded.
-
-    - The --edit option is a secondary source with structural implications:
-        - Structural like --rename because it implies initial input paths are just originals.
-        - We get original paths from a primary source (PATHS, STDIN, file, clipboard).
-        - Those paths are sent to editor.
-        - Resulting text is split into the final input-paths.
-
-My settings after I get preferences and --edit working:
-    - pager = less
-    - editor = mvim
-
-Add --enforce and make --skip=equal the default.
+Editing pass:
+    - User-prefs
+    - The --edit option.
+    - Tests.
 
 Case-change-only renamings.
     - Path(orig).rename(new): works
-    - But existence checks do not respect case.
-    - This will vary by OS.
+
+Add --enforce and make --skip=equal the default.
 
 Issues for optopus:
 
@@ -251,6 +233,38 @@ Adding --enforce and making --skip=equal the default:
         "           | enforce = X  | --skip X
         "           | enforce = X  | --parent X
         ===========================================
+
+How --edit relates to SOURCES and STRUCTURES:
+
+    - The --edit option is like a "source" and has structural implications, but
+      it not literally a source or a structure.
+
+    - Source:
+
+        - The option is not a primary source. Instead, the user provides
+          original paths from a primary source.
+
+        - Like --rename, --edit augments those paths. But unlike --rename, the
+          augmentation occur before path parsing. So the steps go like this:
+
+            - Read input from source (orig paths)
+            - Write paths to temp file.
+            - Edit temp file.
+            - Read input paths from temp file (orig paths and new paths).
+            - Parse.
+
+    - Structure:
+
+        - Both --edit and --rename have structural implications.
+
+        - But --rename functions as a STRUCTURE in command-line grammar becaue
+          it means the user need not (and cannot meaningfully) specify a
+          structure other than the default of --flat.
+
+        - By contrast, a user can use --edit and any of the structures. The
+          --edit option assumes that the input input paths are flat and solely
+          original; but the final edited temp file can have any structure the
+          user wants.
 
 --------
 other-tools: Other tools
