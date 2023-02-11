@@ -14,64 +14,7 @@ todos: TODOs
 --------
 
 Support preferences.
-
-    - Since user-prefs and opts need similar validation, should I load
-      user-prefs and convert them to arguments and just let argparse validate?
-
-        - It sort of works.
-
-        - But it fails as far as required args go. If something is required
-          (either outright or because of the presence of other options), then
-          arg-parsing will complain.
-
-    - ISSUE both here and in optopus:
-
-        - After parsing occurs, how does the user tell if an opts attribute was
-          (1) supplied in the command-line args vs (2) obtain from the default.
-
-        - This an annoying problem with no good argparse solutions.
-
-    - ISSUE for optopus:
-
-        - How to merge user-preferences and opts.
-
-        - I'm doing it in mvs and it's tedious:
-
-            - Some of the hassle is that the mvs options prioritize clarity
-              of usage over ease of validation, so there are various
-              mutually exclusive options.
-
-            - optopus will solve that via grammars.
-
-            - But here are other tedious aspects:
-                
-                - Both user-preferences and opts tend to have the same
-                  validation needs.
-
-                - And then merge them can be tricky.
-
-                    - Maybe this isn't too bad if we could solve the argparse
-                      deficiency where you don't know if the opt was supplied
-                      or was the default.
-
-                    - If we knew that, then the merge logic would be simpler, I think[?].
-
-                        for K, V in prefs.items():
-                            if opts.K was not set by user:
-                                opts.K = V
-
-    - ISSUE for optopus:
-        - negatable options are complicated
-        - whether/how to display in help text
-        - how to represent data
-
-    - File name and type: $HOME/.mvs/config.json
-
-    - Which command-line options to support in user-defaults: all of them.
-
-    - Should help text show app-defaults or user-preferences: former.
-
-    - How to disable flags set in user-preferences: --disable FLAG [FLAG]
+    - Tests
 
 Add --edit: receive original paths; open editor; user defines new paths.
     from subprocess import run
@@ -90,9 +33,49 @@ Case-change-only renamings.
     - But existence checks do not respect case.
     - This will vary by OS.
 
+Issues for optopus:
+
+    - Did user supply a value or did it come from the configured default?
+
+        - After parsing occurs, how does the user tell if an opts attribute was
+          (1) supplied in the command-line args vs (2) obtain from the default.
+
+        - This an annoying problem with no good argparse solutions.
+
+    - Merging user-preferences and opts.
+
+        - User-prefs and opts tend to have the same validation needs.
+
+        - And the merge them can be tricky.
+
+            - Maybe this isn't too bad if we could solve the argparse
+              deficiency where you don't know if the opt was supplied or was
+              the default.
+
+            - If we knew that, then the merge logic would be simpler, I think[?].
+
+                for K, V in prefs.items():
+                    if opts.K was not set by user:
+                        opts.K = V
+
+    - How does a user request a non-default location for user-prefs?
+
+        - Environment variable?
+
+    - Negatable options:
+
+        - Whether/how to display in help text.
+        - How to represent data.
+
 --------
 road-map: Road map
 --------
+
+CLI.opts_config is awkward: rework.
+    - The oc dicts lack a simple name attribute.
+    - The opts_config collection would work better as a dict
+      where you could look items up by name.
+    - The special key names are a hassle.
 
 Other operations:
     - copy: given old-paths, copy them to new-paths.

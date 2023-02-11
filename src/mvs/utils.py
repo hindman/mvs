@@ -15,6 +15,7 @@ class CON:
     # Application configuration.
     app_name = 'mvs'
     encoding = 'utf-8'
+    app_dir_env_var = f'{app_name.upper()}_APP_DIR'
 
     # Characters and simple tokens.
     newline = '\n'

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import subprocess
 import sys
 import traceback
@@ -267,8 +268,6 @@ class CliRenamer:
         else:
             return opts
 
-    # HERE ===========================================================
-
     def load_preferences(self):
         # Return empty if there is no user-preferences file.
         path = self.user_prefs_path
@@ -284,44 +283,6 @@ class CliRenamer:
             self.wrapup_with_tb(msg)
 
     def merge_opts_prefs(self, opts, prefs):
-
-        '''
-
-        Key        | Value | Note
-        --------------------------------------
-        paths      | []    | .
-        stdin      | True  | .
-        file       | PATH  | .
-        clipboard  | True  | .
-        --------------------------------------
-        flat       | True  | .
-        paragraphs | True  | .
-        pairs      | True  | .
-        rows       | True  | .
-        --------------------------------------
-        rename     | CODE  | .
-        filter     | CODE  | .
-        indent     | N     | .
-        seq        | N     | .
-        step       | N     | .
-        --------------------------------------
-        dryrun     | True  | .
-        yes        | True  | .
-        nolog      | True  | .
-        --------------------------------------
-        pager      | CMD   | .
-        limit      | N     | .
-        --------------------------------------
-        skip       | NAMES | .
-        clobber    | NAMES | .
-        create     | NAMES | .
-        --------------------------------------
-        help       | True  | .
-        details    | True  | .
-        version    | True  | .
-
-        '''
-
         # Use the command-line options configuration data to
         # create a dict of PrefType instances.
         ptypes = tuple(
@@ -339,7 +300,7 @@ class CliRenamer:
             invalid = CON.comma_space.join(invalid)
             msg = MF.invalid_pref_keys.format(invalid)
             self.wrapup(CON.exit_fail, msg)
-            return
+            return None
 
         # Check data types of the prefs.
         for name, val in prefs.items():
@@ -348,26 +309,42 @@ class CliRenamer:
             if expected:
                 msg = MF.invalid_pref_val.format(pt.name, expected, val)
                 self.wrapup(CON.exit_fail, msg)
-                return
+                return None
 
-        # Merge preferences into opts.
+        # Merge preferences into opts. If the current opts attribute is unset
+        # and if the preference was not disabled via --disable, apply the
+        # preference to opts.
+        for name, val in prefs.items():
+            if name not in opts.disable:
+                current = getattr(opts, name)
+                if current in CLI.unset_opt_vals:
+                    setattr(opts, name, val)
 
+        # Create a dict of the real_default values.
+        rds = {
+            parse_oc_name(oc) : oc[CLI.real_default]
+            for oc in CLI.opts_config
+            if CLI.real_default in oc
+        }
+
+        # Apply real defaults to any attributes that were
+        # not set either in user-prefs or on the command line.
+        for name, rd in rds.items():
+            current = getattr(opts, name)
+            if current in CLI.unset_opt_vals:
+                setattr(opts, name, rd)
+
+        # Boom.
         return opts
 
-        opts.fubb = 1235
-        print(opts)
-        quit()
-
     def oc_to_preftype(self, oc):
-        name = oc[CLI.names].split()[0].lstrip(CON.hyphen)
+        name = parse_oc_name(oc)
         valid = oc[CLI.dtype]
         return PrefType(name, valid)
 
     @property
     def user_prefs_path(self):
         return self.app_directory / CON.prefs_file_name
-
-    # HERE ===========================================================
 
     def create_arg_parser(self):
         # Define parser.
@@ -383,6 +360,7 @@ class CliRenamer:
         for oc in CLI.opts_config:
             kws = dict(oc)
             kws.pop(CLI.dtype)
+            kws.pop(CLI.real_default, None)
             if CLI.group in kws:
                 arg_group = ap.add_argument_group(kws.pop(CLI.group))
             xs = kws.pop(CLI.names).split()
@@ -494,7 +472,11 @@ class CliRenamer:
 
     @property
     def app_directory(self):
-        return Path.home() / (CON.period + CON.app_name)
+        app_dir = os.environ.get(CON.app_dir_env_var)
+        if app_dir:
+            return Path(app_dir)
+        else:
+            return Path.home() / (CON.period + CON.app_name)
 
     def log_file_path(self, log_type):
         now = self.logged_at.strftime(CON.datetime_fmt)
@@ -572,6 +554,9 @@ class CliRenamer:
 ####
 # Configuration for command-line argument parsing.
 ####
+
+def parse_oc_name(oc):
+    return oc['names'].split()[0].lstrip(CON.hyphen)
 
 class CLI:
 
@@ -668,12 +653,18 @@ class CLI:
           --create parent
     ''').lstrip()
 
-    # Argument configuration for argparse.
-
+    # Important key names in opts_config.
     names = 'names'
     group = 'group'
     dtype = 'dtype'
+    real_default = 'real_default'
 
+    # Values in the parsed opts indicating that the user did not
+    # set the option on the command line. Used when merging 
+    # the user preferences into opts.
+    unset_opt_vals = (False, None, [])
+
+    # Argument configuration for argparse.
     opts_config = (
 
         #
@@ -755,7 +746,8 @@ class CLI:
             names: '--indent',
             'type': positive_int,
             'metavar': 'N',
-            'default': 4,
+            'default': None,
+            real_default: 4,
             'help': 'Number of spaces for indentation in user-supplied code [default: 4]',
             dtype: posint_pref,
         },
@@ -763,7 +755,8 @@ class CLI:
             names: '--seq',
             'metavar': 'N',
             'type': positive_int,
-            'default': 1,
+            'default': None,
+            real_default: 1,
             'help': 'Sequence start value [default: 1]',
             dtype: posint_pref,
         },
@@ -771,7 +764,8 @@ class CLI:
             names: '--step',
             'metavar': 'N',
             'type': positive_int,
-            'default': 1,
+            'default': None,
+            real_default: 1,
             'help': 'Sequence step value [default: 1]',
             dtype: posint_pref,
         },
@@ -806,7 +800,8 @@ class CLI:
             group: 'Listings',
             names: '--pager',
             'metavar': 'CMD',
-            'default': CON.default_pager_cmd,
+            'default': None,
+            real_default: CON.default_pager_cmd,
             'help': (
                 'Command string for paginating listings [default: '
                 f'`{CON.default_pager_cmd}`; empty string to disable]'
@@ -851,10 +846,18 @@ class CLI:
         },
 
         #
-        # Program information.
+        # Other.
         #
         {
-            group: 'Program information',
+            group: 'Other',
+            names: '--disable',
+            'nargs': '+',
+            'metavar': 'FLAG',
+            'default': [],
+            'help': 'Disable flag options that were set true in user preferences',
+            dtype: bool,
+        },
+        {
             names: '--help -h',
             'action': 'store_true',
             'help': 'Display this help message and exit',
@@ -874,4 +877,13 @@ class CLI:
         },
 
     )
+
+    for oc in opts_config:
+        if parse_oc_name(oc) == 'disable':
+            oc['choices'] = tuple(
+                parse_oc_name(oc)
+                for oc in opts_config
+                if oc.get('action') == 'store_true'
+            )
+            break
 
