@@ -23,7 +23,82 @@ Editing pass:
     - Tests.
 
 Case-change-only renamings.
-    - Path(orig).rename(new): works
+    - Path(orig).rename(new): case-change renaming works.
+    - But existence checks current say the renaming is not needed.
+
+    Function to determine a path's existence status:
+
+        PS = PATH_STATUSES = constants('PathStatuses', dict(
+            missing = 0,
+            exists = 1,
+            exists_strict = 2,
+        ))
+
+        def path_existence(path):
+            p = Path(p)
+            if p.parent.exists():
+                if p in p.parent.iterdir():
+                    return PS.exists_strict
+                elif p.exists():
+                    return PS.exists
+            return PS.missing
+
+    How will the fake file system implement those checks?
+
+        - The dict implementation is not well suited for this. Ideally, I would
+          have something like this:
+
+            fs = FileSystem(case = SENSITIVE|PRESERVING|INSENSITIVE)
+
+            Internally, it could use a dict:
+
+                key = path.lower()
+                value = set of actual paths on the system [path.upper() for INSENSITIVE]
+
+                SENSITIVE: key exists and path in set
+                PRESERVING: key exists (for PS.exists) and path in set (for PS.exists_strict)
+                INSENSITIVE: key exists
+
+        - Hacky, temporary workaround:
+
+            - The fake system is used only in testing, with small dicts.
+
+            - Every check could just process all of the key-value pairs to
+              return the correct answer.
+
+            - But that processing would have to assume a file-system behavior,
+              so I guess I would have to default to case-preserving.
+
+    How the RenamePair existence checks should operate:
+
+        check_orig_exists():
+
+            - Key question: is renaming possible?
+            - PS.exists is sufficient.
+
+        check_new_not_exists():
+
+            - Key question: is renaming necessary?
+            - Requires PS.exists_strict.
+
+        check_new_parent_exists():
+
+            - Key question: does renaming also require create-parent?
+            - PS.exists is sufficient.
+
+    Tests for this set of behaviors should cover all possibilities:
+
+        parent    | name      | Example: orig vs new | Note
+        ---------------------------------------------------------------------
+        eq        | eq        | foo/bar   foo/bar    | .
+        "         | case      | foo/bar   foo/BAR    | .
+        "         | different | foo/bar   foo/b      | .
+        case      | eq        | foo/bar   FOO/bar    | .
+        "         | case      | foo/bar   FOO/BAR    | .
+        "         | different | foo/bar   FOO/b      | .
+        different | eq        | foo/bar   f/bar      | .
+        "         | case      | foo/bar   f/BAR      | .
+        "         | different | foo/bar   f/b        | .
 
 Add --enforce and make --skip=equal the default.
 
@@ -265,6 +340,41 @@ How --edit relates to SOURCES and STRUCTURES:
           --edit option assumes that the input input paths are flat and solely
           original; but the final edited temp file can have any structure the
           user wants.
+
+Policy regarding new parents:
+
+    - If user requests parent-affecting rename, what is intended?
+
+        foo/bar.txt => FOO/bar-new.txt
+
+    - Does user want to create FOO or rename foo to FOO?
+
+        - If create is intended, it would work only on the case-sensistive
+          systems that allow foo and FOO to coexist.
+
+        - If rename is intended, that would affect the unlisted siblings of the
+          original path.
+
+            - That seems like a significant operation to infer with certaintly
+              from a file rename request.
+
+            - By contrast, an explicitly requested directory rename is known to
+              affect all of its contents. But contents and siblings are
+              different.
+
+    - Policy to avoid that complexity and ambiguity:
+
+        - Parents can be created but not renamed.
+
+    - How mvs would behave in the current example:
+
+        OS case-sensitive | Action
+        -----------------------------------------------
+        Yes               | Create missing FOO
+        No                | Do nothing since FOO exists
+
+        - In other words, create parent only if the user requests it and if the
+          file system says the parent is missing.
 
 --------
 other-tools: Other tools
