@@ -26,6 +26,7 @@ from .utils import (
     posint_pref,
     positive_int,
     read_from_clipboard,
+    edit_text,
     read_from_file,
     wrap_text,
 )
@@ -427,8 +428,10 @@ class CliRenamer:
         # Gets the input path text from the source.
         # Returns a tuple of stripped lines.
         opts = self.opts
+
+        # Read the input path text from the initial source.
         if opts.paths:
-            paths = opts.paths
+            text = CON.newline.join(opts.paths)
         else:
             try:
                 if opts.clipboard:
@@ -440,7 +443,17 @@ class CliRenamer:
             except Exception as e: # pragma: no cover
                 self.wrapup_with_tb(MF.path_collection_failed)
                 return None
-            paths = text.split(CON.newline)
+
+        # If the user wants to use an editor, run the text through that process.
+        if opts.edit:
+            try:
+                text = edit_text(opts.editor, text)
+            except Exception as e:
+                self.wrapup_with_tb(MF.path_editing_failed)
+                return None
+
+        # Split, strip, return.
+        paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)
 
     ####
@@ -564,7 +577,7 @@ class CLI:
 
     paths = 'paths'
     sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
-    structures = constants('Structures', ('rename',) + STRUCTURES.keys())
+    structures = constants('Structures', ('rename', 'edit') + STRUCTURES.keys())
 
     # Program help text: description and explanatory text.
 
@@ -664,6 +677,8 @@ class CLI:
     # the user preferences into opts.
     unset_opt_vals = (False, None, [])
 
+    just_origs_msg = 'implies inputs are just original paths'
+
     # Argument configuration for argparse.
     opts_config = (
 
@@ -733,7 +748,7 @@ class CLI:
             group: 'User code',
             names: '--rename -r',
             'metavar': 'CODE',
-            'help': 'Code to convert original path to new path [implies inputs are just original paths]',
+            'help': f'Code to convert original path to new path [{just_origs_msg}]',
             dtype: str,
         },
         {
@@ -768,6 +783,24 @@ class CLI:
             real_default: 1,
             'help': 'Sequence step value [default: 1]',
             dtype: posint_pref,
+        },
+
+        #
+        # Renaming via editing.
+        #
+        {
+            group: 'Renaming via editing',
+            names: '--edit',
+            'action': 'store_true',
+            'help': f'Create new paths via a text editor [{just_origs_msg}]',
+            dtype: bool,
+        },
+        {
+            names: '--editor',
+            'default': CON.default_editor_cmd,
+            'metavar': 'CMD',
+            'help': f'Command string for editor used by --edit [default: {CON.default_editor_cmd}]',
+            dtype: bool,
         },
 
         #

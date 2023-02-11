@@ -2,8 +2,12 @@ import pyperclip
 
 from dataclasses import dataclass
 from kwexception import Kwexception
+from pathlib import Path
 from short_con import constants
+from subprocess import run
+from tempfile import gettempdir
 from textwrap import dedent
+from time import time
 
 from .version import __version__
 
@@ -49,8 +53,7 @@ class CON:
 
     # Executables.
     default_pager_cmd = 'more'
-    default_copy_cmd = 'pbcopy'
-    default_paste_cmd = 'pbpaste'
+    default_editor_cmd = 'vim'
 
 ####
 # Structures for input paths data.
@@ -85,6 +88,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     opts_mutex             = 'No more than one of these options should be used',
     invalid_pref_val       = 'User preferences: invalid value for {}: expected {}: got {!r}',
     invalid_pref_keys      = 'User preferences: invalid key(s): {}',
+    no_editor              = 'The --edit option requires an --editor to be set',
     # Other messages in CliRenamer.
     paths_to_be_renamed    = 'Paths to be renamed{}.\n',
     confirm_prompt         = '\nRename paths{}',
@@ -128,6 +132,29 @@ class RenamePair:
 def read_from_file(path):
     with open(path) as fh:
         return fh.read()
+
+def edit_text(editor, text):
+    # Get a temp file path that does not exist.
+    while True:
+        now = str(time()).replace(CON.period, '')
+        path = Path(gettempdir()) / f'{CON.app_name}.{now}.txt'
+        if not path.is_file():
+            break
+
+    # Write current text to it.
+    with open(path, 'w') as fh:
+        fh.write(text)
+
+    # Let user edit the file.
+    cmd = (editor, path)
+    p = run(cmd)
+
+    # Read file and return its edited text.
+    if p.returncode == 0:
+        with open(path) as fh:
+            return fh.read()
+    else:
+        raise MvsError(MF.editor_cmd_failed)
 
 def read_from_clipboard():
     return pyperclip.paste()

@@ -15,12 +15,24 @@ todos: TODOs
 
 Support preferences.
     - Tests
+    - Editing pass for this work: check code organization and comments.
 
-Add --edit: receive original paths; open editor; user defines new paths.
-    from subprocess import run
-    cmd = ('mvim', 'foobar.txt')
-    p = run(cmd)
-    print(p)           # CompletedProcess(args=('mvim', 'foobar.txt'), returncode=0)
+Add --edit:
+
+    - Started implementation.
+    - Have not tried to run it yet.
+    - Some needed constants are still undefined.
+
+    - Receive original paths.
+    - Open editor.
+    - User defines new paths and quits.
+    - Text of original and new paths is loaded.
+
+    - The --edit option is a secondary source with structural implications:
+        - Structural like --rename because it implies initial input paths are just originals.
+        - We get original paths from a primary source (PATHS, STDIN, file, clipboard).
+        - Those paths are sent to editor.
+        - Resulting text is split into the final input-paths.
 
 My settings after I get preferences and --edit working:
     - pager = less
