@@ -22,17 +22,64 @@ Editing pass:
     - The --edit option.
     - Tests.
 
-Github actions:
-    - Windows test failing: test_e2e_clobber()
+Windows test failing: test_e2e_clobber()
 
-        - Failure occurs in do_rename() when we call Path.rename()
-        - Per pathlib docs:
+    - Failure occurs in do_rename() when we call Path.rename()
+    - Per pathlib docs:
 
-            On Unix, if target exists and is a file, it will be replaced
-            silently if the user has permission. On Windows, if target exists,
-            FileExistsError will be raised.
+        On Unix, if target exists and is a file, it will be replaced
+        silently if the user has permission. On Windows, if target exists,
+        FileExistsError will be raised.
 
-    - Clipboard test disabled for Linux.
+    - See docs for os.rename() and os.replace().
+
+        - I need to decide clobber policy.
+
+        - Options:
+            
+            - Clobber means clobber: nuke the dst.
+
+            - Require clobber dst to be of same type (file or dir) as src.
+                - Too simplistic.
+                - There are other file types.
+
+            - Handle nonempty-dir separately: either disallow or require user
+              to request super-clobber.
+
+        - Scenarios:
+
+            src  | dst       | Clobber ok?
+            ------------------------------
+            file | file      | OK
+            file | dir-empty | OK
+            file | dir-stuff | .
+            dir  | file      | OK
+            dir  | dir-empty | OK
+            dir  | dir-stuff | .
+
+Clipboard source test disabled for Linux.
+
+Caveats for documentation:
+
+    - Renaming is implemented with pathlib (and its dependency on os.rename(),
+      os.replace(), etc).
+
+    - Renames across file systems can fail according to those docs.
+
+    - Discuss clobbering policy.
+
+    - Be sensible.
+
+        - If you have a lot of renaming to do involving complex scenarios (eg
+          files replacing nonempty dirs), break it down into more sane steps.
+
+        - Don't rename stuff that could affect the ability of subsequent
+          renames to succeed. The mvs library checks the renaming plan against
+          the current file system: it does not check each rename against the
+          future file system after some renamings have occurred.
+
+    - Symlinks and exotic file types are not well tested: best to avoid such
+      scenarios.
 
 Case-change-only renamings.
     - Path(orig).rename(new): case-change renaming works.
