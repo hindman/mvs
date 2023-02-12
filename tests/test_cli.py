@@ -557,8 +557,8 @@ def test_e2e_clobber(tr):
     extras = ('c', 'x')
     origs, news, extras = tr.temp_area(origs, news, extras)
     ex, fhs = execute_main(*origs, *news, '--clobber', 'existing')
-    check_main_paths(origs, news + extras)
     check_main_outputs(fhs)
+    check_main_paths(origs, news + extras)
 
 ####
 # Problem control.

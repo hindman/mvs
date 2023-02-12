@@ -23,7 +23,15 @@ Editing pass:
     - Tests.
 
 Github actions:
-    - Windows test failing.
+    - Windows test failing: test_e2e_clobber()
+
+        - Failure occurs in do_rename() when we call Path.rename()
+        - Per pathlib docs:
+
+            On Unix, if target exists and is a file, it will be replaced
+            silently if the user has permission. On Windows, if target exists,
+            FileExistsError will be raised.
+
     - Clipboard test disabled for Linux.
 
 Case-change-only renamings.
