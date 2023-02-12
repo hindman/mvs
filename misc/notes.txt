@@ -24,7 +24,7 @@ Editing pass:
 
 Github actions:
     - Clipboard test disabled for Linux.
-    - Python 3.4, 3.5, 3.6 not working on ubuntu-latest.
+    - Python 3.4, 3.5, 3.6 not working on ubuntu-latest [need to use lower Ubuntu version for those Pythons]
 
 Case-change-only renamings.
     - Path(orig).rename(new): case-change renaming works.
