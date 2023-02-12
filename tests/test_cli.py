@@ -289,7 +289,6 @@ def test_sources(tr):
     assert '--stdin' in cli.err
 
 def can_use_clipboard():
-    return True
     # I could not get pyperclip working on ubuntu in Github Actions,
     # I'm using this to bypass clipboard checks.
     return sys.platform != 'linux'
