@@ -14,28 +14,28 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.7", "3.9", "3.11"]
-        # python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        # python-version: ["3.7", "3.9", "3.11"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
           # ubuntu
-          # - os: ubuntu-20.04
-          #   python-version: "3.6"
-          # - os: ubuntu-20.04
-          #   python-version: "3.5"
+          - os: ubuntu-20.04
+            python-version: "3.6"
+          - os: ubuntu-20.04
+            python-version: "3.5"
           - os: ubuntu-18.04
             python-version: "3.4"
           # windows
-          # - os: windows-latest
-          #   python-version: "3.6"
-          # - os: windows-latest
-          #   python-version: "3.5"
+          - os: windows-latest
+            python-version: "3.6"
+          - os: windows-latest
+            python-version: "3.5"
           - os: windows-latest
             python-version: "3.4"
           # macos
-          # - os: macos-latest
-          #   python-version: "3.6"
-          # - os: macos-latest
-          #   python-version: "3.5"
+          - os: macos-latest
+            python-version: "3.6"
+          - os: macos-latest
+            python-version: "3.5"
           - os: macos-latest
             python-version: "3.4"
 
