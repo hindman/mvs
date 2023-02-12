@@ -1,11 +1,8 @@
 
-# test_e2e_basic_rename
-# test_e2e_create_parent
-# test_e2e_clobber
-
 import json
 import pytest
 import re
+import sys
 
 from io import StringIO
 from pathlib import Path
@@ -294,11 +291,13 @@ def test_sources(tr):
 def can_use_clipboard():
     # I could not get pyperclip working on ubuntu in Github Actions,
     # I'm using this to bypass clipboard checks.
-    try:
-        write_to_clipboard('blort')
-        return True
-    except Exception:
-        return False
+    return sys.platform != 'linux'
+
+    # try:
+    #     write_to_clipboard('blort')
+    #     return True
+    # except Exception:
+    #     return False
 
 ####
 # Dryrun and no-confirmation.
