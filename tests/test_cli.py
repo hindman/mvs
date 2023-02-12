@@ -275,6 +275,7 @@ def test_sources(tr):
 
     # Paths via a file.
     path = tr.TEMP_PATH
+    tr.temp_area([], [])
     with open(path, 'w') as fh:
         fh.write(args_txt)
     cli = CliRenamerSIO('--file', path, yes, file_sys = origs, replies = args_txt)

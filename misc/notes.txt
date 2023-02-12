@@ -23,6 +23,7 @@ Editing pass:
     - Tests.
 
 Github actions:
+    - Windows test failing.
     - Clipboard test disabled for Linux.
 
 Case-change-only renamings.
@@ -30,8 +31,6 @@ Case-change-only renamings.
     - But existence checks current say the renaming is not needed.
 
     NEXT:
-        - Try to set up Github Actions.
-
         - If I can test this across MacOS, ubuntu, Windows-server, across
           various Pythons, maybe I could drop the entire file-system apparatus:
           rename for real on the file system.
