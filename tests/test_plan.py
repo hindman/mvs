@@ -635,7 +635,8 @@ def test_new_parent_missing(tr):
         create = PN.parent,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys2
+    got = tuple(path.replace('\\', '/') for path in plan.file_sys) # Temp Windows fix.
+    assert got == exp_file_sys2
 
 def test_news_collide(tr):
     # Paths.

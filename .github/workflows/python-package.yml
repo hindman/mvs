@@ -28,6 +28,5 @@ jobs:
         python -m pip install .[test]
     - name: Test with pytest
       run: |
-        python -VV
         pytest -s -v tests/
 
