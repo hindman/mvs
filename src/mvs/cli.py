@@ -470,10 +470,13 @@ class CliRenamer:
         # in both logging calls).
         if self.opts.nolog: # pragma: no cover
             return
-        else:
-            self.logged_at = self.logged_at or datetime.now()
-            path = self.log_file_path(log_type)
-            d = self.log_data(log_type)
+
+        # Otherwise, prepare the log file path and logging data.
+        # On the first logging call we also set self.logged_at,
+        # which is the datetime to used in both logging calls.
+        self.logged_at = self.logged_at or datetime.now()
+        path = self.log_file_path(log_type)
+        d = self.log_data(log_type)
 
         # Try to write the logging data.
         try:

@@ -26,6 +26,15 @@ Case-change-only renamings.
     - Path(orig).rename(new): case-change renaming works.
     - But existence checks current say the renaming is not needed.
 
+    NEXT:
+        - Try to set up Github Actions.
+
+        - If I can test this across MacOS, ubuntu, Windows-server, across
+          various Pythons, maybe I could drop the entire file-system apparatus:
+          rename for real on the file system.
+
+        - Then just use pytest to capture standard streams, SystemExit, etc.
+
     Function to determine a path's existence status:
 
         PS = PATH_STATUSES = constants('PathStatuses', dict(
@@ -68,6 +77,20 @@ Case-change-only renamings.
 
             - But that processing would have to assume a file-system behavior,
               so I guess I would have to default to case-preserving.
+
+        - File system interactions:
+
+            - cli.py
+                - Path.home().
+                - Read user-prefs.
+                - Write log.
+                - Read input paths from file.
+                - Editing input paths in editor.
+
+            - plan.py
+                - Check path existence.
+                - Create directory during renaming.
+                - Renaming.
 
     How the RenamePair existence checks should operate:
 
