@@ -572,7 +572,11 @@ class RenamingPlan:
         if use_real_fs:
             if rp.create_parent:
                 Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
-            Path(rp.orig).rename(rp.new)
+            p = Path(rp.orig)
+            if rp.clobber:
+                p.replace(rp.new)
+            else:
+                p.rename(rp.new)
         else:
             if rp.create_parent:
                 for par in Path(rp.new).parents:

@@ -22,6 +22,11 @@ Editing pass:
     - The --edit option.
     - Tests.
 
+New checks and policy:
+    - Orig paths must be regular file or directory.
+    - In clobbering, like must overwrite like: file => file; or dir => dir.
+    - In clobbering directories, the victim must be empty.
+
 Windows test failing: test_e2e_clobber()
 
     - Failure occurs in do_rename() when we call Path.rename()
@@ -32,30 +37,6 @@ Windows test failing: test_e2e_clobber()
         FileExistsError will be raised.
 
     - See docs for os.rename() and os.replace().
-
-        - I need to decide clobber policy.
-
-        - Options:
-            
-            - Clobber means clobber: nuke the dst.
-
-            - Require clobber dst to be of same type (file or dir) as src.
-                - Too simplistic.
-                - There are other file types.
-
-            - Handle nonempty-dir separately: either disallow or require user
-              to request super-clobber.
-
-        - Scenarios:
-
-            src  | dst       | Clobber ok?
-            ------------------------------
-            file | file      | OK
-            file | dir-empty | OK
-            file | dir-stuff | .
-            dir  | file      | OK
-            dir  | dir-empty | OK
-            dir  | dir-stuff | .
 
 Clipboard source test disabled for Linux.
 
@@ -283,6 +264,11 @@ Options:
 Alternative dryrun output styles:
     - same as input structures
     - plus json
+    - could be useful if we adopt strict clobbering policy:
+        - Run mvs once to figure out which clobber-victims violate policy.
+        - List that information in a flat/useful way.
+        - User handles those issues.
+        - Then user re-runs the original mvs attempt, which should work now.
 
 Complex failure/validation scenarios:
     - prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
