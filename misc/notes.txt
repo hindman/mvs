@@ -15,6 +15,8 @@ todos: TODOs
 
 Drop fake file system [see FAKE_FS].
 
+Evaluate CliRenamerSio.
+
 Implement new checks regarding file types and clobbering [see NEW_CHECKS].
 
 Support case-change renamings [see CASE_CHANGE].
@@ -246,9 +248,8 @@ Drop fake file system [FAKE_FS]:
 
         - There are many complications, varying by OS, with renaming alone.
 
-        - The number of file system operations is already non-trivial.
-
-        - In future features, I might add others.
+        - The number of file system operations is already non-trivial and, in
+          future changes, I might add others.
 
     - I will mitigate the complexity in three ways:
 
@@ -257,19 +258,13 @@ Drop fake file system [FAKE_FS]:
         - Write real tests involving actual renaming.
 
     - Step 1: implment helpers in conftest.py.
+        
+        - WorkArea.create() appears to work correctly now.
+        - NEXT:
 
-        - Ability to initialize an empty work area.
-            - Put some files and dirs inside of it.
-            - Maybe change file permissions and ownership.
-            - Take a snapshot of the workarea content.
+            - need to implement WorkArea.check(); it's just a stub currently.
 
-        - Test will execute a renaming operation.
-
-        - Take a new snapshot.
-
-        - Check it against expectations.
-
-        - Clear the work area, including dealing with permissions/ownership.
+            - get a working test; partial progress in test_wa().
 
     - Step 2: remove file system from plan.py.
 

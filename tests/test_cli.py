@@ -645,3 +645,54 @@ def test_wrapup_with_tb(tr):
         exp = fmt.split('{')[0]
         assert exp in cli.err
 
+def test_wa(tr, wa):
+
+    # Paths and arguments.
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+
+    origs, news = wa.create(origs, news)
+    cli = CliRenamerSIO(
+        '--flat',
+        *origs,
+        *news,
+        yes = True,
+    )
+    cli.run()
+    assert cli.success
+    assert cli.err == ''
+
+    return
+
+    # This works if I edit listing_a2aa to add work-area root.
+    # After I implement WorkArea.check() I should
+    # be able to handle of of this better.
+    got = cli.out.replace(' \n', '\n\n', 1)
+    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
+    assert got == exp
+
+    return
+
+
+
+    tr.dump(cli.success)
+    tr.dump(cli.err)
+    tr.dump(cli.out)
+
+    return
+
+
+    origs = (
+        'a',
+        'b',
+        'c',
+        'd1/',
+        ('d2/', '-wrx'),
+        ('d2/d22', '-wrx'),
+    )
+    news = ('aa', 'bb', 'cc')
+
+    wa.create(origs, news)
+    tr.dump(wa.origs)
+    tr.dump(wa.news)
+
