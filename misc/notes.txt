@@ -13,6 +13,18 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Drop fake file system [see FAKE_FS].
+
+Implement new checks regarding file types and clobbering [see NEW_CHECKS].
+
+Support case-change renamings [see CASE_CHANGE].
+
+Add --enforce and make --skip=equal the default.
+
+Clipboard source test disabled for Linux: revive if possible.
+
+New documentation [see NEW_DOCS].
+
 Tests:
     - User-prefs
     - The --edit option.
@@ -21,181 +33,6 @@ Editing pass:
     - User-prefs
     - The --edit option.
     - Tests.
-
-New checks and policy:
-    - Orig paths must be regular file or directory.
-    - In clobbering, like must overwrite like: file => file; or dir => dir.
-    - In clobbering directories, the victim must be empty.
-
-Windows test failing: test_e2e_clobber()
-
-    - Failure occurs in do_rename() when we call Path.rename()
-    - Per pathlib docs:
-
-        On Unix, if target exists and is a file, it will be replaced
-        silently if the user has permission. On Windows, if target exists,
-        FileExistsError will be raised.
-
-    - See docs for os.rename() and os.replace().
-
-Clipboard source test disabled for Linux.
-
-Caveats for documentation:
-
-    - Renaming is implemented with pathlib (and its dependency on os.rename(),
-      os.replace(), etc).
-
-    - Renames across file systems can fail according to those docs.
-
-    - Discuss clobbering policy.
-
-    - Be sensible.
-
-        - If you have a lot of renaming to do involving complex scenarios (eg
-          files replacing nonempty dirs), break it down into more sane steps.
-
-        - Don't rename stuff that could affect the ability of subsequent
-          renames to succeed. The mvs library checks the renaming plan against
-          the current file system: it does not check each rename against the
-          future file system after some renamings have occurred.
-
-    - Symlinks and exotic file types are not well tested: best to avoid such
-      scenarios.
-
-Case-change-only renamings.
-    - Path(orig).rename(new): case-change renaming works.
-    - But existence checks current say the renaming is not needed.
-
-    NEXT:
-        - If I can test this across MacOS, ubuntu, Windows-server, across
-          various Pythons, maybe I could drop the entire file-system apparatus:
-          rename for real on the file system.
-
-        - Then just use pytest to capture standard streams, SystemExit, etc.
-
-    Function to determine a path's existence status:
-
-        PS = PATH_STATUSES = constants('PathStatuses', dict(
-            missing = 0,
-            exists = 1,
-            exists_strict = 2,
-        ))
-
-        def path_existence(path):
-            p = Path(p)
-            if p.parent.exists():
-                if p in p.parent.iterdir():
-                    return PS.exists_strict
-                elif p.exists():
-                    return PS.exists
-            return PS.missing
-
-    How will the fake file system implement those checks?
-
-        - The dict implementation is not well suited for this. Ideally, I would
-          have something like this:
-
-            fs = FileSystem(case = SENSITIVE|PRESERVING|INSENSITIVE)
-
-            Internally, it could use a dict:
-
-                key = path.lower()
-                value = set of actual paths on the system [path.upper() for INSENSITIVE]
-
-                SENSITIVE: key exists and path in set
-                PRESERVING: key exists (for PS.exists) and path in set (for PS.exists_strict)
-                INSENSITIVE: key exists
-
-        - Hacky, temporary workaround:
-
-            - The fake system is used only in testing, with small dicts.
-
-            - Every check could just process all of the key-value pairs to
-              return the correct answer.
-
-            - But that processing would have to assume a file-system behavior,
-              so I guess I would have to default to case-preserving.
-
-        - File system interactions:
-
-            - cli.py
-                - Path.home().
-                - Read user-prefs.
-                - Write log.
-                - Read input paths from file.
-                - Editing input paths in editor.
-
-            - plan.py
-                - Check path existence.
-                - Create directory during renaming.
-                - Renaming.
-
-    How the RenamePair existence checks should operate:
-
-        check_orig_exists():
-
-            - Key question: is renaming possible?
-            - PS.exists is sufficient.
-
-        check_new_not_exists():
-
-            - Key question: is renaming necessary?
-            - Requires PS.exists_strict.
-
-        check_new_parent_exists():
-
-            - Key question: does renaming also require create-parent?
-            - PS.exists is sufficient.
-
-    Tests for this set of behaviors should cover all possibilities:
-
-        parent    | name      | Example: orig vs new | Note
-        ---------------------------------------------------------------------
-        eq        | eq        | foo/bar   foo/bar    | .
-        "         | case      | foo/bar   foo/BAR    | .
-        "         | different | foo/bar   foo/b      | .
-        case      | eq        | foo/bar   FOO/bar    | .
-        "         | case      | foo/bar   FOO/BAR    | .
-        "         | different | foo/bar   FOO/b      | .
-        different | eq        | foo/bar   f/bar      | .
-        "         | case      | foo/bar   f/BAR      | .
-        "         | different | foo/bar   f/b        | .
-
-Add --enforce and make --skip=equal the default.
-
-Issues for optopus:
-
-    - Did user supply a value or did it come from the configured default?
-
-        - After parsing occurs, how does the user tell if an opts attribute was
-          (1) supplied in the command-line args vs (2) obtain from the default.
-
-        - This an annoying problem with no good argparse solutions.
-
-    - Merging user-preferences and opts.
-
-        - User-prefs and opts tend to have the same validation needs.
-
-        - And the merge them can be tricky.
-
-            - Maybe this isn't too bad if we could solve the argparse
-              deficiency where you don't know if the opt was supplied or was
-              the default.
-
-            - If we knew that, then the merge logic would be simpler, I think[?].
-
-                for K, V in prefs.items():
-                    if opts.K was not set by user:
-                        opts.K = V
-
-    - How does a user request a non-default location for user-prefs?
-
-        - Environment variable?
-
-    - Negatable options:
-
-        - Whether/how to display in help text.
-        - How to represent data.
 
 --------
 road-map: Road map
@@ -324,6 +161,143 @@ Tag file creation:
 --------
 misc-notes: Misc notes
 --------
+
+New documentation [NEW_DOCS]:
+
+    - New features:
+        - User-prefs
+        - The --edit option.
+
+    - Bug fixes:
+        - Windows replace.
+        - README and argparse configuration for --create was incorrect.
+
+    - Policy changes.
+
+    - CHANGES file.
+
+    - Add caveats:
+
+        - Renaming is implemented with pathlib, which depends on os.rename()
+          os.replace().
+
+        - Renames across file systems can fail according to those docs.
+
+        - Be sensible.
+
+            - If you have a lot of renaming to do involving complex scenarios (eg
+              files replacing nonempty dirs), break it down into more sane steps.
+
+            - Don't rename stuff that could affect the ability of subsequent
+              renames to succeed. The mvs library checks the renaming plan against
+              the current file system: it does not check each rename against the
+              future file system after some renamings have occurred.
+
+Case-change renamings [CASE_CHANGE]:
+
+    - Function to determine a path's existence status:
+
+        PS = PATH_STATUSES = constants('PathStatuses', dict(
+            missing = 0,
+            exists = 1,
+            exists_strict = 2,
+        ))
+
+        def path_existence(path):
+            p = Path(p)
+            if p.parent.exists():
+                if p in p.parent.iterdir():
+                    return PS.exists_strict
+                elif p.exists():
+                    return PS.exists
+            return PS.missing
+
+    - How the RenamePair existence checks should operate:
+
+        check_orig_exists():
+            - Key question: is renaming possible?
+            - PS.exists is sufficient.
+
+        check_new_not_exists():
+            - Key question: is renaming necessary?
+            - Requires PS.exists_strict.
+
+        check_new_parent_exists():
+            - Key question: does renaming also require create-parent?
+            - PS.exists is sufficient.
+
+    - Tests should cover all possibilities:
+
+        parent    | name      | Example: orig vs new | Note
+        ---------------------------------------------------------------------
+        eq        | eq        | foo/bar   foo/bar    | .
+        "         | case      | foo/bar   foo/BAR    | .
+        "         | different | foo/bar   foo/b      | .
+        case      | eq        | foo/bar   FOO/bar    | .
+        "         | case      | foo/bar   FOO/BAR    | .
+        "         | different | foo/bar   FOO/b      | .
+        different | eq        | foo/bar   f/bar      | .
+        "         | case      | foo/bar   f/BAR      | .
+        "         | different | foo/bar   f/b        | .
+
+Drop fake file system [FAKE_FS]:
+
+    - Path renaming is too complex to test well via a fake:
+
+        - There are many complications, varying by OS, with renaming alone.
+
+        - The number of file system operations is already non-trivial.
+
+        - In future features, I might add others.
+
+    - I will mitigate the complexity in three ways:
+
+        - Stricter policy about supported file types.
+        - Stricter policy about clobbering.
+        - Write real tests involving actual renaming.
+
+    - Step 1: implment helpers in conftest.py.
+
+        - Ability to initialize an empty work area.
+            - Put some files and dirs inside of it.
+            - Maybe change file permissions and ownership.
+            - Take a snapshot of the workarea content.
+
+        - Test will execute a renaming operation.
+
+        - Take a new snapshot.
+
+        - Check it against expectations.
+
+        - Clear the work area, including dealing with permissions/ownership.
+
+    - Step 2: remove file system from plan.py.
+
+    - Step 3: adjust tests.
+
+Current file system interactions:
+
+    - cli.py
+        - Path.home().
+        - Read user-prefs.
+        - Write log.
+        - Read input paths from file.
+        - Editing input paths in editor.
+
+    - plan.py
+        - Check path existence.
+        - Create directory during renaming.
+        - Renaming.
+
+New checks: file types and clobbering [NEW_CHECKS]:
+
+    - Orig paths must be regular file or directory.
+
+    - In clobbering, like must overwrite like:
+        file => file
+        dir => dir
+
+    - To-be-clobbered directories, must be empty.
 
 The purpose of the --paragraphs structure:
 
