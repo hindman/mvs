@@ -21,6 +21,7 @@ import subprocess
 import sys
 from invoke import task
 from pathlib import Path
+from glob import glob
 
 LIB = 'mvs'
 
@@ -55,7 +56,8 @@ def test(c, func = None, cov = False, vv = False):
 def path_for_test_func(func):
     # Takes a test function name.
     # Returns the path to its test file, or exits.
-    args = ('ack', '-l', f'^def {func}', 'tests')
+    tests = glob('tests/test_*.py')
+    args = ['ack', '-l', f'^def {func}'] + tests
     result = subprocess.run(args, stdout = subprocess.PIPE)
     out = result.stdout.decode('utf-8').strip()
     paths = out.split('\n') if out else []

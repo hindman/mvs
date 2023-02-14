@@ -16,7 +16,44 @@ def tr():
 def wa():
     return WorkArea()
 
-class TestResource(object):
+@pytest.fixture
+def outs():
+    return Outputs()
+
+class Outputs:
+
+    def config(self, origs, news, total = None, listed = None):
+        self.origs = origs
+        self.news = news
+        self.total = len(origs) if total is None else total
+        self.listed = self.total if listed is None else listed
+
+    @property
+    def totlist(self):
+        return f'(total {self.total}, listed {self.listed})'
+
+    @property
+    def paths_to_be_renamed(self):
+        args = [f'Paths to be renamed {self.totlist}.\n']
+        args.extend(
+            f'{o}\n{n}\n'
+            for o, n in zip(self.origs, self.news)
+        )
+        return '\n'.join(args) + '\n'
+
+    @property
+    def confirm(self):
+        return f'Rename paths {self.totlist} [yes]? \n'
+
+    @property
+    def paths_renamed(self):
+        return 'Paths renamed.\n'
+
+    @property
+    def no_action(self):
+        return 'No action taken.\n\n'
+
+class TestResource:
 
     ####
     # Expected outputs during command-line usage.
@@ -87,7 +124,7 @@ class TestResource(object):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
 
-class WorkArea(object):
+class WorkArea:
     '''
 
     Constants from stat.
@@ -188,13 +225,11 @@ class WorkArea(object):
     def initialize(self):
         # Creates an empty work area.
         r = self.ROOT
+        self.make_subdirs_accessible()
         try:
             shutil.rmtree(r)
         except FileNotFoundError:
             pass
-        except Exception:
-            self.make_subdirs_accessible(r)
-            shutil.rmtree(r)
         Path(r).mkdir()
 
     def to_wpaths(self, xs):
@@ -249,11 +284,11 @@ class WorkArea(object):
                 mask = mask | val
         return mask
 
-    def make_subdirs_accessible(self, root):
+    def make_subdirs_accessible(self):
         # Helper used when the first attempt to clear out the work area fails
         # because a prior test made some subdirs non-accessible. It traverses
         # the tree, calling chmod on every subdir.
-        todo = [Path(root)]
+        todo = [Path(self.ROOT)]
         while todo:
             p = todo.pop()
             for kid in p.iterdir():
@@ -269,13 +304,19 @@ class WorkArea(object):
         p.chmod(curr | mask)
 
     def check(self):
+        # Actual content of the work area.
+        self.make_subdirs_accessible()
+        got = sorted(
+            str(p)
+            for p in Path(self.ROOT).glob('**/*')
+        )
 
-        # Read the work area contents.
-        # Will I need to call make_subdirs_accessible()??
-        pass
+        # What we expected.
+        wps = self.expecteds or (self.news + self.extras)
+        exp = sorted(wp.path for wp in wps)
 
-        # Compare it to expectation.
-        exp = self.expecteds or self.news
+        # Return both.
+        return (got, exp)
 
 @dataclass(frozen = True, order = True)
 class WPath:

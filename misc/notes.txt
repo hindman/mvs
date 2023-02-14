@@ -13,9 +13,22 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Drop fake file system [see FAKE_FS].
+Drop fake file system:
 
-Evaluate CliRenamerSio.
+    x Implment helpers in conftest.py.
+
+    - CliRenamerSio:
+        - Make yes=True the default.
+
+    - Modify test_cli.py:
+        - I have a working test: see test_wa().
+        - Work through the other tests [currently skipped].
+
+    - Modify test_plan.py:
+
+    - Remove file system from plan.py.
+
+    - Assess test coverage, remaining tests, and CliRenamerSio.
 
 Implement new checks regarding file types and clobbering [see NEW_CHECKS].
 
@@ -242,34 +255,6 @@ Case-change renamings [CASE_CHANGE]:
         "         | case      | foo/bar   f/BAR      | .
         "         | different | foo/bar   f/b        | .
 
-Drop fake file system [FAKE_FS]:
-
-    - Path renaming is too complex to test well via a fake:
-
-        - There are many complications, varying by OS, with renaming alone.
-
-        - The number of file system operations is already non-trivial and, in
-          future changes, I might add others.
-
-    - I will mitigate the complexity in three ways:
-
-        - Stricter policy about supported file types.
-        - Stricter policy about clobbering.
-        - Write real tests involving actual renaming.
-
-    - Step 1: implment helpers in conftest.py.
-        
-        - WorkArea.create() appears to work correctly now.
-        - NEXT:
-
-            - need to implement WorkArea.check(); it's just a stub currently.
-
-            - get a working test; partial progress in test_wa().
-
-    - Step 2: remove file system from plan.py.
-
-    - Step 3: adjust tests.
-
 Current file system interactions:
 
     - cli.py
@@ -410,6 +395,21 @@ Policy regarding new parents:
 
         - In other words, create parent only if the user requests it and if the
           file system says the parent is missing.
+
+Why I dropped the fake file system:
+
+    - Path renaming is too complex to test well via a fake:
+
+        - There are many complications, varying by OS, with renaming alone.
+
+        - The number of file system operations is already non-trivial and, in
+          future changes, I might add others.
+
+    - I decided to mitigate the complexity in three ways:
+
+        - Stricter policy about supported file types.
+        - Stricter policy about clobbering.
+        - Commit to writing real tests with actual renaming.
 
 --------
 other-tools: Other tools

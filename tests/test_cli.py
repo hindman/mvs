@@ -3,6 +3,7 @@ import json
 import pytest
 import re
 import sys
+import traceback
 
 from io import StringIO
 from pathlib import Path
@@ -25,6 +26,8 @@ class CliRenamerSIO(CliRenamer):
     # - Adds a convenience (yes) to simulate user confirmation.
     # - Adds a convenience (replies) to feed stdin.
     # - Adds a few properties/methods to simplify assertion making.
+
+    OK = 'OK'
 
     def __init__(self,
                  *args,
@@ -58,15 +61,40 @@ class CliRenamerSIO(CliRenamer):
     def err(self):
         return self.stderr.getvalue()
 
-    def log(self, log_type = None):
-        text = self.logfh.getvalue()
-        if log_type is None:
-            return text
-        else:
-            return parse_log(text, log_type)
+    @property
+    def log(self):
+        return self.logfh.getvalue()
 
-    def check_file_sys(self, *paths):
-        assert tuple(self.plan.file_sys) == paths
+    @property
+    def log_plan(self):
+        return parse_log(self.log, self.LOG_TYPE.plan)
+
+    @property
+    def log_tracking(self):
+        return parse_log(self.log, self.LOG_TYPE.tracking)
+
+    @property
+    def log_plan_dict(self):
+        return json.loads(self.log_plan)
+
+    @property
+    def log_tracking_dict(self):
+        return json.loads(self.log_tracking)
+
+    @property
+    def logs_valid_json(self):
+        plan = self.log_plan
+        tracking = self.log_tracking
+        try:
+            json.loads(plan)
+            json.loads(tracking)
+            return self.OK
+        except Exception as e:
+            return dict(
+                plan = plan,
+                tracking = tracking,
+                trackback = traceback.format_exc(),
+            )
 
 def parse_log(text, log_type):
     # Find the index of the divider between the two logging calls.
@@ -87,6 +115,7 @@ def parse_log(text, log_type):
 # Command-line arguments and options.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_version_and_help(tr):
     # Version.
     cli = CliRenamerSIO('mvs', '--version')
@@ -114,6 +143,7 @@ def test_version_and_help(tr):
     assert cli.err == ''
     assert cli.out.split() == CLI.post_epilog.split()
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_indent_and_posint(tr):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -143,6 +173,7 @@ def test_indent_and_posint(tr):
 # Basic renaming usage.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_basic_use_cases(tr):
     # Paths and arguments.
     origs = ('a', 'b', 'c')
@@ -189,6 +220,7 @@ def test_basic_use_cases(tr):
 # Input paths and sources.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_no_input_paths(tr):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
@@ -233,6 +265,7 @@ def test_no_input_paths(tr):
     assert cli.log() == ''
     assert PF.parsing_no_paths in cli.err
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_odd_number_inputs(tr):
     # An odd number of inputs.
     origs = ('z1',)
@@ -246,6 +279,7 @@ def test_odd_number_inputs(tr):
     assert got.startswith(exp1)
     assert exp2 in got
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_sources(tr):
     # Paths and args.
     origs = ('z1', 'z2', 'z3')
@@ -304,6 +338,7 @@ def can_use_clipboard():
 # Dryrun and no-confirmation.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_dryrun(tr):
     origs = ('a', 'b', 'c')
     cli = CliRenamerSIO(
@@ -321,6 +356,7 @@ def test_dryrun(tr):
     exp = tr.OUTS['listing_a2aa'] + tr.OUTS['no_action']
     assert got == exp
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_no_confirmation(tr):
     origs = ('a', 'b', 'c')
     cli = CliRenamerSIO(
@@ -341,6 +377,7 @@ def test_no_confirmation(tr):
 # User-supplied code.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_rename_paths_raises(tr):
     # Paths and args.
     origs = ('z1', 'z2', 'z3')
@@ -404,6 +441,7 @@ def test_rename_paths_raises(tr):
     assert cli.err.strip().startswith(exp)
     assert 'ZeroDivisionError: SIMULATED_ERROR' in cli.err
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_filter_all(tr):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
@@ -440,6 +478,7 @@ def test_filter_all(tr):
 # Textual outputs.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_log(tr):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -464,6 +503,7 @@ def test_log(tr):
     got = json.loads(cli.log(cli.LOG_TYPE.tracking))
     assert tuple(got) == ('tracking_index',)
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_pagination(tr):
     # Paths.
     origs = tuple(ascii_lowercase)
@@ -531,6 +571,7 @@ def check_main_outputs(fhs):
     d = json.loads(log_tracking)
     assert 'tracking_index' in d
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_e2e_basic_rename(tr):
     # End to end: basic renaming scenario.
     origs = ('a', 'b')
@@ -541,6 +582,7 @@ def test_e2e_basic_rename(tr):
     check_main_paths(origs, news)
     check_main_outputs(fhs)
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_e2e_create_parent(tr):
     # End to end: renaming that requires parent creation.
     origs = ('a', 'b')
@@ -550,6 +592,7 @@ def test_e2e_create_parent(tr):
     check_main_paths(origs, news)
     check_main_outputs(fhs)
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_e2e_clobber(tr):
     # End to end: renaming that clobbers existing paths.
     origs = ('a', 'b')
@@ -564,6 +607,7 @@ def test_e2e_clobber(tr):
 # Problem control.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_some_failed_rps(tr):
     # Paths, args, file-sys, options, expectations.
     origs = ('z1', 'z2', 'z3', 'z4')
@@ -618,6 +662,7 @@ def test_some_failed_rps(tr):
 # Miscellaneous.
 ####
 
+@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_wrapup_with_tb(tr):
     # Excercises all calls of wrapup_with_tb() and checks for expected side
     # effects. Those branches are a hassle to reach during testing, are
@@ -645,13 +690,15 @@ def test_wrapup_with_tb(tr):
         exp = fmt.split('{')[0]
         assert exp in cli.err
 
-def test_wa(tr, wa):
-
+def test_wa(tr, wa, outs):
     # Paths and arguments.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
 
+    # Create work area.
     origs, news = wa.create(origs, news)
+
+    # Rename.
     cli = CliRenamerSIO(
         '--flat',
         *origs,
@@ -660,39 +707,15 @@ def test_wa(tr, wa):
     )
     cli.run()
     assert cli.success
-    assert cli.err == ''
 
-    return
-
-    # This works if I edit listing_a2aa to add work-area root.
-    # After I implement WorkArea.check() I should
-    # be able to handle of of this better.
-    got = cli.out.replace(' \n', '\n\n', 1)
-    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
+    # Check file system.
+    got, exp = wa.check()
     assert got == exp
 
-    return
-
-
-
-    tr.dump(cli.success)
-    tr.dump(cli.err)
-    tr.dump(cli.out)
-
-    return
-
-
-    origs = (
-        'a',
-        'b',
-        'c',
-        'd1/',
-        ('d2/', '-wrx'),
-        ('d2/d22', '-wrx'),
-    )
-    news = ('aa', 'bb', 'cc')
-
-    wa.create(origs, news)
-    tr.dump(wa.origs)
-    tr.dump(wa.news)
+    # Check text outputs.
+    assert cli.err == ''
+    assert cli.logs_valid_json is cli.OK
+    outs.config(origs, news)
+    exp = outs.paths_to_be_renamed + outs.confirm + outs.paths_renamed
+    assert cli.out == exp
 
