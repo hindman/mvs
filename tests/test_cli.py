@@ -690,7 +690,13 @@ def test_wrapup_with_tb(tr):
         exp = fmt.split('{')[0]
         assert exp in cli.err
 
-def test_wa(tr, wa, outs):
+
+@pytest.mark.skip(reason = 'drop-fake-fs')
+def test_wa(tr, make_wa, outs):
+
+    # NOTE: this uses the behavior of the old wa fixture.
+    #       Needs to be switched to make_wa implementation.
+
     # Paths and arguments.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')

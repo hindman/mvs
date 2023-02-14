@@ -13,8 +13,18 @@ def tr():
     return TestResource()
 
 @pytest.fixture
-def wa():
-    return WorkArea()
+def create_wa():
+    def f(*xs):
+        n_args = len(xs)
+        wa = WorkArea(*xs)
+        tups = (
+            wa.origs_paths,
+            wa.news_paths,
+            wa.extras_paths,
+            wa.expecteds_paths,
+        )
+        return (wa, *tups[0 : n_args])
+    return f
 
 @pytest.fixture
 def outs():
@@ -183,13 +193,7 @@ class WorkArea:
         'x': stat.S_IXUSR,
     }
 
-    def __init__(self):
-        self.origs = None
-        self.news = None
-        self.extras = None
-        self.expecteds = None
-
-    def create(self, origs, news = None, extras = None, expecteds = None):
+    def __init__(self, origs, news = None, extras = None, expecteds = None):
         # Initialize an empty work area.
         self.initialize()
 
@@ -198,6 +202,12 @@ class WorkArea:
         self.news = self.to_wpaths(news)
         self.extras = self.to_wpaths(extras)
         self.expecteds = self.to_wpaths(expecteds)
+
+        # Also store tuples of just the paths as str.
+        self.origs_paths = self.just_paths(self.origs)
+        self.news_paths = self.just_paths(self.news)
+        self.extras_paths = self.just_paths(self.extras)
+        self.expecteds_paths = self.just_paths(self.expecteds)
 
         # Put origs and extra in the work area.
         to_create = self.origs + self.extras
@@ -213,14 +223,17 @@ class WorkArea:
         for wp in sorted(to_create, reverse = True):
             self.remove_permissions(wp)
 
-        result = tuple(
-            tuple(wp.path for wp in wps)
-            for wps in (self.origs, self.news, self.extras)
-        )
-        if self.extras:
-            return result
-        else:
-            return result[0:2]
+        # result = tuple(
+        #     self.just_paths(wps)
+        #     for wps in (self.origs, self.news, self.extras)
+        # )
+        # if self.extras:
+        #     return result
+        # else:
+        #     return result[0:2]
+
+    def just_paths(self, wps):
+        return tuple(wp.path for wp in wps)
 
     def initialize(self):
         # Creates an empty work area.
