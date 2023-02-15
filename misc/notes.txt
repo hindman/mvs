@@ -17,30 +17,16 @@ Drop fake file system:
 
     x Implment helpers in conftest.py.
 
+    - conftest.py:
+        - Modify Outputs and its fixture along lines of WorkArea.
+        - In test_cli.py, get test_wa() working again.
+
     - Modify test_plan.py:
-        - All tests are skipped, except one.
-        - Working on test_structure_default():
-
-            - Need to modify WorkArea().
-
-                - Store tuple[str] in origs/news/etc.
-                - Store tuple[WPath] in origs_wp/news_wp/etc.
-
-                - Constructor should just store those tuples.
-                - wa.create() should initialize and create paths.
-
-                - Make wa.check() assert by default.
-                - If do_assert=False, return (got, exp) instead.
-
-            - In tests code, origs/news/etc should not be redefined.
-            - They need to remain as-is for each creation of a fresh WorkArea.
-
-        - Get a working test.
+        - Get tests working along the lines in test_structure_default().
 
     - Modify test_cli.py:
-        - I have a working test: see test_wa().
         - CliRenamerSio: make yes=True the default.
-        - Work through the other tests [currently skipped].
+        - Get tests working along the lines in test_wa().
 
     - Remove file system from plan.py.
 

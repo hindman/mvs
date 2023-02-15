@@ -17,7 +17,6 @@ from mvs.problems import (
 # The packages top-level importables.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_top_level_imports(tr):
     # Do something simple with each top-level import.
     assert 'a' in RenamingPlan(inputs = ('a', 'b')).inputs
@@ -25,11 +24,14 @@ def test_top_level_imports(tr):
     assert isinstance(__version__, str)
 
 ####
-# Helper to confirm that a RenamingPlan failed for the expected reason.
+# Helper to confirm that a RenamingPlan raised for the expected reason.
 ####
 
-def assert_failed_because(einfo, plan, pname):
-    # Get the portion of the failure message before any string formatting.
+def assert_raised_because(einfo, plan, pname):
+    # Takes (1) an einfo for an exception that was raised by,
+    # (2) the given RenamingPlan, and (3) an expected Problem name.
+
+    # Get the portion of the message format before any string formatting.
     exp_msg = Problem.format_for(pname).split('{')[0]
     i = len(exp_msg)
 
@@ -48,46 +50,31 @@ def assert_failed_because(einfo, plan, pname):
 # Inputs and their structures.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_no_inputs(tr):
-    # If given no inputs, prepare will fail.
-    plan = RenamingPlan(
-        inputs = [],
-        structure = STRUCTURES.flat,
-        file_sys = [],
-    )
+    # If given no inputs, prepare() will fail
+    # and rename_paths() will raise.
+    plan = RenamingPlan(inputs = ())
+    plan.prepare()
+    assert plan.failed
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.parsing_no_paths)
+    assert_raised_because(einfo, plan, PN.parsing_no_paths)
 
-# @pytest.mark.skip(reason = 'drop-fake-fs')
 def test_structure_default(tr, create_wa):
     # A RenamingPlan defaults to flat input structure,
     # or the user can request flat explicitly.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
-
-
-    for structure in (None, STRUCTURES.flat):
-
-        wa, origs, news = create_wa(origs, news)
-
-        # tr.dump(origs)
-        # tr.dump(news)
-        # return
-
+    structs = (None, STRUCTURES.flat)
+    for s in structs:
+        wa = create_wa(origs, news)
         plan = RenamingPlan(
-            inputs = origs + news,
-            structure = structure,
+            inputs = wa.origs + wa.news,
+            structure = s,
         )
         assert plan.structure == STRUCTURES.flat
-
         plan.rename_paths()
-
-        got, exp = wa.check()
-        assert got == exp
-
-        break
+        wa.check()
 
 @pytest.mark.skip(reason = 'drop-fake-fs')
 def test_structure_paragraphs(tr):
@@ -122,7 +109,7 @@ def test_structure_paragraphs(tr):
     )
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.parsing_paragraphs)
+    assert_raised_because(einfo, plan, PN.parsing_paragraphs)
 
 @pytest.mark.skip(reason = 'drop-fake-fs')
 def test_structure_pairs(tr):
@@ -159,7 +146,7 @@ def test_structure_pairs(tr):
     )
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.parsing_imbalance)
+    assert_raised_because(einfo, plan, PN.parsing_imbalance)
 
 @pytest.mark.skip(reason = 'drop-fake-fs')
 def test_structure_rows(tr):
@@ -187,7 +174,7 @@ def test_structure_rows(tr):
         )
         with pytest.raises(MvsError) as einfo:
             plan.rename_paths()
-        assert_failed_because(einfo, plan, PN.parsing_row)
+        assert_raised_because(einfo, plan, PN.parsing_row)
 
 ####
 # User-supplied code.
@@ -277,7 +264,7 @@ def test_code_execution_fails(tr):
         plan.prepare()
         with pytest.raises(MvsError) as einfo:
             plan.rename_paths()
-        assert_failed_because(einfo, plan, pname)
+        assert_raised_because(einfo, plan, pname)
         fails = plan.uncontrolled_problems
         assert len(fails) == 1
         assert fails[0].rp.orig == 'b'
@@ -534,7 +521,7 @@ def test_equal(tr):
     plan.prepare()
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.equal)
+    assert_raised_because(einfo, plan, PN.equal)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -568,7 +555,7 @@ def test_missing_orig(tr):
     # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.missing)
+    assert_raised_because(einfo, plan, PN.missing)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -602,7 +589,7 @@ def test_new_exists(tr):
     # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.existing)
+    assert_raised_because(einfo, plan, PN.existing)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -648,7 +635,7 @@ def test_new_parent_missing(tr):
     # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.parent)
+    assert_raised_because(einfo, plan, PN.parent)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -694,7 +681,7 @@ def test_news_collide(tr):
     # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.colliding)
+    assert_raised_because(einfo, plan, PN.colliding)
 
     # Renaming will succeed if we skip the offending paths.
     plan = RenamingPlan(
@@ -734,5 +721,5 @@ def test_failures_skip_all(tr):
     plan.prepare()
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
-    assert_failed_because(einfo, plan, PN.all_filtered)
+    assert_raised_because(einfo, plan, PN.all_filtered)
 
