@@ -24,8 +24,10 @@ def create_wa():
     return f
 
 @pytest.fixture
-def outs():
-    return Outputs()
+def create_outs():
+    def f(*xs, **kws):
+        return Outputs(*xs, **kws)
+    return f
 
 ####
 # General testing resource: data dumping and constants.
@@ -40,7 +42,7 @@ class TestResource:
         print(msg)
 
     @staticmethod
-    def dumpj(val = None, label = 'dump()', indent = 4):
+    def dumpj(val = None, label = 'dumpj()', indent = 4):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
 
@@ -55,8 +57,9 @@ class WPath:
     mode : str
 
 ####
-# A class to put paths in the work area and
-# check them after renaming has occurred.
+# A class (1) to initialize an empty testing work area, (2) to create file and
+# directory paths in that area, and (3) after renaming has occurred, to check
+# the resulting work area paths against expectations.
 ####
 
 class WorkArea:
@@ -78,6 +81,16 @@ class WorkArea:
     ####
 
     def __init__(self, origs, news = None, extras = None, expecteds = None):
+        # Takes sequences of values, each VAL represents a work area path.
+        #
+        # - origs : renaming inputs; the original paths.
+        # - news : renaming inputs; the new paths.
+        # - extras : additional paths to be created in the work area.
+        # - expecteds : paths we expect to exist after renaming;
+        #   if empty, news + extas is used for this purpose.
+        #
+        # See to_wpath() for details on the forms that VAL can take.
+
         # Convert the supplied arguments into tuples of WPath instances.
         self.origs_wp = self.to_wpaths(origs)
         self.news_wp = self.to_wpaths(news)
@@ -102,12 +115,23 @@ class WorkArea:
         # Takes one value from a sequence supplied to WorkArea().
         # Returns a WPath.
 
-        # Unpack the value.
-        # Note that WPath.mode is expressed negatively.
-        # Example: '-wr' means "removes the user write and read permissions"
+        # Unpack the value, which can be either a simple str
+        # like 'foo/bar.txt' or a (PATH, MODE) tuple.
+        #
+        # PATH does not (yet) include the work area root; it
+        # uses forward slashes as separators; and it uses trailing
+        # slash to indicate that the path should be a directory.
+        #
+        # MODE is expressed negatively and applies only to user
+        # permissions (not group or other). For example: '-wr'
+        # means "removes the user write and read permissions"
         if isinstance(x, tuple):
             path, mode = x
-            if not mode.startswith('-'):
+            mode_ok = (
+                mode.startswith('-') and
+                all(char in '-rwx' for char in mode)
+            )
+            if not mode_ok:
                 raise ValueError(f'Invalid WPath mode: {mode}')
         else:
             path = x
@@ -115,15 +139,13 @@ class WorkArea:
 
         # If the supplied path ends with a slash, it will be a directory.
         is_dir = path.endswith(self.SLASH)
-        path.rstrip(self.SLASH)
+        path = path.rstrip(self.SLASH)
 
-        # Normalize path:
+        # Normalize path and return.
         # - Use os.sep rather than forward slash.
         # - Include the workarea root.
         path = path.replace(self.SLASH, os.sep)
         path = f'{self.ROOT}{os.sep}{path}'
-
-        # Return a WPath.
         return WPath(path, is_dir, mode)
 
     def just_paths(self, wps):
@@ -214,15 +236,14 @@ class WorkArea:
         wps = self.expecteds_wp or (self.news_wp + self.extras_wp)
         exp = sorted(wp.path for wp in wps)
 
-        # Return both.
+        # Assert and return.
         if do_assert:
             assert got == exp
-        else:
-            return (got, exp)
+        return (got, exp)
 
 class Outputs:
 
-    def config(self, origs, news, total = None, listed = None):
+    def __init__(self, origs, news, total = None, listed = None):
         self.origs = origs
         self.news = news
         self.total = len(origs) if total is None else total

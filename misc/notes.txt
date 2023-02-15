@@ -15,12 +15,6 @@ todos: TODOs
 
 Drop fake file system:
 
-    x Implment helpers in conftest.py.
-
-    - conftest.py:
-        - Modify Outputs and its fixture along lines of WorkArea.
-        - In test_cli.py, get test_wa() working again.
-
     - Modify test_plan.py:
         - Get tests working along the lines in test_structure_default().
 
@@ -28,7 +22,7 @@ Drop fake file system:
         - CliRenamerSio: make yes=True the default.
         - Get tests working along the lines in test_wa().
 
-    - Remove file system from plan.py.
+    - Remove commented-out file system code from plan.py and cli.py.
 
     - Assess test coverage, remaining tests, and CliRenamerSio.
 

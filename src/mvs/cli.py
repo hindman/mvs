@@ -58,7 +58,7 @@ class CliRenamer:
 
     def __init__(self,
                  args,
-                 file_sys = None,
+                 # file_sys = None,
                  stdout = sys.stdout,
                  stderr = sys.stderr,
                  stdin = sys.stdin,
@@ -66,7 +66,7 @@ class CliRenamer:
 
         # Attributes received as arguments.
         self.args = args
-        self.file_sys = file_sys
+        # self.file_sys = file_sys
         self.stdout = stdout
         self.stderr = stderr
         self.stdin = stdin
@@ -127,7 +127,7 @@ class CliRenamer:
                 seq_step = opts.step,
                 filter_code = opts.filter,
                 indent = opts.indent,
-                file_sys = self.file_sys,
+                # file_sys = self.file_sys,
                 skip = opts.skip,
                 clobber = opts.clobber,
                 create = opts.create,

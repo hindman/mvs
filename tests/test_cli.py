@@ -31,14 +31,14 @@ class CliRenamerSIO(CliRenamer):
 
     def __init__(self,
                  *args,
-                 file_sys = None,
+                 # file_sys = None,
                  replies = '',
                  yes = False,
                  pager = ''):
         args = args + ('--pager', pager)
         super().__init__(
             args,
-            file_sys = file_sys,
+            # file_sys = file_sys,
             stdout = StringIO(),
             stderr = StringIO(),
             stdin = StringIO('yes' if yes else replies),
@@ -690,38 +690,34 @@ def test_wrapup_with_tb(tr):
         exp = fmt.split('{')[0]
         assert exp in cli.err
 
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_wa(tr, make_wa, outs):
-
-    # NOTE: this uses the behavior of the old wa fixture.
-    #       Needs to be switched to make_wa implementation.
+def test_wa(tr, create_wa, create_outs):
+    # TODO: delete.
+    # This is just a temporoary tests used to get the create_* fixtures working.
 
     # Paths and arguments.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
 
     # Create work area.
-    origs, news = wa.create(origs, news)
+    wa = create_wa(origs, news)
 
     # Rename.
     cli = CliRenamerSIO(
         '--flat',
-        *origs,
-        *news,
+        *wa.origs,
+        *wa.news,
         yes = True,
     )
     cli.run()
     assert cli.success
 
     # Check file system.
-    got, exp = wa.check()
-    assert got == exp
+    wa.check()
 
     # Check text outputs.
     assert cli.err == ''
     assert cli.logs_valid_json is cli.OK
-    outs.config(origs, news)
+    outs = create_outs(wa.origs, wa.news)
     exp = outs.paths_to_be_renamed + outs.confirm + outs.paths_renamed
     assert cli.out == exp
 
