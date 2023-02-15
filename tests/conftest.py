@@ -3,7 +3,9 @@ import os
 import pytest
 import shutil
 import stat
+import os
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,7 +82,12 @@ class WorkArea:
     # Creating a WorkArea instance.
     ####
 
-    def __init__(self, origs, news = None, extras = None, expecteds = None):
+    def __init__(self,
+                 origs,
+                 news = None,
+                 extras = None,
+                 expecteds = None,
+                 rootless = False):
         # Takes sequences of values, each VAL represents a work area path.
         #
         # - origs : renaming inputs; the original paths.
@@ -91,13 +98,23 @@ class WorkArea:
         #
         # See to_wpath() for details on the forms that VAL can take.
 
-        # Convert the supplied arguments into tuples of WPath instances.
+        # Rootless mode.
+        self.rootless = rootless
+
+        # Convert the supplied arguments into tuples of WPath instances. These
+        # are the attributes used by WorkArea to manage its own affairs, such
+        # as creating paths and checking final work area contents. These paths
+        # are expressed relative to the repository root.
         self.origs_wp = self.to_wpaths(origs)
         self.news_wp = self.to_wpaths(news)
         self.extras_wp = self.to_wpaths(extras)
         self.expecteds_wp = self.to_wpaths(expecteds)
 
-        # Also store tuples of just the paths as str.
+        # Also store tuples of just the paths as str. These are attributes used
+        # by the caller to pass inputs into a RenamingPlan. Depending on the
+        # value of rootless, these paths might or might not have the work area
+        # ROOT as a prefix. In rootless mode, the caller intends to execute
+        # rename_paths() from the work area root (not repo root).
         self.origs = self.just_paths(self.origs_wp)
         self.news = self.just_paths(self.news_wp)
         self.extras = self.just_paths(self.extras_wp)
@@ -145,12 +162,18 @@ class WorkArea:
         # - Use os.sep rather than forward slash.
         # - Include the workarea root.
         path = path.replace(self.SLASH, os.sep)
-        path = f'{self.ROOT}{os.sep}{path}'
+        path = self.prefix + path
         return WPath(path, is_dir, mode)
 
     def just_paths(self, wps):
         # Takes some WPath instances. Returns their paths.
-        return tuple(wp.path for wp in wps)
+        # Those paths might or might not include the ROOT prefix.
+        i = len(self.prefix) if self.rootless else 0
+        return tuple(wp.path[i:] for wp in wps)
+
+    @property
+    def prefix(self):
+        return self.ROOT + os.sep
 
     ####
     # Creating the paths in the work area.
@@ -221,20 +244,41 @@ class WorkArea:
             os.chmod(wp.path, curr ^ mask)
 
     ####
+    # Change directory to the work area root.
+    ####
+
+    @contextmanager
+    def cd(self):
+        prev = os.getcwd()
+        os.chdir(self.ROOT)
+        try:
+            yield
+        finally:
+            os.chdir(prev)
+
+    ####
     # Checking the work area after renaming has occurred.
     ####
 
-    def check(self, do_assert = True):
+    def check(self, do_assert = True, no_change = False):
+        # What we expect to find.
+        if self.expecteds_wp:
+            wps = self.expecteds_wp
+            if no_change:
+                msg = 'WorkArea.check(): do not use both expecteds and no_change'
+                raise RuntimeError(msg)
+        elif no_change:
+            wps = self.origs_wp + self.extras_wp
+        else:
+            wps = self.news_wp + self.extras_wp
+        exp = sorted(wp.path for wp in wps)
+
         # Actual content of the work area.
         self.make_subdirs_accessible()
         got = sorted(
             str(p)
             for p in Path(self.ROOT).glob('**/*')
         )
-
-        # What we expected.
-        wps = self.expecteds_wp or (self.news_wp + self.extras_wp)
-        exp = sorted(wp.path for wp in wps)
 
         # Assert and return.
         if do_assert:

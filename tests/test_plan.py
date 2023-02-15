@@ -14,7 +14,7 @@ from mvs.problems import (
 )
 
 ####
-# The packages top-level importables.
+# Exercise package's top-level importables.
 ####
 
 def test_top_level_imports(tr):
@@ -31,13 +31,13 @@ def assert_raised_because(einfo, plan, pname):
     # Takes (1) an einfo for an exception that was raised by,
     # (2) the given RenamingPlan, and (3) an expected Problem name.
 
-    # Get the portion of the message format before any string formatting.
+    # Get the part of the Problem message format before any string formatting.
     exp_msg = Problem.format_for(pname).split('{')[0]
-    i = len(exp_msg)
+    size = len(exp_msg)
 
     # Grab the plan's uncontrolled failure messages, trimmed to the same size.
     fmsgs = tuple(
-        f.msg[0 : i]
+        f.msg[0 : size]
         for f in plan.uncontrolled_problems
     )
 
@@ -76,112 +76,156 @@ def test_structure_default(tr, create_wa):
         plan.rename_paths()
         wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_structure_paragraphs(tr):
-    # Paths.
+def test_structure_paragraphs(tr, create_wa):
+    # Paths, etc.
     origs = ('a', 'b', 'c')
-    empty = ('', '')
     news = ('a1', 'b1', 'c1')
+    empty = ('', '')
+    struct = STRUCTURES.paragraphs
 
-    # Basic use case: blank line(s) between orig-paths and new-paths.
-    plan = RenamingPlan(
-        inputs = origs + empty + news,
-        structure = STRUCTURES.paragraphs,
-        file_sys = origs,
-    )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
-
-    # Plus blank lines at start and end.
-    plan = RenamingPlan(
-        inputs = empty + origs + empty + news + empty,
-        structure = STRUCTURES.paragraphs,
-        file_sys = origs,
-    )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
-
-    # Odd number of paragraphs.
-    plan = RenamingPlan(
-        inputs = origs[0:1] + empty + origs[1:] + empty + news,
-        structure = STRUCTURES.paragraphs,
-        file_sys = origs,
-    )
-    with pytest.raises(MvsError) as einfo:
+    # Helper.
+    def do_check(n, before = False, after = False):
+        include_empties = {
+            False: (),
+            True: empty,
+        }
+        wa = create_wa(origs, news)
+        inputs = (
+            include_empties[before] +
+            wa.origs + 
+            empty[0:n] +
+            wa.news + 
+            include_empties[after]
+        )
+        plan = RenamingPlan(
+            inputs = inputs,
+            structure = struct,
+        )
         plan.rename_paths()
-    assert_raised_because(einfo, plan, PN.parsing_paragraphs)
+        wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_structure_pairs(tr):
-    # Paths.
+    # Basic use cases: varying N of empty lines between origs and news,
+    # optionally with empty lines before and after.
+    do_check(1)
+    do_check(2)
+    do_check(1, before = True)
+    do_check(2, after = True)
+    do_check(1, before = True, after = True)
+
+    # Helper.
+    def do_check_raise(n_para):
+        wa = create_wa(origs, news)
+        if n_para == 3:
+            inputs = wa.origs + empty + wa.news[0:1] + empty + wa.news[1:]
+        else:
+            inputs = wa.origs + wa.news
+        plan = RenamingPlan(
+            inputs = inputs,
+            structure = struct,
+        )
+        with pytest.raises(MvsError) as einfo:
+            plan.rename_paths()
+        assert_raised_because(einfo, plan, PN.parsing_paragraphs)
+        wa.check(no_change = True)
+
+    # Cases that will raise due to an odd N of paragraphs (1 then 3).
+    # In both cases, there are equal numbers of origs vs news.
+    do_check_raise(1)
+    do_check_raise(3)
+
+def test_structure_pairs(tr, create_wa):
+    # Paths, etc.
     origs = ('a', 'b', 'c')
-    empty = ('', '')
     news = ('a1', 'b1', 'c1')
-    pairs = zip(origs, news)
-    inputs = tuple(chain(*pairs))
+    empty = ('', '')
+    struct = STRUCTURES.pairs
 
-    # Basic use case.
+    # Helper to organize WorkArea paths as orig-new pairs.
+    def as_pairs(wa):
+        pairs = zip(wa.origs, wa.news)
+        return tuple(chain(*pairs))
+
+    # Basic use case: inputs as orig-new pairs.
+    wa = create_wa(origs, news)
+    inputs = as_pairs(wa)
     plan = RenamingPlan(
         inputs = inputs,
-        structure = STRUCTURES.pairs,
-        file_sys = origs,
+        structure = struct,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    wa.check()
 
-    # Add empty lines in various spots: still works.
+    # Same, but empty lines in various spots.
+    wa = create_wa(origs, news)
+    inputs = as_pairs(wa)
+    inputs = empty + inputs[:2] + empty + inputs[2:] + empty
     plan = RenamingPlan(
-        inputs = empty + inputs[:4] + empty + inputs[4:] + empty,
-        structure = STRUCTURES.pairs,
-        file_sys = origs,
+        inputs = inputs,
+        structure = struct,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    wa.check()
 
-    # Odd number of paths: should fail.
+    # Odd number of paths: should raise.
+    wa = create_wa(origs, news)
+    inputs = as_pairs(wa)[:-1]
     plan = RenamingPlan(
-        inputs = inputs[:-1],
-        structure = STRUCTURES.pairs,
-        file_sys = origs,
+        inputs = inputs,
+        structure = struct,
     )
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.parsing_imbalance)
+    wa.check(no_change = True)
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_structure_rows(tr):
+def test_structure_rows(tr, create_wa):
     # Paths.
     origs = ('a', 'b', 'c')
     empty = ('', '')
     news = ('a1', 'b1', 'c1')
-    inputs = tuple(f'{o}\t{n}' for o, n in zip(origs, news))
+    struct = STRUCTURES.rows
 
-    # Basic use case.
+    # Helper to organize WorkArea paths as rows.
+    def as_rows(wa, fmt = '{}\t{}'):
+        inputs = tuple(
+            fmt.format(o, n)
+            for o, n in  zip(wa.origs, wa.news)
+        )
+        return empty + inputs + empty
+
+    # Basic use case with row inputs.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = empty + inputs + empty,
-        structure = STRUCTURES.rows,
-        file_sys = origs,
+        inputs = as_rows(wa),
+        structure = struct,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    wa.check()
 
-    # Invalid rows with empty cells, an odd number, or both.
-    for bad_row in ('c\t', 'c\t\t\tc1', 'c\tc1\t\t'):
+    # Cases that should raise du to invalid row formats:
+    # empty cells, odd number of cells, or both.
+    bad_formats = (
+        '{}\t',
+        '{}\t\t{}',
+        '{}\t{}\t',
+        '\t{}\t{}',
+    )
+    for fmt in bad_formats:
+        wa = create_wa(origs, news)
         plan = RenamingPlan(
-            inputs = inputs[:-1] + (bad_row,),
-            structure = STRUCTURES.rows,
-            file_sys = origs,
+            inputs = as_rows(wa, fmt),
+            structure = struct,
         )
         with pytest.raises(MvsError) as einfo:
             plan.rename_paths()
         assert_raised_because(einfo, plan, PN.parsing_row)
+        wa.check(no_change = True)
 
 ####
 # User-supplied code.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_renaming_code(tr):
+def test_renaming_code(tr, create_wa):
     # Paths and three variants of renaming code.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
@@ -191,13 +235,14 @@ def test_renaming_code(tr):
 
     # Basic use case: generate new-paths via user-supplied code.
     for code in (code_str, code_lambda, code_func):
+        wa = create_wa(origs, news, rootless = True)
         plan = RenamingPlan(
-            inputs = origs,
+            inputs = wa.origs,
             rename_code = code,
-            file_sys = origs,
         )
-        plan.rename_paths()
-        assert tuple(plan.file_sys) == news
+        with wa.cd():
+            plan.rename_paths()
+        wa.check()
 
 @pytest.mark.skip(reason = 'drop-fake-fs')
 def test_filtering_code(tr):

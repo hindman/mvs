@@ -18,6 +18,14 @@ Drop fake file system:
     - Modify test_plan.py:
         - Get tests working along the lines in test_structure_default().
 
+        # Unskip.
+        # Add create_* fixtures.
+        wa = create_wa(origs, news)
+        inputs = wa.origs + wa.news
+        plan = RenamingPlan(...)
+        plan.rename_paths()
+        wa.check()
+
     - Modify test_cli.py:
         - CliRenamerSio: make yes=True the default.
         - Get tests working along the lines in test_wa().
