@@ -271,7 +271,7 @@ class WorkArea:
             wps = self.origs_wp + self.extras_wp
         else:
             wps = self.news_wp + self.extras_wp
-        exp = sorted(wp.path for wp in wps)
+        exp = sorted(set(wp.path for wp in wps))
 
         # Actual content of the work area.
         self.make_subdirs_accessible()

@@ -15,24 +15,23 @@ todos: TODOs
 
 Drop fake file system:
 
-    - Modify test_plan.py:
-        - Get tests working along the lines in test_structure_default().
-
-        # Unskip.
-        # Add create_* fixtures.
-        wa = create_wa(origs, news)
-        inputs = wa.origs + wa.news
-        plan = RenamingPlan(...)
-        plan.rename_paths()
-        wa.check()
-
     - Modify test_cli.py:
         - CliRenamerSio: make yes=True the default.
         - Get tests working along the lines in test_wa().
-
-    - Remove commented-out file system code from plan.py and cli.py.
+        - Drop test_wa()
 
     - Assess test coverage, remaining tests, and CliRenamerSio.
+
+    # Unskip.
+    # Add create_* fixtures.
+    wa = create_wa(origs, news)
+    wa = create_wa(origs, news, rootless = True)
+    inputs = wa.origs + wa.news
+    plan = RenamingPlan(...)
+    plan.rename_paths()
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
 
 Implement new checks regarding file types and clobbering [see NEW_CHECKS].
 

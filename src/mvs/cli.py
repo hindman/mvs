@@ -58,7 +58,6 @@ class CliRenamer:
 
     def __init__(self,
                  args,
-                 # file_sys = None,
                  stdout = sys.stdout,
                  stderr = sys.stderr,
                  stdin = sys.stdin,
@@ -66,7 +65,6 @@ class CliRenamer:
 
         # Attributes received as arguments.
         self.args = args
-        # self.file_sys = file_sys
         self.stdout = stdout
         self.stderr = stderr
         self.stdin = stdin
@@ -127,7 +125,6 @@ class CliRenamer:
                 seq_step = opts.step,
                 filter_code = opts.filter,
                 indent = opts.indent,
-                # file_sys = self.file_sys,
                 skip = opts.skip,
                 clobber = opts.clobber,
                 create = opts.create,
@@ -623,14 +620,24 @@ class CLI:
         The code text does not require indentation for its first line,
         but does require it for any subsequent lines.
 
-        For reference, here are some useful Path components in a renaming
-        context:
+        For reference, here are some useful Path attributes and methods in a
+        renaming context:
 
           p         Path('/parent/dir/foo-bar.fubb')
           p.parent  Path('/parent/dir')
+
           p.name    'foo-bar.fubb'
-          p.step    'foo-bar'
+          p.stem    'foo-bar'
           p.suffix  '.fubb'
+          p.parts   ('/', 'parent', 'dir', 'foo-bar.fubb')
+
+          p.exists()   bool
+          p.is_file()  "
+          p.is_dir()   "
+
+          p.with_name(X)    New Path having name X.
+          p.with_stem(X)    "               stem X.
+          p.with_suffix(X)  "               suffix X.
 
         Problem control
         ---------------
@@ -679,7 +686,7 @@ class CLI:
     real_default = 'real_default'
 
     # Values in the parsed opts indicating that the user did not
-    # set the option on the command line. Used when merging 
+    # set the option on the command line. Used when merging
     # the user preferences into opts.
     unset_opt_vals = (False, None, [])
 

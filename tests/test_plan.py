@@ -92,9 +92,9 @@ def test_structure_paragraphs(tr, create_wa):
         wa = create_wa(origs, news)
         inputs = (
             include_empties[before] +
-            wa.origs + 
+            wa.origs +
             empty[0:n] +
-            wa.news + 
+            wa.news +
             include_empties[after]
         )
         plan = RenamingPlan(
@@ -244,59 +244,57 @@ def test_renaming_code(tr, create_wa):
             plan.rename_paths()
         wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_filtering_code(tr):
-    # Basic use case: filter orig-paths with user-supplied code.
-    origs = ('a', 'b', 'c', 'd', 'dd')
+def test_filtering_code(tr, create_wa):
+    # Filter orig paths with user-supplied code.
+    origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
+    extras = ('d', 'dd', 'xyz/')
+    wa = create_wa(origs, news, extras, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
+        inputs = wa.origs + wa.extras,
         rename_code = 'return o + o',
-        filter_code = 'return "d" not in o',
-        file_sys = origs,
+        filter_code = 'return not ("d" in o or p.is_dir())',
     )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == ('d', 'dd') + news
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_code_compilation_fails(tr):
+def test_code_compilation_fails(tr, create_wa):
     # Paths and a snippet of invalid code.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     bad_code = 'FUBB BLORT'
 
     # Helper to check the plan's failures.
-    def do_checks(p):
+    def do_checks(wa, plan):
         with pytest.raises(MvsError) as einfo:
-            p.rename_paths()
+            plan.rename_paths()
         assert einfo.value.params['msg'] == MF.prepare_failed
-        f = p.uncontrolled_problems[0]
+        f = plan.uncontrolled_problems[0]
         assert f.name == PN.user_code_exec
         assert bad_code in f.msg
         assert 'invalid syntax' in f.msg
+        wa.check(no_change = True)
 
     # Scenario: invalid renaming code.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs,
-        structure = STRUCTURES.flat,
+        inputs = wa.origs,
         rename_code = bad_code,
-        file_sys = origs,
     )
-    do_checks(plan)
+    do_checks(wa, plan)
 
     # Scenario: invalid filtering code.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
+        inputs = wa.origs + wa.news,
         filter_code = bad_code,
-        file_sys = origs,
     )
-    do_checks(plan)
+    do_checks(wa, plan)
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_code_execution_fails(tr):
-    # Paths and code that will cause the second RenamePair to fail
-    # during execution of user code.
+def test_code_execution_fails(tr, create_wa):
+    # Paths and code that will cause the second RenamePair
+    # to fail during execution of user code.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     rename_code1 = 'return FUBB if seq == 2 else o + o'
@@ -305,116 +303,75 @@ def test_code_execution_fails(tr):
     exp_rp_fails = [False, True, False]
 
     # Helper try to rename paths and then check the plan's failures.
-    def do_checks(plan, pname):
-        plan.prepare()
+    def do_checks(wa, plan, pname):
         with pytest.raises(MvsError) as einfo:
-            plan.rename_paths()
+            with wa.cd():
+                plan.rename_paths()
         assert_raised_because(einfo, plan, pname)
         fails = plan.uncontrolled_problems
         assert len(fails) == 1
-        assert fails[0].rp.orig == 'b'
+        f = fails[0]
+        assert f.name == pname
+        assert f.rp.orig == 'b'
+        wa.check(no_change = True)
 
     # Scenario: renaming code raises an exception.
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
+        inputs = wa.origs,
         rename_code = rename_code1,
-        file_sys = origs,
     )
-    do_checks(plan, PN.rename_code_invalid)
+    do_checks(wa, plan, PN.rename_code_invalid)
 
     # Scenario: renaming code returns bad data type.
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
+        inputs = wa.origs,
         rename_code = rename_code2,
-        file_sys = origs,
     )
-    do_checks(plan, PN.rename_code_bad_return)
+    do_checks(wa, plan, PN.rename_code_bad_return)
 
     # Scenario: filtering code raises an exception.
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
+        inputs = wa.origs + wa.news,
         filter_code = filter_code,
-        file_sys = origs,
     )
-    do_checks(plan, PN.filter_code_invalid)
+    do_checks(wa, plan, PN.filter_code_invalid)
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_seq(tr):
+def test_seq(tr, create_wa):
     # User defines a sequence and uses its values in user-supplied code.
     origs = ('a', 'b', 'c')
     news = ('a.20', 'b.30', 'c.40')
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
+        inputs = wa.origs,
         rename_code = 'return f"{o}.{seq * 2}"',
-        file_sys = origs,
         seq_start = 10,
         seq_step = 5,
     )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_common_prefix(tr):
+def test_common_prefix(tr, create_wa):
     # User-supplied code exercises strip_prefix() helper.
     origs = ('blah-a', 'blah-b', 'blah-c')
-    exp_file_sys = ('a', 'b', 'c')
+    news = ('a', 'b', 'c')
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
+        inputs = wa.origs,
         rename_code = 'return plan.strip_prefix(o)',
-        file_sys = origs,
     )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
 
 ####
 # RenamingPlan data.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_file_sys_arg(tr):
-    # Paths.
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'a1')
-
-    # Pass file_sys as a sequence. We do this to generate the
-    # expected file_sys for a subsequent test.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
-    )
-    file_sys = plan.file_sys
-
-    # Pass file_sys as None: works fine.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = None,
-    )
-    assert plan.file_sys is None
-
-    # Pass file_sys as a dict: we expect an
-    # indepentent dict equal to the original.
-    plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
-    )
-    assert plan.file_sys == file_sys
-    assert plan.file_sys is not file_sys
-
-    # Pass non-iterable as a file_sys.
-    with pytest.raises(MvsError) as einfo:
-        plan = RenamingPlan(
-            inputs = origs + news,
-            structure = STRUCTURES.flat,
-            file_sys = 123,
-        )
-    assert einfo.value.params['msg'] == MF.invalid_file_sys
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_plan_as_dict(tr):
+def test_plan_as_dict(tr, create_wa):
     # Expected keys in plan.as_dict.
     exp_keys = sorted((
         'inputs',
@@ -424,7 +381,6 @@ def test_plan_as_dict(tr):
         'indent',
         'seq_start',
         'seq_step',
-        'file_sys',
         'skip',
         'clobber',
         'create',
@@ -437,35 +393,33 @@ def test_plan_as_dict(tr):
     # Set up plan.
     origs = ('a', 'b', 'c')
     news = ('a.10', 'b.15', 'c.20')
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs,
-        structure = None,
+        inputs = wa.origs,
         rename_code = 'return f"{o}.{seq}"',
         filter_code = 'return "d" not in o',
         seq_start = 10,
         seq_step = 5,
-        file_sys = origs,
     )
 
     # Check before and after renaming.
     assert sorted(plan.as_dict) == exp_keys
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
     assert sorted(plan.as_dict) == exp_keys
 
 ####
 # Check unexpected usage scenarios.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_prepare_rename_multiple_times(tr):
+def test_prepare_rename_multiple_times(tr, create_wa):
     # Setup.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
+        inputs = wa.origs + wa.news,
     )
 
     # Can call prepare multiple times.
@@ -474,47 +428,46 @@ def test_prepare_rename_multiple_times(tr):
 
     # Renaming plan works.
     plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    wa.check()
 
     # Cannot call rename_paths multiple times.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert einfo.value.params['msg'] == MF.rename_done_already
+    wa.check()
 
 ####
 # Problems and problem-control.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_invalid_controls(tr):
+def test_invalid_controls(tr, create_wa):
     # Paths.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
 
-    # Common keyword args.
-    common = dict(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
-    )
-
     # Base scenario: it works fine.
-    plan = RenamingPlan(**common)
+    # In addition, we will re-use the inputs defined here
+    # in subsequent tests, which don't need a WorkArea
+    # because the RenamingPlan will raise during initialization.
+    wa = create_wa(origs, news)
+    inputs = wa.origs + wa.news
+    plan = RenamingPlan(inputs)
     plan.rename_paths()
-    assert tuple(plan.file_sys) == news
+    wa.check()
 
     # Scenarios: can configure problem-control in various ways.
-    all5 = CONTROLLABLES[CONTROLS.skip]
-    first2 = all5[0:2]
+    all_controls = CONTROLLABLES[CONTROLS.skip]
+    first2 = all_controls[0:2]
     checks = (
-        ['all-tuple', all5, all5],
-        ['some-tuple', first2, first2],
-        ['some-str', first2, ' '.join(first2)],
-        ['some-with-all-tuple', all5, first2 + (CON.all,)],
-        ['all-str', all5, CON.all],
+        # LABEL            EXP            SKIP
+        ('all-tuple',      all_controls,  all_controls),
+        ('some-tuple',     first2,        first2),
+        ('some-str',       first2,        ' '.join(first2)),
+        ('some-with-all',  all_controls,  first2 + (CON.all,)),
+        ('all-str',        all_controls,  CON.all),
     )
     for label, exp, skip in checks:
-        plan = RenamingPlan(**common, skip = skip)
+        plan = RenamingPlan(inputs, skip = skip)
         assert (label, plan.skip) == (label, exp)
 
     # But we cannot control the same problem in two different ways.
@@ -526,7 +479,7 @@ def test_invalid_controls(tr):
     for pname, *controls in checks:
         control_params = {c : pname for c in controls}
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(**common, **control_params)
+            plan = RenamingPlan(inputs, **control_params)
         msg = einfo.value.params['msg']
         exp = MF.conflicting_controls.format(pname, *controls)
         assert msg == exp
@@ -540,231 +493,204 @@ def test_invalid_controls(tr):
     for pname, control in checks:
         control_params = {control : pname}
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(**common, **control_params)
+            plan = RenamingPlan(inputs, **control_params)
         msg = einfo.value.params['msg']
         exp = MF.invalid_control.format(control, pname)
         assert msg == exp
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_equal(tr):
-    # Paths.
+def test_equal(tr, create_wa):
+    # Paths where an orig path equals its new counterpart.
     d = ('d',)
     origs = ('a', 'b', 'c') + d
     news = ('a1', 'b1', 'c1') + d
-    inputs = origs + news
-    file_sys = origs
-    exp_file_sys = d + news[:-1]
 
-    # Renaming plan, but with one pair where orig equals new.
+    # Renaming attempt will raise.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = inputs,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
+        inputs = wa.origs + wa.news,
     )
-
-    # Renaming will raise.
-    plan.prepare()
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.equal)
+    wa.check(no_change = True)
 
     # Renaming will succeed if we skip the offending paths.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = inputs,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         skip = PN.equal,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_missing_orig(tr):
+def test_missing_orig(tr, create_wa):
     # Paths.
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    file_sys = origs[0:-1]
-    exp_file_sys = news[0:-1]
+    origs = ('a', 'b')
+    news = ('a1', 'b1')
+    missing_origs = ('c', 'd')
+    missing_news = ('c1', 'd1')
 
-    # Renaming plan, but file_sy is missing an original path.
+    # Helper to assemble RenamingPlan inputs.
+    # We need to includes missing_news so there are equal N of
+    # origs and news given as arguments to RenamingPlan.
+    def assemble_inputs(wa):
+        return wa.origs + missing_origs + wa.news + missing_news
+
+    # Renaming plan where some of origs are missing.
+    # Prepare will not raise, but will mark the plan as failed.
+    # Rename attempt will raise.
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = assemble_inputs(wa),
     )
-
-    # Prepare does not raise and it marks the plan as failed.
     plan.prepare()
     assert plan.failed
-
-    # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
-        plan.rename_paths()
+        with wa.cd():
+            plan.rename_paths()
     assert_raised_because(einfo, plan, PN.missing)
+    wa.check(no_change = True)
 
     # Renaming will succeed if we skip the offending paths.
+    wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = assemble_inputs(wa),
         skip = PN.missing,
     )
-    plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys
+    with wa.cd():
+        plan.rename_paths()
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_new_exists(tr):
-    # Paths.
+def test_new_exists(tr, create_wa):
+    # Some paths where one of the news will be in extras
+    # and thus will exist before renaming.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
-    file_sys = origs + news[1:2]
-    exp_file_sys = ('b', 'b1', 'a1', 'c1')
+    extras = ('a1',)
+    expecteds_skip = ('a', 'a1', 'b1', 'c1')
+    expecteds_clobber = news
 
-    # Renaming plan, but file_sy is missing an original path.
+    # Scenario: one of new paths exists.
+    # Prepare will mark plan as failed. Rename will raise.
+    wa = create_wa(origs, news, extras)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
     )
-
-    # Prepare does not raise and it marks the plan as failed.
     plan.prepare()
     assert plan.failed
-
-    # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.existing)
+    wa.check(no_change = True)
 
     # Renaming will succeed if we skip the offending paths.
+    wa = create_wa(origs, news, extras, expecteds_skip)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         skip = PN.existing,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys
+    wa.check()
 
     # Renaming will succeed if we clobber the offending paths.
+    wa = create_wa(origs, news, extras, expecteds_clobber)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         clobber = PN.existing,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys[1:]
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_new_parent_missing(tr):
-    # Paths.
+def test_new_parent_missing(tr, create_wa):
+    # Paths where a parent of a new path will be missing.
     origs = ('a', 'b', 'c')
-    news = ('xy/tmp/a1', 'b1', 'c1')
-    parents = ('xy/tmp', 'xy', '.')
-    file_sys = origs
-    exp_file_sys1 = ('a', 'b1', 'c1')
-    exp_file_sys2 = parents + news
+    news = ('a1', 'b1', 'xy/zzz/c1')
+    expecteds_skip = ('a1', 'b1', 'c')
+    expecteds_create = news + ('xy/', 'xy/zzz/')
 
-    # Renaming plan, but file_sy is missing the parent of a new path.
+    # Prepare will mark plan as failed. Rename will raise.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
     )
-
-    # Prepare does not raise and it marks the plan as failed.
     plan.prepare()
     assert plan.failed
-
-    # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.parent)
+    wa.check(no_change = True)
 
     # Renaming will succeed if we skip the offending paths.
+    wa = create_wa(origs, news, (), expecteds_skip)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         skip = PN.parent,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys1
+    wa.check()
 
     # Renaming will succeed if we create the missing parents.
+    wa = create_wa(origs, news, (), expecteds_create)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         create = PN.parent,
     )
     plan.rename_paths()
-    got = tuple(path.replace('\\', '/') for path in plan.file_sys) # Temp Windows fix.
-    assert got == exp_file_sys2
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_news_collide(tr):
-    # Paths.
+def test_news_collide(tr, create_wa):
+    # Paths where some of the new paths collide.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'a1')
-    file_sys = origs
-    exp_file_sys1 = ('a', 'c', 'b1')
-    exp_file_sys2 = ('a1', 'b1')
+    expecteds_skip = ('a', 'b1', 'c')
+    expecteds_clobber = ('a1', 'b1')
 
-    # Renaming plan with collision among the new paths.
+    # Prepare will mark plan as failed. Rename will raise.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
     )
-
-    # Prepare does not raise and it marks the plan as failed.
     plan.prepare()
     assert plan.failed
-
-    # Renaming will raise.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.colliding)
+    wa.check(no_change = True)
 
     # Renaming will succeed if we skip the offending paths.
+    wa = create_wa(origs, news, (), expecteds_skip)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         skip = PN.colliding,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys1
+    wa.check()
 
     # Renaming will succeed if we allow clobbering.
+    wa = create_wa(origs, news, (), expecteds_clobber)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = file_sys,
+        inputs = wa.origs + wa.news,
         clobber = PN.colliding,
     )
     plan.rename_paths()
-    assert tuple(plan.file_sys) == exp_file_sys2
+    wa.check()
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_failures_skip_all(tr):
-    # Paths.
+def test_failures_skip_all(tr, create_wa):
+    # Paths where all new paths collide.
     origs = ('a', 'b', 'c')
     news = ('Z', 'Z', 'Z')
 
-    # Renaming plan, but where all news collide, and we skip them.
+    # Renaming will raise because the skip control
+    # will filter out all paths.
+    wa = create_wa(origs, news)
     plan = RenamingPlan(
-        inputs = origs + news,
-        structure = STRUCTURES.flat,
-        file_sys = origs,
+        inputs = wa.origs + wa.news,
         skip = PN.colliding,
     )
-
-    # Renaming will raise because everything is skipped.
     plan.prepare()
+    assert plan.failed
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.all_filtered)
+    wa.check(no_change = True)
 

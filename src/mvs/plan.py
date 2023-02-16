@@ -26,9 +26,6 @@ from .problems import (
 
 class RenamingPlan:
 
-    # # Default value for entries in a fake file system.
-    # DEFAULT_FILE_SYS_VAL = True
-
     # Special values used by self.tracking_index.
     #
     # During rename_paths(), we track progress via self.tracking_index. It has
@@ -59,8 +56,6 @@ class RenamingPlan:
                  skip = None,
                  clobber = None,
                  create = None,
-                 # Fake file system.
-                 # file_sys = None,
                  ):
 
         # Input paths, input structure, and RenamePair instances.
@@ -83,9 +78,6 @@ class RenamingPlan:
         self.has_renamed = False
         self.tracking_index = self.TRACKING.not_started
         self.raise_at = None
-
-        # Fake file system injected for testing purposes.
-        # self.file_sys = self.initialize_file_sys(file_sys)
 
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
@@ -509,38 +501,8 @@ class RenamingPlan:
     # Files system operations.
     ####
 
-    #def initialize_file_sys(self, file_sys):
-    #    # Currently the file system is stored as a dict mapping each
-    #    # existing path to True. Later, we might need the dict values
-    #    # to hold additional information.
-    #    #
-    #    # We build an independent copy of the file system because
-    #    # the rename_paths() method will modify the dict.
-    #    if file_sys is None:
-    #        return None
-    #    elif isinstance(file_sys, dict):
-    #        return deepcopy(file_sys)
-    #    else:
-    #        try:
-    #            return {
-    #                path : self.DEFAULT_FILE_SYS_VAL
-    #                for path in file_sys
-    #            }
-    #        except Exception as e:
-    #            raise MvsError.new(e, msg = MF.invalid_file_sys)
-
     def path_exists(self, p):
         return Path(p).exists()
-
-        # if self.file_sys is None:
-        #     # Check the real file system.
-        #     return Path(p).exists()
-        # else:
-        #     # Or check the fake file system added for testing purposes.
-        #     # In this context, assume that '.' always exists so that the
-        #     # user/tester does not have to include explicitly.
-        #     p = str(p)
-        #     return p in self.file_sys or p == '.'
 
     def rename_paths(self):
         # Don't rename more than once.
@@ -555,16 +517,13 @@ class RenamingPlan:
             raise MvsError(MF.prepare_failed, problems = self.problems[None])
 
         # Rename paths.
-        # use_real_fs = self.file_sys is None
-        use_real_fs = True
         for i, rp in enumerate(self.rps):
             self.tracking_index = i
-            self.do_rename(rp, use_real_fs)
+            self.do_rename(rp)
         self.tracking_index = self.TRACKING.done
 
-    def do_rename(self, rp, use_real_fs):
-        # Takes a RenamePair and executes its renaming, either on the
-        # real file system or the fake one.
+    def do_rename(self, rp):
+        # Takes a RenamePair and executes its renaming.
 
         # For testing purposes, raise a simulated error at
         # the desired tracking_index.
@@ -572,19 +531,13 @@ class RenamingPlan:
             raise ZeroDivisionError('SIMULATED_ERROR')
 
         # Rename.
-        if use_real_fs:
-            if rp.create_parent:
-                Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
-            p = Path(rp.orig)
-            if rp.clobber:
-                p.replace(rp.new)
-            else:
-                p.rename(rp.new)
-        # else:
-        #     if rp.create_parent:
-        #         for par in Path(rp.new).parents:
-        #             self.file_sys[str(par)] = self.DEFAULT_FILE_SYS_VAL
-        #     self.file_sys[rp.new] = self.file_sys.pop(rp.orig)
+        if rp.create_parent:
+            Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
+        p = Path(rp.orig)
+        if rp.clobber:
+            p.replace(rp.new)
+        else:
+            p.rename(rp.new)
 
     ####
     # Other info.
@@ -612,7 +565,6 @@ class RenamingPlan:
             indent = self.indent,
             seq_start = self.seq_start,
             seq_step = self.seq_step,
-            # file_sys = self.file_sys,
             # Problem controls.
             skip = self.skip,
             clobber = self.clobber,
