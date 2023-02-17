@@ -1,3 +1,27 @@
+'''
+
+    # TEMPLATE CODE.
+    return
+    wa = create_wa(origs, news)
+    wa = create_wa(origs, news, rootless = True)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news, ...)
+    cli.run()
+    with wa.cd():
+        cli.run()
+    assert cli.err == ''
+    assert cli.out == ''
+    assert cli.out == outs.regular_output
+    assert cli.log == ''
+    assert cli.logs_valid_json is cli.OK
+    wa.check()
+    wa.check(no_change = True)
+    assert cli.success
+    assert cli.failure
+
+'''
+
+
 import json
 import pytest
 import re
@@ -92,6 +116,15 @@ class CliRenamerSIO(CliRenamer):
                 tracking = tracking,
                 trackback = traceback.format_exc(),
             )
+
+####
+# Helper functions.
+####
+
+def can_use_clipboard():
+    # I could not get pyperclip working on ubuntu in Github Actions,
+    # I'm using this to bypass clipboard checks.
+    return sys.platform != 'linux'
 
 def parse_log(text, log_type):
     # CliRenamerSIO collects logging output from CliRenamer
@@ -188,166 +221,151 @@ def test_indent_and_posint(tr, create_wa, create_outs):
 # Basic renaming usage.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_basic_use_cases(tr):
-    # Paths and arguments.
+def test_basic_use_cases(tr, create_wa, create_outs):
+    # Paths.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    kws = dict(file_sys = origs, yes = True)
 
-    # Helper to run the renaming and check stuff.
-    def do_checks(cli):
+    # Helper.
+    def do_checks(*xs, include_news = True):
+        wa = create_wa(origs, news)
+        outs = create_outs(wa.origs, wa.news)
+        args = wa.origs + (wa.news if include_news else ()) + xs
+        cli = CliRenamerSIO(*args)
         cli.run()
         assert cli.success
-        cli.check_file_sys(*news)
+        assert cli.out == outs.regular_output
         assert cli.err == ''
-        got = cli.out.replace(' \n', '\n\n', 1)
-        exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['paths_renamed']
-        assert got == exp
+        assert cli.logs_valid_json is cli.OK
+        wa.check()
 
-    # Basic use case: renaming via code.
-    cli = CliRenamerSIO(
+    # Basic use cases:
+    # - Flat structure as the default.
+    # - Flat passed explicitly.
+    # - Renaming via code.
+    do_checks()
+    do_checks('--flat')
+    do_checks(
         '--rename',
-        'return o + o',
-        *origs,
-        **kws,
+        'return p.with_name(p.name + p.name)',
+        include_news = False,
     )
-    do_checks(cli)
-
-    # Basic use case: flat structure passed explicitly.
-    cli = CliRenamerSIO(
-        '--flat',
-        *origs,
-        *news,
-        **kws,
-    )
-    do_checks(cli)
-
-    # Basic use case: flat structure as the default.
-    cli = CliRenamerSIO(
-        *origs,
-        *news,
-        **kws,
-    )
-    do_checks(cli)
 
 ####
 # Input paths and sources.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_no_input_paths(tr):
+def test_no_input_paths(tr, create_wa, create_outs):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    rename_args = ('--rename', 'return o + o')
     empty_paths = ('', '   ', ' ')
 
     # Initial scenario: it works.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
-        *rename_args,
-        *origs,
-        file_sys = origs,
-        yes = True,
+        *wa.origs,
+        *wa.news,
     )
     cli.run()
+    assert cli.err == ''
+    assert cli.out == outs.regular_output
+    assert cli.logs_valid_json is cli.OK
     assert cli.success
-    cli.check_file_sys(*news)
+    wa.check()
 
     # But it fails if we omit the input paths.
-    cli = CliRenamerSIO(
-        *rename_args,
-        file_sys = origs,
-        yes = True,
-    )
+    wa = create_wa(origs, news)
+    cli = CliRenamerSIO()
     cli.run()
-    assert cli.failure
-    assert cli.out == ''
-    assert cli.log() == ''
     assert cli.err.startswith(MF.opts_require_one)
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.failure
     for name in CLI.sources.keys():
         assert name in cli.err
+    wa.check(no_change = True)
 
     # It also fails if the input paths are empty.
-    cli = CliRenamerSIO(
-        *rename_args,
-        *empty_paths,
-        file_sys = origs,
-        yes = True,
-    )
+    wa = create_wa(origs, news)
+    cli = CliRenamerSIO(*empty_paths)
     cli.run()
-    assert cli.failure
-    assert cli.out == ''
-    assert cli.log() == ''
     assert PF.parsing_no_paths in cli.err
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_odd_number_inputs(tr):
-    # An odd number of inputs.
-    origs = ('z1',)
-    cli = CliRenamerSIO(*origs, file_sys = origs)
-    cli.run()
-    assert cli.failure
     assert cli.out == ''
+    assert cli.log == ''
+    assert cli.failure
+
+def test_odd_number_inputs(tr, create_wa, create_outs):
+    # An odd number of inputs will fail.
+    origs = ('z1', 'z2', 'z3')
+    news = ()
+    wa = create_wa(origs, news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
+    cli.run()
     got = cli.err
     exp1 = MF.prepare_failed_cli.split(CON.colon)[0]
     exp2 = PF.parsing_imbalance
     assert got.startswith(exp1)
     assert exp2 in got
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.failure
+    wa.check(no_change = True)
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_sources(tr):
+def test_sources(tr, create_wa, create_outs):
     # Paths and args.
     origs = ('z1', 'z2', 'z3')
     news = ('A1', 'A2', 'A3')
-    args = origs + news
-    args_txt = CON.newline.join(args)
-    yes = '--yes'
+    extras = ('input_paths.txt',)
 
-    def do_checks(cli):
+    # Helper to assemble path inputs into a chunk of text.
+    def args_text(wa):
+        return CON.newline.join(wa.origs + wa.news)
+
+    # Helper for checks during successful renamings.
+    def do_checks(wa, *xs, **kws):
+        outs = create_outs(wa.origs, wa.news)
+        cli = CliRenamerSIO(*xs, **kws)
         cli.run()
+        assert cli.out == outs.regular_output
+        assert cli.err == ''
+        assert cli.logs_valid_json is cli.OK
+        wa.check()
         assert cli.success
-        cli.check_file_sys(*news)
 
     # Base scenario: paths via args.
-    cli = CliRenamerSIO(*args, yes, file_sys = origs)
-    do_checks(cli)
+    wa = create_wa(origs, news)
+    do_checks(wa, *wa.origs, *wa.news)
+
+    # Paths via stdin.
+    wa = create_wa(origs, news)
+    do_checks(wa, '--stdin', replies = args_text(wa))
 
     # Paths via clipboard.
     if can_use_clipboard():
-        write_to_clipboard(args_txt)
-        cli = CliRenamerSIO('--clipboard', yes, file_sys = origs)
-        do_checks(cli)
-
-    # Paths via stdin.
-    cli = CliRenamerSIO('--stdin', yes, file_sys = origs, replies = args_txt)
-    do_checks(cli)
+        wa = create_wa(origs, news)
+        write_to_clipboard(args_text(wa))
+        do_checks(wa, '--clipboard')
 
     # Paths via a file.
-    path = tr.TEMP_PATH
-    tr.temp_area([], [])
-    with open(path, 'w') as fh:
-        fh.write(args_txt)
-    cli = CliRenamerSIO('--file', path, yes, file_sys = origs, replies = args_txt)
-    do_checks(cli)
+    wa = create_wa(origs, news, extras)
+    inputs_path = wa.extras[0]
+    with open(inputs_path, 'w') as fh:
+        fh.write(args_text(wa))
+    do_checks(wa, '--file', inputs_path)
 
     # Too many sources.
-    cli = CliRenamerSIO('--clipboard', '--stdin', yes, file_sys = origs)
+    wa = create_wa(origs, news)
+    cli = CliRenamerSIO('--clipboard', '--stdin')
     cli.run()
+    got = cli.err
+    assert got.startswith(MF.opts_mutex)
+    assert '--clipboard' in got
+    assert '--stdin' in got
+    assert cli.out == ''
+    assert cli.log == ''
+    wa.check(no_change = True)
     assert cli.failure
-    assert cli.err.startswith(MF.opts_mutex)
-    assert '--clipboard' in cli.err
-    assert '--stdin' in cli.err
-
-def can_use_clipboard():
-    # I could not get pyperclip working on ubuntu in Github Actions,
-    # I'm using this to bypass clipboard checks.
-    return sys.platform != 'linux'
-
-    # try:
-    #     write_to_clipboard('blort')
-    #     return True
-    # except Exception:
-    #     return False
 
 ####
 # Dryrun and no-confirmation.

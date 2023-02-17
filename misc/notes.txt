@@ -14,7 +14,7 @@ todos: TODOs
 --------
 
 Drop fake file system:
-    - Modify test_cli.py: get remaining tests working [currently: 15 skipped]
+    - Modify test_cli.py: get remaining tests working [currently: 11 skipped]
 
 Implement new checks regarding file types and clobbering [see NEW_CHECKS].
 
@@ -29,6 +29,7 @@ New documentation [see NEW_DOCS].
 Tests:
     - User-prefs
     - The --edit option.
+    - Double check pragma-no-cover stuff.
 
 Editing pass:
     - User-prefs
