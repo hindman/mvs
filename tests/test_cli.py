@@ -1,4 +1,3 @@
-
 import json
 import pytest
 import re
@@ -22,26 +21,24 @@ class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer:
     #
     # - Adds args to disable pagination by default.
+    # - Includes --yes among args by default.
     # - Sets I/O handles to be StringIO instances, so we can capture outputs.
-    # - Adds a convenience (yes) to simulate user confirmation.
     # - Adds a convenience (replies) to feed stdin.
-    # - Adds a few properties/methods to simplify assertion making.
+    # - Adds various properties/etc to simplify assertion making.
 
-    OK = 'OK'
+    OK = 'LOGS_OK'
 
-    def __init__(self,
-                 *args,
-                 # file_sys = None,
-                 replies = '',
-                 yes = False,
-                 pager = ''):
-        args = args + ('--pager', pager)
+    def __init__(self, *args, pager = '', yes = True, replies = ''):
+        args = (
+            args +
+            ('--pager', pager) +
+            (('--yes',) if yes else ())
+        )
         super().__init__(
             args,
-            # file_sys = file_sys,
             stdout = StringIO(),
             stderr = StringIO(),
-            stdin = StringIO('yes' if yes else replies),
+            stdin = StringIO(replies),
             logfh = StringIO(),
         )
 
@@ -97,14 +94,20 @@ class CliRenamerSIO(CliRenamer):
             )
 
 def parse_log(text, log_type):
+    # CliRenamerSIO collects logging output from CliRenamer
+    # in a single StringIO, which means that the plan-log and
+    # the tracking-log are combined. This function takes a
+    # log_type and returns the desired portion of the log output.
+
     # Find the index of the divider between the two logging calls.
+    # If we don't find it, all content will go to the plan-log.
+    div = '\n}{\n'
     try:
-        i = text.index('\n}{\n') + 2
+        i = text.index(div) + 2
     except ValueError:
         i = len(text)
 
-    # Partition the text into the two logs and return
-    # the requested one.
+    # Partition the text into the two logs and return the requested one.
     logs = {
         CliRenamer.LOG_TYPE.plan:     text[0 : i],
         CliRenamer.LOG_TYPE.tracking: text[i : None],
@@ -115,56 +118,68 @@ def parse_log(text, log_type):
 # Command-line arguments and options.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
 def test_version_and_help(tr):
+    # Exercise the command-line options that report
+    # information about the app and exit immediately.
+
+    # A helper.
+    def do_checks(*args):
+        cli = CliRenamerSIO('mvs', *args)
+        cli.run()
+        assert cli.success
+        assert cli.err == ''
+        assert cli.log == ''
+        return cli
+
     # Version.
-    cli = CliRenamerSIO('mvs', '--version')
-    cli.run()
-    assert cli.success
-    assert cli.err == ''
+    cli = do_checks('--version')
     assert cli.out == MF.cli_version_msg + CON.newline
 
+    # Details.
+    cli = do_checks('--details')
+    assert cli.out.split() == CLI.post_epilog.split()
+
     # Help.
-    cli = CliRenamerSIO('mvs', '--version', '--help')
-    cli.run()
-    assert cli.success
-    assert cli.err == ''
+    cli = do_checks('--version', '--help')
     assert cli.out.startswith(f'Usage: {CON.app_name}')
     assert len(cli.out) > 2000
+    assert CLI.description[:40] in cli.out
     for opt in ('--clipboard', '--paragraphs', '--rename'):
         assert f'\n  {opt}' in cli.out
     for oc in CLI.opts_config:
         assert oc['help'][0:40] in cli.out
 
-    # Details.
-    cli = CliRenamerSIO('mvs', '--details')
-    cli.run()
-    assert cli.success
-    assert cli.err == ''
-    assert cli.out.split() == CLI.post_epilog.split()
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_indent_and_posint(tr):
+def test_indent_and_posint(tr, create_wa, create_outs):
     # Paths and args.
     origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
     args = ('--rename', 'return o + o', '--indent')
-    exp_file_sys = ('aa', 'bb', 'cc')
+    valid_indents = ('2', '4', '8')
+    invalid_indents = ('-4', 'xx', '0', '1.2')
 
     # Valid indent values.
-    for i in ('2', '4', '8'):
-        cli = CliRenamerSIO(*args, i, *origs, file_sys = origs, yes = True)
-        cli.run()
+    for i in valid_indents:
+        wa = create_wa(origs, news, rootless = True)
+        outs = create_outs(wa.origs, wa.news)
+        cli = CliRenamerSIO(*args, i, *wa.origs)
+        with wa.cd():
+            cli.run()
+        wa.check()
         assert cli.success
-        cli.check_file_sys(*exp_file_sys)
         assert cli.err == ''
-        assert cli.out
+        assert cli.out == outs.regular_output
+        assert cli.logs_valid_json is cli.OK
 
     # Invalid indent values.
-    for i in ('-4', 'xx', '0', '1.2'):
-        cli = CliRenamerSIO(*args, i, *origs, file_sys = origs, yes = True)
-        cli.run()
+    for i in invalid_indents:
+        wa = create_wa(origs, news, rootless = True)
+        cli = CliRenamerSIO(*args, i, *wa.origs)
+        with wa.cd():
+            cli.run()
+        wa.check(no_change = True)
         assert cli.failure
         assert cli.out == ''
+        assert cli.log == ''
         exp = '--indent: invalid positive_int value'
         assert exp in cli.err
         assert cli.err.startswith(f'Usage: {CON.app_name}')
@@ -689,35 +704,4 @@ def test_wrapup_with_tb(tr):
         assert cli.log() == ''
         exp = fmt.split('{')[0]
         assert exp in cli.err
-
-def test_wa(tr, create_wa, create_outs):
-    # TODO: delete.
-    # This is just a temporoary tests used to get the create_* fixtures working.
-
-    # Paths and arguments.
-    origs = ('a', 'b', 'c')
-    news = ('aa', 'bb', 'cc')
-
-    # Create work area.
-    wa = create_wa(origs, news)
-
-    # Rename.
-    cli = CliRenamerSIO(
-        '--flat',
-        *wa.origs,
-        *wa.news,
-        yes = True,
-    )
-    cli.run()
-    assert cli.success
-
-    # Check file system.
-    wa.check()
-
-    # Check text outputs.
-    assert cli.err == ''
-    assert cli.logs_valid_json is cli.OK
-    outs = create_outs(wa.origs, wa.news)
-    exp = outs.paths_to_be_renamed + outs.confirm + outs.paths_renamed
-    assert cli.out == exp
 

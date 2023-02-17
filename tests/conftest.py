@@ -298,6 +298,10 @@ class Outputs:
         return f'(total {self.total}, listed {self.listed})'
 
     @property
+    def regular_output(self):
+        return self.paths_to_be_renamed + self.paths_renamed
+
+    @property
     def paths_to_be_renamed(self):
         args = [f'Paths to be renamed {self.totlist}.\n']
         args.extend(
