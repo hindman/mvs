@@ -261,3 +261,29 @@ def wrap_text(text, width):
         for line in lines
     )
 
+####
+# Functions to check path type.
+####
+
+PATH_TYPES = constants('PathTypes', (
+    'file',
+    'directory',
+    'other',
+))
+
+def path_type(path):
+    p = Path(path)
+    return (
+        PATH_TYPES.other if p.is_symlink() else
+        PATH_TYPES.file if p.is_file() else
+        PATH_TYPES.directory if p.is_dir() else
+        PATH_TYPES.other
+    )
+
+def is_valid_path_type(path):
+    return path_type(path) in (PATH_TYPES.file, PATH_TYPES.directory)
+
+def paths_have_same_type(path, *others):
+    pt = path_type(path)
+    return all(pt == path_type(o) for o in others)
+

@@ -13,9 +13,12 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     # Controllable.
     'equal',
     'missing',
+    'type',
+    'parent',
     'existing',
     'colliding',
-    'parent',
+    'existing_diff',
+    'colliding_diff',
     # Not controllable.
     'all_filtered',
     'parsing_no_paths',
@@ -32,9 +35,12 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     # Controllable.
     PN.equal:                  'Original path and new path are the same',
     PN.missing:                'Original path does not exist',
+    PN.type:                   'Original path must be regular file or directory',
     PN.parent:                 'Parent directory of new path does not exist',
     PN.existing:               'New path exists',
     PN.colliding:              'New path collides with another new path',
+    PN.existing_diff:          'New path exists and differs with original in type',
+    PN.colliding_diff:         'New path collides with another new path, and they differ in type',
     # Not controllable.
     PN.all_filtered:           'All paths were filtered out by failure control during processing',
     PN.parsing_no_paths:       'No input paths',
@@ -58,9 +64,23 @@ CONTROLS = constants('ProblemControls', (
 ))
 
 CONTROLLABLES = {
-    CONTROLS.skip:    (PN.equal, PN.missing, PN.parent, PN.existing, PN.colliding),
-    CONTROLS.clobber: (PN.existing, PN.colliding),
-    CONTROLS.create:  (PN.parent,),
+    CONTROLS.skip: (
+        PN.equal,
+        PN.missing,
+        PN.type,
+        PN.parent,
+        PN.existing,
+        PN.colliding,
+        PN.existing_diff,
+        PN.colliding_diff,
+    ),
+    CONTROLS.clobber: (
+        PN.existing,
+        PN.colliding,
+    ),
+    CONTROLS.create: (
+        PN.parent,
+    ),
 }
 
 ####

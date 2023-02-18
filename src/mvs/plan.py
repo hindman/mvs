@@ -10,11 +10,13 @@ from pathlib import Path
 from short_con import constants
 
 from .utils import (
-    MvsError,
     CON,
     MSG_FORMATS as MF,
+    MvsError,
     RenamePair,
     STRUCTURES,
+    is_valid_path_type,
+    paths_have_same_type,
 )
 
 from .problems import (
@@ -149,6 +151,7 @@ class RenamingPlan:
             (None, self.execute_user_filter),
             (None, self.execute_user_rename),
             (None, self.check_orig_exists),
+            (None, self.check_orig_type),
             (None, self.check_orig_new_differ),
             (None, self.check_new_not_exists),
             (None, self.check_new_parent_exists),
@@ -375,6 +378,12 @@ class RenamingPlan:
         else:
             return Problem(PN.missing)
 
+    def check_orig_type(self, rp, seq_val):
+        if is_valid_path_type(rp.orig):
+            return rp
+        else:
+            return Problem(PN.type)
+
     def check_orig_new_differ(self, rp, seq_val):
         if rp.equal:
             return Problem(PN.equal)
@@ -386,7 +395,10 @@ class RenamingPlan:
         # to avoid pointless reporting of multiple problems in cases
         # where ORIG does not exist and where it equals NEW.
         if self.path_exists(rp.new) and not rp.equal:
-            return Problem(PN.existing)
+            if paths_have_same_type(rp.orig, rp.new):
+                return Problem(PN.existing)
+            else:
+                return Problem(PN.existing_diff)
         else:
             return rp
 
@@ -408,7 +420,11 @@ class RenamingPlan:
         if len(g) == 1:
             return rp
         else:
-            return Problem(PN.colliding)
+            others = tuple(rp2.new for rp2 in g)
+            if paths_have_same_type(rp.new, *others):
+                return Problem(PN.colliding)
+            else:
+                return Problem(PN.colliding_diff)
 
     ####
     # Methods related to problem control.

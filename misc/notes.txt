@@ -13,8 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Implement new checks regarding file types and clobbering [see NEW_CHECKS].
-
 Support case-change renamings [see CASE_CHANGE].
 
 Add --enforce and make --skip=equal the default.
@@ -27,11 +25,13 @@ Tests:
     - User-prefs
     - The --edit option.
     - Double check pragma-no-cover stuff.
+    - New checks: file types; clobbering.
 
 Editing pass:
     - User-prefs
     - The --edit option.
     - Tests.
+    - New checks: file types; clobbering.
 
 --------
 road-map: Road map
@@ -172,6 +172,9 @@ New documentation [NEW_DOCS]:
         - README and argparse configuration for --create was incorrect.
 
     - Policy changes.
+        - Orig paths must be regular file or directory.
+        - In clobbering, like must overwrite like (file => file; dir => dir).
+        - Only empty directories can be clobbered.
 
     - CHANGES file.
 
@@ -252,16 +255,6 @@ Current file system interactions:
         - Check path existence.
         - Create directory during renaming.
         - Renaming.
-
-New checks: file types and clobbering [NEW_CHECKS]:
-
-    - Orig paths must be regular file or directory.
-
-    - In clobbering, like must overwrite like:
-        file => file
-        dir => dir
-
-    - Only empty directories can be clobbered.
 
 The purpose of the --paragraphs structure:
 
