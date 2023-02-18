@@ -13,9 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Drop fake file system:
-    - Modify test_cli.py: get remaining tests working [currently: 11 skipped]
-
 Implement new checks regarding file types and clobbering [see NEW_CHECKS].
 
 Support case-change renamings [see CASE_CHANGE].

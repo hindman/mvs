@@ -1,27 +1,3 @@
-'''
-
-    # TEMPLATE CODE.
-    return
-    wa = create_wa(origs, news)
-    wa = create_wa(origs, news, rootless = True)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(*wa.origs, *wa.news, ...)
-    cli.run()
-    with wa.cd():
-        cli.run()
-    assert cli.err == ''
-    assert cli.out == ''
-    assert cli.out == outs.regular_output
-    assert cli.log == ''
-    assert cli.logs_valid_json is cli.OK
-    wa.check()
-    wa.check(no_change = True)
-    assert cli.success
-    assert cli.failure
-
-'''
-
-
 import json
 import pytest
 import re
@@ -31,8 +7,10 @@ import traceback
 from io import StringIO
 from pathlib import Path
 from string import ascii_lowercase
+from types import SimpleNamespace
 
 from mvs.cli import main, CliRenamer, CLI
+from mvs.plan import RenamingPlan
 from mvs.problems import CONTROLS, PROBLEM_FORMATS as PF
 from mvs.utils import write_to_clipboard, CON, MSG_FORMATS as MF
 from mvs.version import __version__
@@ -47,7 +25,7 @@ class CliRenamerSIO(CliRenamer):
     # - Adds args to disable pagination by default.
     # - Includes --yes among args by default.
     # - Sets I/O handles to be StringIO instances, so we can capture outputs.
-    # - Adds a convenience (replies) to feed stdin.
+    # - Adds a convenience to feed stdin (replies).
     # - Adds various properties/etc to simplify assertion making.
 
     OK = 'LOGS_OK'
@@ -371,75 +349,90 @@ def test_sources(tr, create_wa, create_outs):
 # Dryrun and no-confirmation.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_dryrun(tr):
+def test_dryrun(tr, create_wa, create_outs):
+    # In dryrun mode, we get the expected listing, but no renaming occurs.
     origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    wa = create_wa(origs, news, rootless = True)
+    outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
+        *wa.origs,
         '--rename',
         'return o + o',
         '--dryrun',
-        *origs,
-        file_sys = origs,
     )
-    cli.run()
-    assert cli.success
-    cli.check_file_sys(*origs)
+    with wa.cd():
+        cli.run()
+    wa.check(no_change = True)
     assert cli.err == ''
-    got = re.sub(r' +\n', '\n', cli.out)
-    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['no_action']
-    assert got == exp
+    assert cli.log == ''
+    assert cli.out == outs.no_action_output
+    assert cli.success
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_no_confirmation(tr):
+def test_no_confirmation(tr, create_wa, create_outs):
+    # If use does not confirm, we get the usual listing,
+    # but no renaming occurs.
     origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    wa = create_wa(origs, news, rootless = True)
+    outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
+        *wa.origs,
         '--rename',
         'return o + o',
-        *origs,
-        file_sys = origs,
+        yes = False,
     )
-    cli.run()
-    assert cli.success
+    with wa.cd():
+        cli.run()
+    wa.check(no_change = True)
     assert cli.err == ''
-    cli.check_file_sys(*origs)
-    got = cli.out.replace(' \n', '\n\n', 1)
-    exp = tr.OUTS['listing_a2aa'] + tr.OUTS['confirm3'] + tr.OUTS['no_action']
-    assert got == exp
+    assert cli.log == ''
+    assert cli.out == outs.no_confirm_output
+    assert cli.success
 
 ####
 # User-supplied code.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_rename_paths_raises(tr):
-    # Paths and args.
+def test_rename_paths_raises(tr, create_wa, create_outs):
+    # Paths, etc.
     origs = ('z1', 'z2', 'z3')
     news = ('ZZ1', 'ZZ2', 'ZZ3')
-    args = origs + news + ('--yes',)
+    expecteds = news[:1] + origs[1:]
+    NSTART = RenamingPlan.TRACKING.not_started
+
+    def do_checks(mode):
+        wa = create_wa(origs, news)
+        outs = create_outs(wa.origs, wa.news)
+        cli = CliRenamerSIO(*wa.origs, *wa.news)
+        if mode == 'run':
+            cli.run()
+        elif mode == 'do':
+            cli.do_prepare()
+            cli.do_rename()
+        elif mode == 'multiple-do':
+            cli.do_prepare()
+            cli.do_prepare()
+            assert cli.plan.tracking_rp is None
+            cli.do_rename()
+            assert cli.plan.tracking_rp is None
+            cli.do_rename()
+            assert cli.plan.tracking_rp is None
+        else:
+            assert False
+        wa.check()
+        assert cli.err == ''
+        assert cli.out == outs.regular_output
+        assert cli.logs_valid_json is cli.OK
+        assert cli.success
 
     # A working scenario.
-    cli = CliRenamerSIO(*args, file_sys = origs)
-    cli.run()
-    assert cli.success
-    cli.check_file_sys(*news)
+    do_checks('run')
 
-    # Same scenario, but using do_prepare() and do_rename().
-    cli = CliRenamerSIO(*args, file_sys = origs)
-    cli.do_prepare()
-    cli.do_rename()
-    assert cli.success
-    cli.check_file_sys(*news)
-
-    # Same scenario. Calling the methods multiple times has no adverse effect.
-    cli = CliRenamerSIO(*args, file_sys = origs)
-    cli.do_prepare()
-    cli.do_prepare()
-    cli.do_rename()
-    assert cli.plan.tracking_rp is None
-    cli.do_rename()
-    assert cli.success
-    cli.check_file_sys(*news)
-    assert cli.plan.tracking_rp is None
+    # Same scenario, but using do_prepare() and do_rename(),
+    # either once or even multiple times.
+    do_checks('do')
+    do_checks('multiple-do')
 
     # Helper to format expected error text for subsequent checks.
     def exp_err_text(tracking_index):
@@ -448,259 +441,249 @@ def test_rename_paths_raises(tr):
 
     # Same scenario, but we will set plan.has_renamed to trigger
     # an exception when plan.rename_paths() is called.
-    cli = CliRenamerSIO(*args, file_sys = origs)
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
     cli.do_prepare()
     cli.plan.has_renamed = True
     cli.do_rename()
+    wa.check(no_change = True)
+    assert cli.plan.tracking_index == NSTART
+    got = cli.err
+    exp = exp_err_text(NSTART)
+    assert got.strip().startswith(exp)
+    assert 'raise MvsError(MF.rename_done_already)' in got
     assert cli.failure
-    exp = exp_err_text(cli.plan.TRACKING.not_started)
-    assert cli.err.strip().startswith(exp)
-    assert 'raise MvsError(MF.rename_done_already)' in cli.err
+    assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
+    assert cli.logs_valid_json is cli.OK
 
     # Same scenario, but this time we will trigger the exception via
     # the raise_at attribute, so we can check the tracking_index in
     # the tracking log and in the command-line error message.
-    n = 1
-    cli = CliRenamerSIO(*args, file_sys = origs)
+    N = 1
+    wa = create_wa(origs, news, (), expecteds)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
     cli.do_prepare()
     assert cli.plan.tracking_rp is None
-    cli.plan.raise_at = n
+    assert cli.plan.tracking_index == NSTART
+    cli.plan.raise_at = N
     cli.do_rename()
+    wa.check()
+    assert cli.plan.tracking_rp.orig == wa.origs[N]
+    assert cli.plan.tracking_index == N
+    assert cli.logs_valid_json is cli.OK
+    assert cli.log_tracking_dict == dict(tracking_index = N)
+    assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
+    got = cli.err
+    exp = exp_err_text(N)
+    assert got.strip().startswith(exp)
+    assert 'ZeroDivisionError: SIMULATED_ERROR' in got
     assert cli.failure
-    got = json.loads(cli.log(cli.LOG_TYPE.tracking))
-    assert got == dict(tracking_index = n)
-    assert cli.plan.tracking_rp.orig == 'z2'
-    exp = exp_err_text(n)
-    assert cli.err.strip().startswith(exp)
-    assert 'ZeroDivisionError: SIMULATED_ERROR' in cli.err
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_filter_all(tr):
+def test_filter_all(tr, create_wa, create_outs):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    args = origs + news
     exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
     exp_conflict = MF.conflicting_controls.split(':')[0]
 
     # Initial scenario: it works.
-    cli = CliRenamerSIO(
-        *args,
-        file_sys = origs,
-        yes = True,
-    )
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
     cli.run()
+    assert cli.err == ''
+    assert cli.out == outs.regular_output
+    assert cli.logs_valid_json is cli.OK
+    wa.check()
     assert cli.success
-    cli.check_file_sys(*news)
 
     # But it fails if the user's code filters everything out.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
-        *args,
+        *wa.origs,
+        *wa.news,
         '--filter',
         'return False',
-        file_sys = origs,
-        yes = True,
     )
     cli.run()
-    assert cli.failure
-    assert cli.out == ''
-    assert cli.log() == ''
     assert cli.err.startswith(exp_cli_prep)
     assert PF.all_filtered in cli.err
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.failure
+    wa.check(no_change = True)
 
 ####
 # Textual outputs.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_log(tr):
+def test_log(tr, create_wa, create_outs):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    rename_args = ('--rename', 'return o + o')
 
-    # A basic scenario that works.
-    cli = CliRenamerSIO(*rename_args, *origs, file_sys = origs, yes = True)
-    cli.run()
-    assert cli.success
-    cli.check_file_sys(*news)
-
+    # A basic renaming scenario.
     # We can load its log file and check that it is a dict
     # with some of the expected keys.
-    got = json.loads(cli.log(cli.LOG_TYPE.plan))
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
+    cli.run()
+    assert cli.err == ''
+    assert cli.out == outs.regular_output
+    assert cli.logs_valid_json is cli.OK
+    wa.check()
+    assert cli.success
+    got = cli.log_plan_dict
     assert got['version'] == __version__
     ks = ['current_directory', 'opts', 'inputs', 'rename_pairs', 'problems']
     for k in ks:
         assert k in got
+    got = cli.log_tracking_dict
+    assert got == dict(tracking_index = cli.plan.TRACKING.done)
 
-    # Also check the tracking log.
-    got = json.loads(cli.log(cli.LOG_TYPE.tracking))
-    assert tuple(got) == ('tracking_index',)
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_pagination(tr):
+def test_pagination(tr, create_wa, create_outs):
     # Paths.
     origs = tuple(ascii_lowercase)
     news = tuple(o + o for o in origs)
 
     # Exercise the paginate() function by using cat and /dev/null.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
-        *origs,
-        '--rename',
-        'return o + o',
-        file_sys = origs,
-        yes = True,
+        *wa.origs,
+        *wa.news,
         pager = 'cat > /dev/null',
     )
     cli.run()
+    wa.check()
+    assert cli.err == ''
+    assert cli.logs_valid_json is cli.OK
+    assert cli.out.lstrip() == outs.paths_renamed.lstrip()
     assert cli.success
-    cli.check_file_sys(*news)
 
 ####
-# End to end tests: real file system operations via main().
+# Exercising main().
 ####
 
-def execute_main(*args):
-    # Helper to execute main() and return program textual outputs.
+def test_main(tr, create_wa, create_outs):
+    # Paths.
+    origs = ('xx', 'yy')
+    news = ('xx.new', 'yy.new')
+
+    # Helper to check that logging output is valid JSON.
+    def check_log(cli, log_name):
+        log_type = getattr(CliRenamer.LOG_TYPE, log_name)
+        text = parse_log(cli.logfh, log_type)
+        d = json.loads(text)
+        assert isinstance(d, dict)
+
+    # File handles to pass into main().
     fhs = dict(
         stdout = StringIO(),
         stderr = StringIO(),
         stdin = StringIO(),
         logfh = StringIO(),
     )
-    args = args + ('--yes', '--pager', '')
+
+    # Create work area.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+
+    # Call main(). It should exit successfully.
+    args = wa.origs + wa.news + ('--yes', '--pager', '')
     with pytest.raises(SystemExit) as einfo:
         main(args, **fhs)
-    fhs = {
+    einfo.value.code == CON.exit_ok
+
+    # Confirm that paths were renamed as expected.
+    wa.check()
+
+    # Check textual outputs.
+    cli = SimpleNamespace(**{
         k : fh.getvalue()
         for k, fh in fhs.items()
-    }
-    return (einfo.value, fhs)
-
-def check_main_paths(origs, news):
-    # Helper to check the resulting file system after renaming.
-    checks = (
-        (origs, False),
-        (news, True),
-    )
-    for paths, exp in checks:
-        for p in paths:
-            if p.endswith('/'):
-                assert (p, Path(p).is_dir()) == (p, exp)
-            else:
-                assert (p, Path(p).is_file()) == (p, exp)
-
-def check_main_outputs(fhs):
-    # Helper to check the textual outputs from a main() call.
-    out = fhs['stdout']
-    err = fhs['stderr']
-    assert err == ''
-    assert 'Paths renamed.' in out
-    assert 'Paths to be renamed (total' in out
-    log_plan = parse_log(fhs['logfh'], CliRenamer.LOG_TYPE.plan)
-    log_tracking = parse_log(fhs['logfh'], CliRenamer.LOG_TYPE.tracking)
-    d = json.loads(log_plan)
-    assert 'version' in d
-    assert 'opts' in d
-    d = json.loads(log_tracking)
-    assert 'tracking_index' in d
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_e2e_basic_rename(tr):
-    # End to end: basic renaming scenario.
-    origs = ('a', 'b')
-    news = ('c', 'd')
-    origs, news = tr.temp_area(origs, news)
-    ex, fhs = execute_main(*origs, *news)
-    assert ex.args[0] == CON.exit_ok
-    check_main_paths(origs, news)
-    check_main_outputs(fhs)
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_e2e_create_parent(tr):
-    # End to end: renaming that requires parent creation.
-    origs = ('a', 'b')
-    news = ('foo/c', 'foo/d')
-    origs, news = tr.temp_area(origs, news)
-    ex, fhs = execute_main(*origs, *news, '--create', 'parent')
-    check_main_paths(origs, news)
-    check_main_outputs(fhs)
-
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_e2e_clobber(tr):
-    # End to end: renaming that clobbers existing paths.
-    origs = ('a', 'b')
-    news = ('c', 'd')
-    extras = ('c', 'x')
-    origs, news, extras = tr.temp_area(origs, news, extras)
-    ex, fhs = execute_main(*origs, *news, '--clobber', 'existing')
-    check_main_outputs(fhs)
-    check_main_paths(origs, news + extras)
+    })
+    assert cli.stdout == outs.regular_output
+    assert cli.stderr == ''
+    assert cli.stdin == ''
+    check_log(cli, 'plan')
+    check_log(cli, 'tracking')
 
 ####
 # Problem control.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_some_failed_rps(tr):
-    # Paths, args, file-sys, options, expectations.
+def test_some_failed_rps(tr, create_wa, create_outs):
+    # Paths, options, expectations.
     origs = ('z1', 'z2', 'z3', 'z4')
     news = ('A1', 'A2', 'A3', 'A4')
-    args = origs + news
-    file_sys = origs + news[1:3]
-    exp_file_sys = ('z2', 'z3', 'A2', 'A3', 'A1', 'A4')
+    extras = ('A1', 'A2')
+    expecteds = ('z1', 'z2', 'A3', 'A4') + extras
     opt_skip = ('--skip', 'existing')
     opt_clobber = ('--clobber', 'existing')
     exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
     exp_conflict = MF.conflicting_controls.split('{')[0]
 
     # Initial scenario fails: 2 of the new paths already exist.
-    cli = CliRenamerSIO(
-        *args,
-        file_sys = file_sys,
-        yes = True,
-    )
+    # No renaming occurs.
+    wa = create_wa(origs, news, extras)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
     cli.run()
-    assert cli.failure
+    wa.check(no_change = True)
     assert cli.err.startswith(exp_cli_prep)
     assert PF.existing in cli.err
+    assert cli.out == ''
+    assert cli.log == ''
+    assert cli.failure
 
-    # Renaming succeeds if we pass --skip-existing-new.
+    # Renaming succeeds if we use --skip.
+    wa = create_wa(origs, news, extras, expecteds)
+    outs = create_outs(wa.origs[2:], wa.news[2:])
     cli = CliRenamerSIO(
-        *args,
+        *wa.origs,
+        *wa.news,
         *opt_skip,
-        file_sys = file_sys,
-        yes = True,
     )
     cli.run()
+    wa.check()
+    assert cli.out == outs.regular_output
+    assert cli.logs_valid_json is cli.OK
+    assert cli.err == ''
     assert cli.success
-    cli.check_file_sys(*exp_file_sys)
 
     # Renaming fails if we pass both failure-control options.
+    wa = create_wa(origs, news, extras)
     cli = CliRenamerSIO(
-        *args,
+        *wa.origs,
+        *wa.news,
         *opt_skip,
         *opt_clobber,
-        file_sys = file_sys,
-        yes = True,
     )
     cli.run()
-    assert cli.failure
+    wa.check(no_change = True)
+    got = cli.err
+    assert got.startswith(exp_conflict)
+    assert CONTROLS.skip in got
+    assert CONTROLS.clobber in got
     assert cli.out == ''
-    assert cli.log() == ''
-    assert cli.err.startswith(exp_conflict)
-    assert CONTROLS.skip in cli.err
-    assert CONTROLS.clobber in cli.err
+    assert cli.log == ''
+    assert cli.failure
 
 ####
 # Miscellaneous.
 ####
 
-@pytest.mark.skip(reason = 'drop-fake-fs')
-def test_wrapup_with_tb(tr):
-    # Excercises all calls of wrapup_with_tb() and checks for expected side
-    # effects. Those branches are a hassle to reach during testing, are
-    # unlikely to occur in real usage, and do nothing interesting other than
-    # call the method tested here. So they are pragma-ignored by test-coverage.
+def test_wrapup_with_tb(tr, create_wa):
+    # Excercises all calls of wrapup_with_tb() and checks for expected
+    # attribute changes. Those code branches are a hassle to reach during
+    # testing, are unlikely to occur in real usage, and do nothing interesting
+    # other than call the method tested here. So they are pragma-ignored by
+    # test-coverage. Here we simple exercise the machinery to insure against MF
+    # attribute names becoming outdated.
     origs = ('z1', 'z2', 'z3')
     news = ('A1', 'A2', 'A3')
     args = origs + news
@@ -712,14 +695,17 @@ def test_wrapup_with_tb(tr):
         MF.plan_creation_failed,
     )
     for fmt in fmts:
-        cli = CliRenamerSIO(*args, file_sys = origs, yes = True)
+        wa = create_wa(origs, news)
+        cli = CliRenamerSIO(*wa.origs, *wa.news)
         assert cli.exit_code is None
         assert cli.done is False
         cli.wrapup_with_tb(fmt)
         assert cli.exit_code == CON.exit_fail
         assert cli.done is True
         assert cli.out == ''
-        assert cli.log() == ''
+        assert cli.log == ''
+        got = cli.err
         exp = fmt.split('{')[0]
-        assert exp in cli.err
+        assert exp in got
+        wa.check(no_change = True)
 

@@ -302,6 +302,14 @@ class Outputs:
         return self.paths_to_be_renamed + self.paths_renamed
 
     @property
+    def no_action_output(self):
+        return self.paths_to_be_renamed + self.no_action
+
+    @property
+    def no_confirm_output(self):
+        return self.paths_to_be_renamed + self.confirm + self.no_action
+
+    @property
     def paths_to_be_renamed(self):
         args = [f'Paths to be renamed {self.totlist}.\n']
         args.extend(
@@ -320,5 +328,5 @@ class Outputs:
 
     @property
     def no_action(self):
-        return 'No action taken.\n\n'
+        return 'No action taken.\n'
 
