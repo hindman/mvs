@@ -11,10 +11,12 @@ from short_con import constants
 
 from .utils import (
     CON,
+    EXISTENCES,
     MSG_FORMATS as MF,
     MvsError,
     RenamePair,
     STRUCTURES,
+    existence_status,
     is_valid_path_type,
     paths_have_same_type,
 )
@@ -373,7 +375,9 @@ class RenamingPlan:
             return rp
 
     def check_orig_exists(self, rp, seq_val):
-        if self.path_exists(rp.orig):
+        # Key question: is renaming possible?
+        # Strict existence not required.
+        if self.path_exists(rp.orig, strict = False):
             return rp
         else:
             return Problem(PN.missing)
@@ -391,10 +395,14 @@ class RenamingPlan:
             return rp
 
     def check_new_not_exists(self, rp, seq_val):
+        # Key question: is renaming necessary?
+        # Here the check requires strict existence so we can
+        # support case-change-only renamings.
+        #
         # The problem is conditional on ORIG and NEW being different
         # to avoid pointless reporting of multiple problems in cases
         # where ORIG does not exist and where it equals NEW.
-        if self.path_exists(rp.new) and not rp.equal:
+        if self.path_exists(rp.new, strict = True) and not rp.equal:
             if paths_have_same_type(rp.orig, rp.new):
                 return Problem(PN.existing)
             else:
@@ -403,7 +411,9 @@ class RenamingPlan:
             return rp
 
     def check_new_parent_exists(self, rp, seq_val):
-        if self.path_exists(Path(rp.new).parent):
+        # Key question: does renaming also require parent creation?
+        # Mere existence is sufficient.
+        if self.path_exists(Path(rp.new).parent, strict = False):
             return rp
         else:
             return Problem(PN.parent)
@@ -517,8 +527,9 @@ class RenamingPlan:
     # Files system operations.
     ####
 
-    def path_exists(self, p):
-        return Path(p).exists()
+    def path_exists(self, path, strict = False):
+        e = EXISTENCES.exists_strict if strict else EXISTENCES.exists
+        return existence_status(path) >= e
 
     def rename_paths(self):
         # Don't rename more than once.

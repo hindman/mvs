@@ -262,13 +262,19 @@ def wrap_text(text, width):
     )
 
 ####
-# Functions to check path type.
+# Functions to check path type and existence-status.
 ####
 
 PATH_TYPES = constants('PathTypes', (
     'file',
     'directory',
     'other',
+))
+
+EXISTENCES = constants('Existences', dict(
+    missing = 0,
+    exists = 1,
+    exists_strict = 2,
 ))
 
 def path_type(path):
@@ -286,4 +292,17 @@ def is_valid_path_type(path):
 def paths_have_same_type(path, *others):
     pt = path_type(path)
     return all(pt == path_type(o) for o in others)
+
+def existence_status(path):
+    E = EXISTENCES
+    p = Path(path)
+    if p.parent.exists():
+        if p in p.parent.iterdir():
+            # Means p exists and p.name exactly matches the name
+            # as reported by file system (including case).
+            return E.exists_strict
+        elif p.exists():
+            # Means only that p exists.
+            return E.exists
+    return E.missing
 

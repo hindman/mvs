@@ -13,25 +13,20 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Support case-change renamings [see CASE_CHANGE].
+Add --enforce and make --skip=equal the default [see ADD_ENFORCE].
 
-Add --enforce and make --skip=equal the default.
-
-Clipboard source test disabled for Linux: revive if possible.
+Tests [see NEW_TESTS].
 
 New documentation [see NEW_DOCS].
-
-Tests:
-    - User-prefs
-    - The --edit option.
-    - Double check pragma-no-cover stuff.
-    - New checks: file types; clobbering.
 
 Editing pass:
     - User-prefs
     - The --edit option.
+    - Case-change.
     - Tests.
     - New checks: file types; clobbering.
+
+Clipboard source test disabled for Linux: revive if possible.
 
 --------
 road-map: Road map
@@ -175,6 +170,7 @@ New documentation [NEW_DOCS]:
         - Orig paths must be regular file or directory.
         - In clobbering, like must overwrite like (file => file; dir => dir).
         - Only empty directories can be clobbered.
+        - The --create control will create parents, not move-create.
 
     - CHANGES file.
 
@@ -195,40 +191,18 @@ New documentation [NEW_DOCS]:
               the current file system: it does not check each rename against the
               future file system after some renamings have occurred.
 
-Case-change renamings [CASE_CHANGE]:
+        - The package is not tested on case-insensitive operating systems. In
+          that context, regular renamings will probably work fine. Some
+          case-change-only renamings won't be treated as problems by the checks
+          (if rp.new fails to exists-strict), so the renaming would be tried,
+          and it will fail.
 
-    - Function to determine a path's existence status:
-
-        PS = PATH_STATUSES = constants('PathStatuses', dict(
-            missing = 0,
-            exists = 1,
-            exists_strict = 2,
-        ))
-
-        def path_existence(path):
-            p = Path(p)
-            if p.parent.exists():
-                if p in p.parent.iterdir():
-                    return PS.exists_strict
-                elif p.exists():
-                    return PS.exists
-            return PS.missing
-
-    - How the RenamePair existence checks should operate:
-
-        check_orig_exists():
-            - Key question: is renaming possible?
-            - PS.exists is sufficient.
-
-        check_new_not_exists():
-            - Key question: is renaming necessary?
-            - Requires PS.exists_strict.
-
-        check_new_parent_exists():
-            - Key question: does renaming also require create-parent?
-            - PS.exists is sufficient.
-
-    - Tests should cover all possibilities:
+New tests [NEW_TESTS].
+    - User-prefs
+    - The --edit option.
+    - Double check pragma-no-cover stuff.
+    - New checks: file types; clobbering.
+    - Exercise the case-change renamings:
 
         parent    | name      | Example: orig vs new | Note
         ---------------------------------------------------------------------
@@ -266,7 +240,7 @@ The purpose of the --paragraphs structure:
       requirement that at least one blank existings between the original and
       new paths.
 
-Adding --enforce and making --skip=equal the default:
+Adding --enforce and making --skip=equal the default [ADD_ENFORCE]:
 
     - What the --enforce mechanism means:
 
