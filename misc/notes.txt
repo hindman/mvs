@@ -32,12 +32,6 @@ Clipboard source test disabled for Linux: revive if possible.
 road-map: Road map
 --------
 
-CLI.opts_config is awkward: rework.
-    - The oc dicts lack a simple name attribute.
-    - The opts_config collection would work better as a dict
-      where you could look items up by name.
-    - The special key names are a hassle.
-
 Other operations:
     - copy: given old-paths, copy them to new-paths.
     - link: given old-paths (sources), create new-paths (links, soft or hard).
@@ -278,6 +272,8 @@ Adding --enforce and making --skip=equal the default [ADD_ENFORCE]:
         -------------------------------------------
         "           | enforce = X  | --skip X
         "           | enforce = X  | --parent X
+        ===========================================
+        parent = X  | etc...       | ...
         ===========================================
 
 How --edit relates to SOURCES and STRUCTURES:

@@ -19,14 +19,11 @@ from .utils import (
     CON,
     MSG_FORMATS as MF,
     MvsError,
-    PrefType,
+    OptConfig,
     STRUCTURES,
-    list_of_str,
-    list_or_str,
-    posint_pref,
+    edit_text,
     positive_int,
     read_from_clipboard,
-    edit_text,
     read_from_file,
     wrap_text,
 )
@@ -281,31 +278,20 @@ class CliRenamer:
             self.wrapup_with_tb(msg)
 
     def merge_opts_prefs(self, opts, prefs):
-        # Use the command-line options configuration data to
-        # create a dict of PrefType instances.
-        ptypes = tuple(
-            self.oc_to_preftype(oc)
-            for oc in CLI.opts_config
-        )
-        ptypes = {
-            pt.name : pt
-            for pt in ptypes
-        }
-
         # Confirm that the prefs keys are valid.
-        invalid = set(prefs) - set(ptypes)
+        invalid = set(prefs) - set(CLI.opt_configs)
         if invalid:
-            invalid = CON.comma_space.join(invalid)
-            msg = MF.invalid_pref_keys.format(invalid)
+            invalid_str = CON.comma_space.join(invalid)
+            msg = MF.invalid_pref_keys.format(invalid_str)
             self.wrapup(CON.exit_fail, msg)
             return None
 
-        # Check data types of the prefs.
+        # Check data types of the pref values.
         for name, val in prefs.items():
-            pt = ptypes[name]
-            expected = pt.check_value(val)
-            if expected:
-                msg = MF.invalid_pref_val.format(pt.name, expected, val)
+            oc = CLI.opt_configs[name]
+            expected_type = oc.check_value(val)
+            if expected_type:
+                msg = MF.invalid_pref_val.format(oc.name, expected_type, val)
                 self.wrapup(CON.exit_fail, msg)
                 return None
 
@@ -318,27 +304,17 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, name, val)
 
-        # Create a dict of the real_default values.
-        rds = {
-            parse_oc_name(oc) : oc[CLI.real_default]
-            for oc in CLI.opts_config
-            if CLI.real_default in oc
-        }
-
-        # Apply real defaults to any attributes that were
+        # Apply the real_default values to any attributes that were
         # not set either in user-prefs or on the command line.
-        for name, rd in rds.items():
-            current = getattr(opts, name)
-            if current in CLI.unset_opt_vals:
-                setattr(opts, name, rd)
+        for oc in CLI.opt_configs.values():
+            rd = oc.real_default
+            if rd is not None:
+                current = getattr(opts, oc.name)
+                if current in CLI.unset_opt_vals:
+                    setattr(opts, oc.name, rd)
 
         # Boom.
         return opts
-
-    def oc_to_preftype(self, oc):
-        name = parse_oc_name(oc)
-        valid = oc[CLI.dtype]
-        return PrefType(name, valid)
 
     @property
     def user_prefs_path(self):
@@ -351,18 +327,14 @@ class CliRenamer:
             description = CLI.description,
             add_help = False,
         )
-        # Add arguments, in argument-groups.
-        # The presense of CLI.group in the configuration dict (oc)
-        # signals the start of each new argument-group.
+
+        # Add arguments, in argument groups.
         arg_group = None
-        for oc in CLI.opts_config:
-            kws = dict(oc)
-            kws.pop(CLI.dtype)
-            kws.pop(CLI.real_default, None)
-            if CLI.group in kws:
-                arg_group = ap.add_argument_group(kws.pop(CLI.group))
-            xs = kws.pop(CLI.names).split()
-            arg_group.add_argument(*xs, **kws)
+        for oc in CLI.opt_configs.values():
+            if oc.group:
+                arg_group = ap.add_argument_group(oc.group)
+            arg_group.add_argument(*oc.names, **oc.params)
+
         # Return parser.
         return ap
 
@@ -679,258 +651,258 @@ class CLI:
           --create parent
     ''').lstrip()
 
-    # Important key names in opts_config.
-    names = 'names'
-    group = 'group'
-    dtype = 'dtype'
-    real_default = 'real_default'
-
     # Values in the parsed opts indicating that the user did not
     # set the option on the command line. Used when merging
     # the user preferences into opts.
     unset_opt_vals = (False, None, [])
 
+    # Text used in various OptConfig help texts.
     just_origs_msg = 'implies inputs are just original paths'
 
     # Argument configuration for argparse.
-    opts_config = (
+    opt_configs = (
 
         #
         # Input path sources.
         #
-        {
-            group: 'Input path sources',
-            names: 'paths',
-            'nargs': '*',
-            'metavar': 'PATH',
-            'help': 'Input paths via arguments',
-            dtype: list_of_str,
-        },
-        {
-            names: '--stdin',
-            'action': 'store_true',
-            'help': 'Input paths via STDIN',
-            dtype: bool,
-        },
-        {
-            names: '--file',
-            'metavar': 'PATH',
-            'help': 'Input paths via a text file',
-            dtype: str,
-        },
-        {
-            names: '--clipboard',
-            'action': 'store_true',
-            'help': 'Input paths via the clipboard',
-            dtype: bool,
-        },
+        OptConfig(
+            group = 'Input path sources',
+            names = 'paths',
+            validator = OptConfig.list_of_str,
+            nargs = '*',
+            metavar = 'PATH',
+            help = 'Input paths via arguments',
+        ),
+        OptConfig(
+            names = '--stdin',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths via STDIN',
+        ),
+        OptConfig(
+            names = '--file',
+            validator = str,
+            metavar = 'PATH',
+            help = 'Input paths via a text file',
+        ),
+        OptConfig(
+            names = '--clipboard',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths via the clipboard',
+        ),
 
         #
         # Options defining the structure of the input path data.
         #
-        {
-            group: 'Input path structures',
-            names: '--flat',
-            'action': 'store_true',
-            'help': 'Input paths: original paths, then equal number of new paths [the default]',
-            dtype: bool,
-        },
-        {
-            names: '--paragraphs',
-            'action': 'store_true',
-            'help': 'Input paths in paragraphs: original paths, blank line(s), new paths',
-            dtype: bool,
-        },
-        {
-            names: '--pairs',
-            'action': 'store_true',
-            'help': 'Input paths in alternating lines: original, new, original, new, etc.',
-            dtype: bool,
-        },
-        {
-            names: '--rows',
-            'action': 'store_true',
-            'help': 'Input paths in tab-delimited rows: original, tab, new',
-            dtype: bool,
-        },
+        OptConfig(
+            group = 'Input path structures',
+            names = '--flat',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths: original paths, then equal number of new paths [the default]',
+        ),
+        OptConfig(
+            names = '--paragraphs',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths in paragraphs: original paths, blank line(s), new paths',
+        ),
+        OptConfig(
+            names = '--pairs',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths in alternating lines: original, new, original, new, etc.',
+        ),
+        OptConfig(
+            names = '--rows',
+            validator = bool,
+            action = 'store_true',
+            help = 'Input paths in tab-delimited rows: original, tab, new',
+        ),
 
         #
         # User code for renaming and filtering.
         #
-        {
-            group: 'User code',
-            names: '--rename -r',
-            'metavar': 'CODE',
-            'help': f'Code to convert original path to new path [{just_origs_msg}]',
-            dtype: str,
-        },
-        {
-            names: '--filter',
-            'metavar': 'CODE',
-            'help': 'Code to filter input paths',
-            dtype: str,
-        },
-        {
-            names: '--indent',
-            'type': positive_int,
-            'metavar': 'N',
-            'default': None,
-            real_default: 4,
-            'help': 'Number of spaces for indentation in user-supplied code [default: 4]',
-            dtype: posint_pref,
-        },
-        {
-            names: '--seq',
-            'metavar': 'N',
-            'type': positive_int,
-            'default': None,
-            real_default: 1,
-            'help': 'Sequence start value [default: 1]',
-            dtype: posint_pref,
-        },
-        {
-            names: '--step',
-            'metavar': 'N',
-            'type': positive_int,
-            'default': None,
-            real_default: 1,
-            'help': 'Sequence step value [default: 1]',
-            dtype: posint_pref,
-        },
+        OptConfig(
+            group = 'User code',
+            names = '--rename -r',
+            validator = str,
+            metavar = 'CODE',
+            help = f'Code to convert original path to new path [{just_origs_msg}]',
+        ),
+        OptConfig(
+            names = '--filter',
+            validator = str,
+            metavar = 'CODE',
+            help = 'Code to filter input paths',
+        ),
+        OptConfig(
+            names = '--indent',
+            validator = OptConfig.posint,
+            real_default = 4,
+            type = positive_int,
+            metavar = 'N',
+            default = None,
+            help = 'Number of spaces for indentation in user-supplied code [default: 4]',
+        ),
+        OptConfig(
+            names = '--seq',
+            validator = OptConfig.posint,
+            real_default = 1,
+            metavar = 'N',
+            type = positive_int,
+            default = None,
+            help = 'Sequence start value [default: 1]',
+        ),
+        OptConfig(
+            names = '--step',
+            validator = OptConfig.posint,
+            real_default = 1,
+            metavar = 'N',
+            type = positive_int,
+            default = None,
+            help = 'Sequence step value [default: 1]',
+        ),
 
         #
         # Renaming via editing.
         #
-        {
-            group: 'Renaming via editing',
-            names: '--edit',
-            'action': 'store_true',
-            'help': f'Create new paths via a text editor [{just_origs_msg}]',
-            dtype: bool,
-        },
-        {
-            names: '--editor',
-            'metavar': 'CMD',
-            'default': None,
-            real_default: CON.default_editor_cmd,
-            'help': f'Command string for editor used by --edit [default: {CON.default_editor_cmd}]',
-            dtype: str,
-        },
+        OptConfig(
+            group = 'Renaming via editing',
+            names = '--edit',
+            validator = bool,
+            action = 'store_true',
+            help = f'Create new paths via a text editor [{just_origs_msg}]',
+        ),
+        OptConfig(
+            names = '--editor',
+            validator = str,
+            real_default = CON.default_editor_cmd,
+            metavar = 'CMD',
+            default = None,
+            help = f'Command string for editor used by --edit [default: {CON.default_editor_cmd}]',
+        ),
 
         #
         # Renaming behaviors.
         #
-        {
-            group: 'Renaming behaviors',
-            names: '--dryrun -d',
-            'action': 'store_true',
-            'help': 'List renamings without performing them',
-            dtype: bool,
-        },
-        {
-            names: '--yes',
-            'action': 'store_true',
-            'help': 'Rename files without a user confirmation step',
-            dtype: bool,
-        },
-        {
-            names: '--nolog',
-            'action': 'store_true',
-            'help': 'Suppress logging',
-            dtype: bool,
-        },
+        OptConfig(
+            group = 'Renaming behaviors',
+            names = '--dryrun -d',
+            validator = bool,
+            action = 'store_true',
+            help = 'List renamings without performing them',
+        ),
+        OptConfig(
+            names = '--yes',
+            validator = bool,
+            action = 'store_true',
+            help = 'Rename files without a user confirmation step',
+        ),
+        OptConfig(
+            names = '--nolog',
+            validator = bool,
+            action = 'store_true',
+            help = 'Suppress logging',
+        ),
 
         #
         # Listing/pagination.
         #
-        {
-            group: 'Listings',
-            names: '--pager',
-            'metavar': 'CMD',
-            'default': None,
-            real_default: CON.default_pager_cmd,
-            'help': (
+        OptConfig(
+            group = 'Listings',
+            names = '--pager',
+            validator = str,
+            real_default = CON.default_pager_cmd,
+            metavar = 'CMD',
+            default = None,
+            help = (
                 'Command string for paginating listings [default: '
                 f'`{CON.default_pager_cmd}`; empty string to disable]'
             ),
-            dtype: str,
-        },
-        {
-            names: '--limit',
-            'metavar': 'N',
-            'type': positive_int,
-            'help': 'Upper limit on the number of items to display in listings [default: none]',
-            dtype: posint_pref,
-        },
+        ),
+        OptConfig(
+            names = '--limit',
+            validator = OptConfig.posint,
+            metavar = 'N',
+            type = positive_int,
+            help = 'Upper limit on the number of items to display in listings [default: none]',
+        ),
 
         #
         # Failure control.
         #
-        {
-            group: 'Problem control',
-            names: '--skip',
-            'choices': CON.all_tup + Problem.names_for(CONTROLS.skip),
-            'nargs': '+',
-            'metavar': 'PROB',
-            'help': 'Skip items with the named problems',
-            dtype: list_or_str,
-        },
-        {
-            names: '--clobber',
-            'choices': CON.all_tup + Problem.names_for(CONTROLS.clobber),
-            'nargs': '+',
-            'metavar': 'PROB',
-            'help': 'Rename anyway, in spite of named overwriting problems',
-            dtype: list_or_str,
-        },
-        {
-            names: '--create',
-            'choices': CON.all_tup + Problem.names_for(CONTROLS.create),
-            'nargs': '+',
-            'metavar': 'PROB',
-            'help': 'Fix missing parent problem before renaming',
-            dtype: list_or_str,
-        },
+        OptConfig(
+            group = 'Problem control',
+            names = '--skip',
+            validator = OptConfig.list_or_str,
+            choices = CON.all_tup + Problem.names_for(CONTROLS.skip),
+            nargs = '+',
+            metavar = 'PROB',
+            help = 'Skip items with the named problems',
+        ),
+        OptConfig(
+            names = '--clobber',
+            validator = OptConfig.list_or_str,
+            choices = CON.all_tup + Problem.names_for(CONTROLS.clobber),
+            nargs = '+',
+            metavar = 'PROB',
+            help = 'Rename anyway, in spite of named overwriting problems',
+        ),
+        OptConfig(
+            names = '--create',
+            validator = OptConfig.list_or_str,
+            choices = CON.all_tup + Problem.names_for(CONTROLS.create),
+            nargs = '+',
+            metavar = 'PROB',
+            help = 'Fix missing parent problem before renaming',
+        ),
 
         #
         # Other.
         #
-        {
-            group: 'Other',
-            names: '--disable',
-            'nargs': '+',
-            'metavar': 'FLAG',
-            'default': [],
-            'help': 'Disable flag options that were set true in user preferences',
-            dtype: bool,
-        },
-        {
-            names: '--help -h',
-            'action': 'store_true',
-            'help': 'Display this help message and exit',
-            dtype: bool,
-        },
-        {
-            names: '--details',
-            'action': 'store_true',
-            'help': 'Display additional help details and exit',
-            dtype: bool,
-        },
-        {
-            names: '--version',
-            'action': 'store_true',
-            'help': 'Display the version number and exit',
-            dtype: bool,
-        },
+        OptConfig(
+            group = 'Other',
+            names = '--disable',
+            validator = bool,
+            nargs = '+',
+            metavar = 'FLAG',
+            default = [],
+            help = 'Disable flag options that were set true in user preferences',
+        ),
+        OptConfig(
+            names = '--help -h',
+            validator = bool,
+            action = 'store_true',
+            help = 'Display this help message and exit',
+        ),
+        OptConfig(
+            names = '--details',
+            validator = bool,
+            action = 'store_true',
+            help = 'Display additional help details and exit',
+        ),
+        OptConfig(
+            names = '--version',
+            validator = bool,
+            action = 'store_true',
+            help = 'Display the version number and exit',
+        ),
 
     )
 
-    for oc in opts_config:
-        if parse_oc_name(oc) == 'disable':
-            oc['choices'] = tuple(
-                parse_oc_name(oc)
-                for oc in opts_config
-                if oc.get('action') == 'store_true'
-            )
-            break
+    # Convert opt_configs from tuple to dict so that
+    # we can look them up by name.
+    opt_configs = {
+        oc.name : oc
+        for oc in opt_configs
+    }
+
+    # Set the choices parameter for the --disable option.
+    opt_configs['disable'].params['choices'] = tuple(
+        oc.name
+        for oc in opt_configs.values()
+        if oc.is_flag
+    )
 

@@ -157,8 +157,8 @@ def test_version_and_help(tr):
     assert CLI.description[:40] in cli.out
     for opt in ('--clipboard', '--paragraphs', '--rename'):
         assert f'\n  {opt}' in cli.out
-    for oc in CLI.opts_config:
-        assert oc['help'][0:40] in cli.out
+    for oc in CLI.opt_configs.values():
+        assert oc.params['help'][0:40] in cli.out
 
 def test_indent_and_posint(tr, create_wa, create_outs):
     # Paths and args.
