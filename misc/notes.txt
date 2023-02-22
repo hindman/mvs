@@ -244,6 +244,69 @@ Adding --enforce and making --skip=equal the default [ADD_ENFORCE]:
         - The upstream configuations are the application defaults and the user
           defaults (mvs.conf).
 
+    - Why downstream control settings augment upstream settings:
+
+        - If downstream problem controls were to replace (rather than augment)
+          the upstream settings, we would get one benefit and one big cost.
+
+        - Benefit: the --enforce option would be unneeded.
+
+            App default:                   --skip equal
+            User requests enforcement:     --skip ''
+            Even this would enforce equal: --skip existing
+
+        - Big cost: downstream settings would have to be restate all upstream
+          controls that are still desired:
+
+            App default:  --skip equal
+            User pref:    --skip equal type           # Cannot omit equal.
+            Command line: --skip equal type existing  # Again, cannot omit equal or type.
+
+    - Currently, CliRenamer is not enforcing against conflicting_controls.
+
+        - For now, ignore this: rely on RenamingPlan to catch such problems.
+
+    - RenamingPlan behaviors related to problem control:
+
+        - Defaults will be skip='equal', clobber=None, create=None.
+
+        - Settings coming from CliRenamer will replace (not augment) those
+          defaults.
+
+        - RenamingPlan won't need the enforce concept at all.
+
+    - Order of operations:
+
+        Inside merge_opts_prefs(), the problem-control settings will need to be
+        handled separately from the other attributes.
+
+        Tentative approach for problem controls:
+
+            Start with app-defaults:
+                skip = 'equal'
+
+            Overlay user-prefs:
+                - Add pref controls to the app-defaults.
+                - Then apply enforcements.
+
+            Overlay command-line:
+                - Add CLI controls.
+                - Then apply enforcements.
+
+        Perhaps all of those steps could be as simple as adding all of the
+        tuples together (including for enforce). De-duping each of them. Then
+        using the enforce tuple to modify the other tuples. Roughly:
+
+            # Add.
+            skip = tuple(set(app.skip + prefs.skip + opts.skip))
+
+            # Apply enforcement.
+            skip = tuple(
+                prob
+                for prob in skip
+                if prob not in enforce
+            )
+
     - Demonstration that we can achieve all configurations:
 
         - Assume that Problem X has applicable controls skip, parent.
