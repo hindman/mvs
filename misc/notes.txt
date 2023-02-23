@@ -13,6 +13,8 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Refactor problem control [see NEW_PROB_CONTROL].
+
 Add --enforce and make --skip=equal the default [see ADD_ENFORCE].
 
 Tests [see NEW_TESTS].
@@ -233,6 +235,35 @@ The purpose of the --paragraphs structure:
     - The paragraphs structure is the same as flat, plus the additional
       requirement that at least one blank existings between the original and
       new paths.
+
+Refactor problem control [NEW_PROB_CONTROL]:
+
+    - Add --controls and drop --skip, --clobber, --create, --enforce.
+
+    - Parameters:
+
+        - Grammar:
+
+            [no-]CONTROL-PROBLEM     # Allow hypens or underscores.
+
+            skip-missing             # Examples.
+            clobber-existing
+            no-skip-equal
+            create-parent
+
+        - Configuring argparse: use a metavar (C) and a type function that will
+          normalize the value: problem_control().
+
+        - This approach eliminates API bloat. Future controls or problems won't
+          expand CLI usage or RenamingPlan API.
+
+        - No need for a separate mechanism to remove upstream controls.
+
+        - Validation won't be any harder, maybe even a small bit easier.
+
+        - Building the control lookup for RenamingPlan also seems doable.
+
+        - Merging app-defaults, user-prefs, cli-options seems easier.
 
 Adding --enforce and making --skip=equal the default [ADD_ENFORCE]:
 
