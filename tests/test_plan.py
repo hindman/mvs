@@ -381,9 +381,10 @@ def test_plan_as_dict(tr, create_wa):
         'indent',
         'seq_start',
         'seq_step',
-        'skip',
-        'clobber',
-        'create',
+        'controls',
+        # 'skip',
+        # 'clobber',
+        # 'create',
         'problems',
         'prefix_len',
         'rename_pairs',
@@ -457,18 +458,16 @@ def test_invalid_controls(tr, create_wa):
 
     # Scenarios: can configure problem-control in various ways.
     all_controls = CONTROLLABLES[CONTROLS.skip]
-    first2 = all_controls[0:2]
     checks = (
-        # LABEL            EXP            SKIP
-        ('all-tuple',      all_controls,  all_controls),
-        ('some-tuple',     first2,        first2),
-        ('some-str',       first2,        ' '.join(first2)),
-        ('some-with-all',  all_controls,  first2 + (CON.all,)),
-        ('all-str',        all_controls,  CON.all),
+        ('all', all_controls),
+        ('first2', all_controls[0:2]),
     )
-    for label, exp, skip in checks:
-        plan = RenamingPlan(inputs, skip = skip)
-        assert (label, plan.skip) == (label, exp)
+    for label, controls in checks:
+        tup = tuple(f'skip-{c}' for c in controls)
+        plan1 = RenamingPlan(inputs, controls = tup)
+        plan2 = RenamingPlan(inputs, controls = ' '.join(tup))
+        assert (label, plan1.controls) == (label, tup)
+        assert (label, plan2.controls) == (label, tup)
 
     # But we cannot control the same problem in two different ways.
     checks = (
@@ -477,9 +476,9 @@ def test_invalid_controls(tr, create_wa):
         (PN.colliding, CONTROLS.skip, CONTROLS.clobber),
     )
     for pname, *controls in checks:
-        control_params = {c : pname for c in controls}
+        tup = tuple(f'{c}-{pname}' for c in controls)
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(inputs, **control_params)
+            plan = RenamingPlan(inputs, controls = tup)
         msg = einfo.value.params['msg']
         exp = MF.conflicting_controls.format(pname, *controls)
         assert msg == exp
@@ -491,11 +490,11 @@ def test_invalid_controls(tr, create_wa):
         (PN.parent, CONTROLS.clobber),
     )
     for pname, control in checks:
-        control_params = {control : pname}
+        pc_name = f'{control}-{pname}'
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(inputs, **control_params)
+            plan = RenamingPlan(inputs, controls = pc_name)
         msg = einfo.value.params['msg']
-        exp = MF.invalid_control.format(control, pname)
+        exp = MF.invalid_control.format(pc_name)
         assert msg == exp
 
 def test_equal(tr, create_wa):
@@ -518,7 +517,7 @@ def test_equal(tr, create_wa):
     wa = create_wa(origs, news)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        skip = PN.equal,
+        controls = 'skip-equal',
     )
     plan.rename_paths()
     wa.check()
@@ -555,7 +554,7 @@ def test_missing_orig(tr, create_wa):
     wa = create_wa(origs, news, rootless = True)
     plan = RenamingPlan(
         inputs = assemble_inputs(wa),
-        skip = PN.missing,
+        controls = 'skip-missing',
     )
     with wa.cd():
         plan.rename_paths()
@@ -587,7 +586,7 @@ def test_new_exists(tr, create_wa):
     wa = create_wa(origs, news, extras, expecteds_skip)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        skip = PN.existing,
+        controls = 'skip-existing',
     )
     plan.rename_paths()
     wa.check()
@@ -596,7 +595,7 @@ def test_new_exists(tr, create_wa):
     wa = create_wa(origs, news, extras, expecteds_clobber)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        clobber = PN.existing,
+        controls = 'clobber-existing',
     )
     plan.rename_paths()
     wa.check()
@@ -624,7 +623,7 @@ def test_new_parent_missing(tr, create_wa):
     wa = create_wa(origs, news, (), expecteds_skip)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        skip = PN.parent,
+        controls = 'skip-parent',
     )
     plan.rename_paths()
     wa.check()
@@ -633,7 +632,7 @@ def test_new_parent_missing(tr, create_wa):
     wa = create_wa(origs, news, (), expecteds_create)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        create = PN.parent,
+        controls = 'create-parent',
     )
     plan.rename_paths()
     wa.check()
@@ -661,7 +660,7 @@ def test_news_collide(tr, create_wa):
     wa = create_wa(origs, news, (), expecteds_skip)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        skip = PN.colliding,
+        controls = 'skip-colliding',
     )
     plan.rename_paths()
     wa.check()
@@ -670,7 +669,7 @@ def test_news_collide(tr, create_wa):
     wa = create_wa(origs, news, (), expecteds_clobber)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        clobber = PN.colliding,
+        controls = 'clobber-colliding',
     )
     plan.rename_paths()
     wa.check()
@@ -685,7 +684,7 @@ def test_failures_skip_all(tr, create_wa):
     wa = create_wa(origs, news)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
-        skip = PN.colliding,
+        controls = 'skip-colliding',
     )
     plan.prepare()
     assert plan.failed

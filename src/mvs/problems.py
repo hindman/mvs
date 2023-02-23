@@ -1,7 +1,12 @@
 from dataclasses import dataclass, field
 from short_con import constants, cons
 
-from .utils import RenamePair
+from .utils import (
+    CON,
+    MSG_FORMATS as MF,
+    MvsError,
+    RenamePair,
+)
 
 ####
 # Problem names and associated messages/formats.
@@ -54,36 +59,6 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
 })
 
 ####
-# Problem controls.
-####
-
-CONTROLS = constants('ProblemControls', (
-    'skip',
-    'clobber',
-    'create',
-))
-
-CONTROLLABLES = {
-    CONTROLS.skip: (
-        PN.equal,
-        PN.missing,
-        PN.type,
-        PN.parent,
-        PN.existing,
-        PN.colliding,
-        PN.existing_diff,
-        PN.colliding_diff,
-    ),
-    CONTROLS.clobber: (
-        PN.existing,
-        PN.colliding,
-    ),
-    CONTROLS.create: (
-        PN.parent,
-    ),
-}
-
-####
 # Data object to represent a problem.
 ####
 
@@ -109,11 +84,73 @@ class Problem:
         else:
             return f'{self.msg}:\n{self.rp.formatted}'
 
-    @classmethod
-    def format_for(cls, name):
+    @staticmethod
+    def format_for(name):
         return PROBLEM_FORMATS[name]
 
-    @classmethod
-    def names_for(cls, control):
+    @staticmethod
+    def names_for(control):
         return CONTROLLABLES[control]
+
+####
+# Problem controls.
+####
+
+CONTROLS = constants('Controls', (
+    'skip',
+    'clobber',
+    'create',
+))
+
+CONTROLLABLES = {
+    CONTROLS.skip: (
+        PN.equal,
+        PN.missing,
+        PN.type,
+        PN.parent,
+        PN.existing,
+        PN.colliding,
+        PN.existing_diff,
+        PN.colliding_diff,
+    ),
+    CONTROLS.clobber: (
+        PN.existing,
+        PN.colliding,
+    ),
+    CONTROLS.create: (
+        PN.parent,
+    ),
+}
+
+class ProblemControl:
+
+    def __init__(self, raw_name):
+        self.name = self.normalized_name(raw_name)
+        tup = self.all_controls().get(self.name, None)
+        if tup:
+            self.control = tup[0]
+            self.pname = tup[1]
+            self.no = tup[2]
+        else:
+            msg = MF.invalid_control.format(raw_name)
+            raise MvsError(msg)
+
+    @classmethod
+    def normalized_name(cls, name):
+        return name.replace(CON.underscore, CON.hyphen)
+
+    @classmethod
+    def all_controls(cls, no = True, names_only = False):
+        prefixes = ('', 'no-') if no else ('',)
+        d = {}
+        for no in prefixes:
+            for control, pnames in CONTROLLABLES.items():
+                for pname in pnames:
+                    pname = cls.normalized_name(pname)
+                    k = f'{no}{control}-{pname}'
+                    d[k] = (control, pname, bool(no))
+        if names_only:
+            return tuple(d)
+        else:
+            return d
 

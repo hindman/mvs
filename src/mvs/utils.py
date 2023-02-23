@@ -27,6 +27,7 @@ class CON:
     space = ' '
     tab = '\t'
     colon = ':'
+    pipe = '|'
     period = '.'
     comma_join = ', '
     underscore = '_'
@@ -74,8 +75,9 @@ MSG_FORMATS = constants('MsgFormats', dict(
     # MvsError instances in RenamingPlan.
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
-    invalid_control        = 'Invalid problem name(s) for {!r} control: {}',
+    invalid_control        = 'Invalid problem control: {!r}',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
+    invalid_controls       = 'Invalid controls attribute',
     # Error messages in CliRenamer.
     path_collection_failed = 'Collection of input paths failed.\n\n{}',
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',

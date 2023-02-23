@@ -26,6 +26,7 @@ from .problems import (
     PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
     Problem,
+    ProblemControl,
 )
 
 class RenamingPlan:
@@ -57,9 +58,7 @@ class RenamingPlan:
                  seq_start = 1,
                  seq_step = 1,
                  # Problem controls.
-                 skip = None,
-                 clobber = None,
-                 create = None,
+                 controls = None,
                  ):
 
         # Input paths, input structure, and RenamePair instances.
@@ -86,14 +85,10 @@ class RenamingPlan:
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
 
-        # Convert the problem-control inputs (skip, clobber, create)
-        # into validated tuples of problem names.
-        self.skip = self.validated_pnames(CONTROLS.skip, skip)
-        self.clobber = self.validated_pnames(CONTROLS.clobber, clobber)
-        self.create = self.validated_pnames(CONTROLS.create, create)
-
-        # From those validated problem-control tuples, build a lookup mapping
-        # each Problem name to the user's requested control mechanism.
+        # Convert the problem-control inputs into a normalized tuple. Then
+        # build a lookup mapping each Problem name to the user's requested
+        # control mechanism.
+        self.controls = self.normalized_controls(controls)
         self.control_lookup = self.build_control_lookup()
 
         # Problems that occur during the prepare() phase are stored in a dict.
@@ -440,51 +435,37 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
-    def validated_pnames(self, control, pnames):
-        # Takes a CONTROLS name and a str or sequence of problem names.
-        # Validates that those names are appropropriate for the control.
-        # Also handles the "all" shortcut.
-        # Returns a tuple of validated problem names.
-
-        # Convert str to sequence.
-        if isinstance(pnames, str):
-            pnames = pnames.split()
-
-        # Stop if no problem names.
-        if not pnames:
+    def normalized_controls(self, controls):
+        # Takes user's input controls and returns them as
+        # a tuple of normalized values using hyphens.
+        if controls is None:
             return ()
-
-        # Check that the problem names are valid for the given control.
-        all_choices = Problem.names_for(control)
-        invalid = tuple(
-            nm
-            for nm in pnames
-            if not (nm in all_choices or nm == CON.all)
-        )
-
-        # Either raise or return the validated tuple of problem names.
-        if invalid:
-            pn = CON.comma_join.join(pnames)
-            msg = MF.invalid_control.format(control, pn)
-            raise MvsError(msg)
-        elif CON.all in pnames:
-            return all_choices
+        elif isinstance(controls, str):
+            return tuple(controls.split())
         else:
-            return tuple(pnames)
+            try:
+                return tuple(controls)
+            except Exception as e:
+                raise MvsError(MF.invalid_controls, controls = controls)
 
     def build_control_lookup(self):
-        # Uses the tuples in self.skip, self.create, and self.clobber to return
-        # a dict mapping each Problem name that the user wants to control to
-        # the desired control mechanism. Raises if the user tries to control
-        # the same Problem in different ways.
+        # Uses self.controls to return a dict mapping each Problem name that
+        # the user wants to control to the desired control mechanism. Raises if
+        # the user supplies an invalid problem control or tries to control the
+        # same Problem in different ways.
+        pcs = tuple(
+            ProblemControl(name)
+            for name in self.controls
+        )
         lookup = {}
-        for c in CONTROLS.keys():
-            for pname in getattr(self, c):
-                if pname in lookup:
-                    msg = MF.conflicting_controls.format(pname, lookup[pname], c)
-                    raise MvsError(msg)
-                else:
-                    lookup[pname] = c
+        for pc in pcs:
+            pname = pc.pname
+            if pname in lookup:
+                fmt = MF.conflicting_controls
+                msg = fmt.format(pname, lookup[pname], pc.control)
+                raise MvsError(msg)
+            else:
+                lookup[pname] = pc.control
         return lookup
 
     def handle_problem(self, p, rp = None):
@@ -592,10 +573,7 @@ class RenamingPlan:
             indent = self.indent,
             seq_start = self.seq_start,
             seq_step = self.seq_step,
-            # Problem controls.
-            skip = self.skip,
-            clobber = self.clobber,
-            create = self.create,
+            controls = self.controls,
             # Other.
             prefix_len = self.prefix_len,
             rename_pairs = [

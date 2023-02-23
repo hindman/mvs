@@ -12,7 +12,7 @@ from textwrap import dedent
 from short_con import constants
 
 from .plan import RenamingPlan
-from .problems import Problem, CONTROLS
+from .problems import Problem, CONTROLS, ProblemControl
 from .version import __version__
 
 from .utils import (
@@ -122,9 +122,7 @@ class CliRenamer:
                 seq_step = opts.step,
                 filter_code = opts.filter,
                 indent = opts.indent,
-                skip = opts.skip,
-                clobber = opts.clobber,
-                create = opts.create,
+                controls = opts.controls,
             )
             plan = self.plan
         except MvsError as e:
@@ -831,39 +829,18 @@ class CLI:
         ),
 
         #
-        # Failure control.
+        # Problem control and other configuration.
         #
         OptConfig(
-            group = 'Problem control',
-            names = '--skip',
-            validator = OptConfig.list_or_str,
-            choices = CON.all_tup + Problem.names_for(CONTROLS.skip),
+            group = 'Problem control and other configuration',
+            names = '--controls',
+            validator = OptConfig.list_of_str,
+            choices = ProblemControl.all_controls(names_only = True),
             nargs = '+',
-            metavar = 'PROB',
-            help = 'Skip items with the named problems',
+            metavar = 'PC',
+            help = 'Configure how to respond to problems (see --details)',
         ),
         OptConfig(
-            names = '--clobber',
-            validator = OptConfig.list_or_str,
-            choices = CON.all_tup + Problem.names_for(CONTROLS.clobber),
-            nargs = '+',
-            metavar = 'PROB',
-            help = 'Rename anyway, in spite of named overwriting problems',
-        ),
-        OptConfig(
-            names = '--create',
-            validator = OptConfig.list_or_str,
-            choices = CON.all_tup + Problem.names_for(CONTROLS.create),
-            nargs = '+',
-            metavar = 'PROB',
-            help = 'Fix missing parent problem before renaming',
-        ),
-
-        #
-        # Other.
-        #
-        OptConfig(
-            group = 'Other',
             names = '--disable',
             validator = bool,
             nargs = '+',
@@ -871,7 +848,12 @@ class CLI:
             default = [],
             help = 'Disable flag options that were set true in user preferences',
         ),
+
+        #
+        # Program information.
+        #
         OptConfig(
+            group = 'Program information',
             names = '--help -h',
             validator = bool,
             action = 'store_true',

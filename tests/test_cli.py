@@ -622,8 +622,8 @@ def test_some_failed_rps(tr, create_wa, create_outs):
     news = ('A1', 'A2', 'A3', 'A4')
     extras = ('A1', 'A2')
     expecteds = ('z1', 'z2', 'A3', 'A4') + extras
-    opt_skip = ('--skip', 'existing')
-    opt_clobber = ('--clobber', 'existing')
+    opt_skip = ('--controls', 'skip-existing')
+    opt_clobber = ('--controls', 'clobber-existing')
     exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
     exp_conflict = MF.conflicting_controls.split('{')[0]
 
@@ -640,7 +640,7 @@ def test_some_failed_rps(tr, create_wa, create_outs):
     assert cli.log == ''
     assert cli.failure
 
-    # Renaming succeeds if we use --skip.
+    # Renaming succeeds if we skip the items with problems.
     wa = create_wa(origs, news, extras, expecteds)
     outs = create_outs(wa.origs[2:], wa.news[2:])
     cli = CliRenamerSIO(
@@ -661,7 +661,7 @@ def test_some_failed_rps(tr, create_wa, create_outs):
         *wa.origs,
         *wa.news,
         *opt_skip,
-        *opt_clobber,
+        *opt_clobber[1:],
     )
     cli.run()
     wa.check(no_change = True)
