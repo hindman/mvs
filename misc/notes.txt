@@ -13,7 +13,7 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Make skip-equal the default [see SKIP_EQUAL].
+Make skip-equal the default and implement merge-prefs-opts correctly [see SKIP_EQUAL].
 
 Tests [see NEW_TESTS].
 
@@ -238,112 +238,52 @@ The purpose of the --paragraphs structure:
       requirement that at least one blank existings between the original and
       new paths.
 
-Adding --enforce and making --skip=equal the default [SKIP_EQUAL]:
+Make skip-equal the default [SKIP_EQUAL]:
 
-    - NOTE: enforce no longer needed after refactor of problem-control.
+    - The --enforce option is no longer required.
 
-    - What the --enforce mechanism means:
+    - Problem control settings replace upstream settings:
 
-        - If the user applies --enforce=X it removes any upstream configuations
-          setting a control for X.
+        - Under the old approach, problem control was organized around control
+          names (skip, clobber, create). One upshot was that downstream
+          settings had to augment (rather than replace) upstream settings.
 
-        - The upstream configuations are the application defaults and the user
-          defaults (mvs.conf).
+        - Under the new approach, settings are fine-grained: each is a
+          problem-control combo. That means downstream can replace upstream.
 
-    - Why downstream control settings augment upstream settings:
-
-        - If downstream problem controls were to replace (rather than augment)
-          the upstream settings, we would get one benefit and one big cost.
-
-        - Benefit: the --enforce option would be unneeded.
-
-            App default:                   --skip equal
-            User requests enforcement:     --skip ''
-            Even this would enforce equal: --skip existing
-
-        - Big cost: downstream settings would have to be restate all upstream
-          controls that are still desired:
-
-            App default:  --skip equal
-            User pref:    --skip equal type           # Cannot omit equal.
-            Command line: --skip equal type existing  # Again, cannot omit equal or type.
-
-    - Currently, CliRenamer is not enforcing against conflicting_controls.
-
-        - For now, ignore this: rely on RenamingPlan to catch such problems.
+            App default:  --controls skip-equal
+            User pref:    --controls skip-type     # Other skip-settings don't affect upstream skip-equal.
+            Command line: --controls skip-existing # Ditto.
+                          --controls no-skip-equal # Only the same setting can affect upstream.
 
     - RenamingPlan behaviors related to problem control:
 
-        - Defaults will be skip='equal', clobber=None, create=None.
+        - Default will be controls='skip-equal'.
 
         - Settings coming from CliRenamer will replace (not augment) those
-          defaults.
+          defaults. But the CliRenamer will start with the same app-default as
+          the RenamingPlan, so the latter will need to provide that default as
+          a constant.
 
-        - RenamingPlan won't need the enforce concept at all.
+    - Merging plan for controls:
 
-    - Order of operations:
+        - Start with app-default:
 
-        Inside merge_opts_prefs(), the problem-control settings will need to be
-        handled separately from the other attributes.
+            RenamingPlan.DEFAULT_CONTROLS
 
-        Tentative approach for problem controls:
+        - Apply user-prefs and then command-line option (each stage can use the
+          same logic):
 
-            Start with app-defaults:
-                skip = 'equal'
+            for c in user-pref-controls:
+                if c is valid:
+                    if c.no:
+                        remove its affirmative sibling
+                    else:
+                        add it to controls
+                else:
+                    gripe
 
-            Overlay user-prefs:
-                - Add pref controls to the app-defaults.
-                - Then apply enforcements.
-
-            Overlay command-line:
-                - Add CLI controls.
-                - Then apply enforcements.
-
-        Perhaps all of those steps could be as simple as adding all of the
-        tuples together (including for enforce). De-duping each of them. Then
-        using the enforce tuple to modify the other tuples. Roughly:
-
-            # Add.
-            skip = tuple(set(app.skip + prefs.skip + opts.skip))
-
-            # Apply enforcement.
-            skip = tuple(
-                prob
-                for prob in skip
-                if prob not in enforce
-            )
-
-    - Demonstration that we can achieve all configurations:
-
-        - Assume that Problem X has applicable controls skip, parent.
-
-        - Under every combination of application default (either no control or
-          having a default control) and user default (either no change or
-          applying a setting), the command-line user can still achieve all of
-          the possible behaviors (enforce, skip, parent).
-
-        App default | User default | Command-line
-        ===========================================
-        No control  | .            | --skip X
-        "           | .            | --parent X
-        -------------------------------------------
-        "           | skip = X     | --parent X
-        "           | skip = X     | --enforce X
-        -------------------------------------------
-        "           | parent = X   | --skip X
-        "           | parent = X   | --enforce X
-        ===========================================
-        skip = X    | .            | --parent X
-        "           | .            | --enforce X
-        -------------------------------------------
-        "           | parent = X   | --skip X
-        "           | parent = X   | --enforce X
-        -------------------------------------------
-        "           | enforce = X  | --skip X
-        "           | enforce = X  | --parent X
-        ===========================================
-        parent = X  | etc...       | ...
-        ===========================================
+        - Check for conflicting controls.
 
 How --edit relates to SOURCES and STRUCTURES:
 
