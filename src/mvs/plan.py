@@ -46,6 +46,9 @@ class RenamingPlan:
         done = None,
     ))
 
+    # Default problem controls.
+    DEFAULT_CONTROLS = f'{CONTROLS.skip}-{PN.equal}'
+
     def __init__(self,
                  # Path inputs and their structure.
                  inputs,
@@ -88,8 +91,10 @@ class RenamingPlan:
         # Convert the problem-control inputs into a normalized tuple. Then
         # build a lookup mapping each Problem name to the user's requested
         # control mechanism.
+        if controls is None:
+            controls = self.DEFAULT_CONTROLS
         self.controls = self.normalized_controls(controls)
-        self.control_lookup = self.build_control_lookup()
+        self.control_lookup = self.build_control_lookup(self.controls)
 
         # Problems that occur during the prepare() phase are stored in a dict.
         # A problem can be either controlled (as requested by the user) or not.
@@ -435,7 +440,8 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
-    def normalized_controls(self, controls):
+    @staticmethod
+    def normalized_controls(controls):
         # Takes user's input controls and returns them as
         # a tuple of normalized values using hyphens.
         if controls is None:
@@ -448,19 +454,27 @@ class RenamingPlan:
             except Exception as e:
                 raise MvsError(MF.invalid_controls, controls = controls)
 
-    def build_control_lookup(self):
-        # Uses self.controls to return a dict mapping each Problem name that
-        # the user wants to control to the desired control mechanism. Raises if
-        # the user supplies an invalid problem control or tries to control the
-        # same Problem in different ways.
+    @staticmethod
+    def build_control_lookup(pc_names):
+        # Takes an iterable of ProblemControl names.
+        #
+        # Returns a dict mapping each Problem name that the user wants
+        # to control to the desired control mechanism.
+        #
+        # Raises if the user (1) supplies an invalid problem control,
+        # (2) suplies a negative problem control, or
+        # (3) tries to control the same Problem in different ways.
         pcs = tuple(
             ProblemControl(name)
-            for name in self.controls
+            for name in pc_names
         )
         lookup = {}
         for pc in pcs:
             pname = pc.pname
-            if pname in lookup:
+            if pc.no:
+                msg = MF.invalid_control.format(pc.name)
+                raise MvsError(msg)
+            elif pname in lookup:
                 fmt = MF.conflicting_controls
                 msg = fmt.format(pname, lookup[pname], pc.control)
                 raise MvsError(msg)

@@ -503,24 +503,29 @@ def test_equal(tr, create_wa):
     origs = ('a', 'b', 'c') + d
     news = ('a1', 'b1', 'c1') + d
 
-    # Renaming attempt will raise.
+    def do_check(**kws):
+        wa = create_wa(origs, news)
+        plan = RenamingPlan(
+            inputs = wa.origs + wa.news,
+            **kws,
+        )
+        plan.rename_paths()
+        wa.check()
+
+    # Renaming will succeed, because skip-equal is the default.
+    do_check()
+    do_check(controls = 'skip-equal')
+
+    # Renaming attempt will raise if we cancel the default.
     wa = create_wa(origs, news)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
+        controls = '',
     )
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.equal)
     wa.check(no_change = True)
-
-    # Renaming will succeed if we skip the offending paths.
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
-        controls = 'skip-equal',
-    )
-    plan.rename_paths()
-    wa.check()
 
 def test_missing_orig(tr, create_wa):
     # Paths.

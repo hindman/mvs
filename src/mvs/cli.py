@@ -293,11 +293,15 @@ class CliRenamer:
                 self.wrapup(CON.exit_fail, msg)
                 return None
 
-        # Merge preferences into opts. If the current opts attribute is unset
-        # and if the preference was not disabled via --disable, apply the
-        # preference to opts.
+        # Attributes that either don't require merging (disable)
+        # or that need to be merged differently (controls).
+        special = ('disable', 'controls')
+
+        # Merge preferences into opts. If the current opts attribute
+        # is unset and if the preference was not disabled on the
+        # command line via --disable, apply the preference to opts.
         for name, val in prefs.items():
-            if name not in opts.disable:
+            if not (name in special or name in opts.disable):
                 current = getattr(opts, name)
                 if current in CLI.unset_opt_vals:
                     setattr(opts, name, val)
@@ -311,7 +315,42 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Boom.
+        # Merge settings for problem controls, in three stages:
+        # - Start with the application defaults.
+        # - Then apply user-preferences.
+        # - Finally command-line.
+        controls = set()
+        normalized = RenamingPlan.normalized_controls
+        stages = (
+            normalized(RenamingPlan.DEFAULT_CONTROLS),
+            normalized(prefs.get('controls', '')),
+            normalized(opts.controls or ''),
+        )
+        for pc_names in stages:
+            for name in pc_names:
+                # Make sure the supplied name is valid.
+                try:
+                    pc = ProblemControl(name)
+                except MvsError as e:
+                    self.wrapup(CON.exit_fail, e.msg)
+                    return None
+                # If it's a negative control name, remove its
+                # affirmative sibling. Otherwise, add it.
+                if pc.no:
+                    controls.discard(pc.affirmative_name)
+                else:
+                    controls.add(pc.name)
+
+        # Check for conflicting controls.
+        # We ignore returned lookup: just validating here.
+        try:
+            RenamingPlan.build_control_lookup(controls)
+        except MvsError as e:
+            self.wrapup(CON.exit_fail, e.msg)
+            return None
+
+        # Set the controls and return.
+        opts.controls = list(controls)
         return opts
 
     @property

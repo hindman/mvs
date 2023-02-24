@@ -13,19 +13,12 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Make skip-equal the default and implement merge-prefs-opts correctly [see SKIP_EQUAL].
-
 Tests [see NEW_TESTS].
 
 New documentation [see NEW_DOCS].
 
 Editing pass:
-    - User-prefs
-    - The --edit option.
-    - Case-change.
-    - Tests.
-    - New checks: file types; clobbering.
-    - Problem control.
+    - See NEW_DOCS
 
 Clipboard source test disabled for Linux: revive if possible.
 
@@ -155,10 +148,14 @@ misc-notes: Misc notes
 
 New documentation [NEW_DOCS]:
 
+    - Don't delete this until just before publish.
+
     - New features:
         - User-prefs
         - The --edit option.
         - New problem control API.
+        - skip-equal as default
+        - case-change renamings
 
     - Bug fixes:
         - Windows replace.
@@ -196,11 +193,9 @@ New documentation [NEW_DOCS]:
           and it will fail.
 
 New tests [NEW_TESTS].
-    - User-prefs
-    - The --edit option.
+    - See NEW_DOCS
     - Double check pragma-no-cover stuff.
-    - New checks: file types; clobbering.
-    - Exercise the case-change renamings:
+    - Case-change renaming scenarios:
 
         parent    | name      | Example: orig vs new | Note
         ---------------------------------------------------------------------
@@ -215,6 +210,8 @@ New tests [NEW_TESTS].
         "         | different | foo/bar   f/b        | .
 
 Current file system interactions:
+
+    - This is outdated.
 
     - cli.py
         - Path.home().
@@ -237,53 +234,6 @@ The purpose of the --paragraphs structure:
     - The paragraphs structure is the same as flat, plus the additional
       requirement that at least one blank existings between the original and
       new paths.
-
-Make skip-equal the default [SKIP_EQUAL]:
-
-    - The --enforce option is no longer required.
-
-    - Problem control settings replace upstream settings:
-
-        - Under the old approach, problem control was organized around control
-          names (skip, clobber, create). One upshot was that downstream
-          settings had to augment (rather than replace) upstream settings.
-
-        - Under the new approach, settings are fine-grained: each is a
-          problem-control combo. That means downstream can replace upstream.
-
-            App default:  --controls skip-equal
-            User pref:    --controls skip-type     # Other skip-settings don't affect upstream skip-equal.
-            Command line: --controls skip-existing # Ditto.
-                          --controls no-skip-equal # Only the same setting can affect upstream.
-
-    - RenamingPlan behaviors related to problem control:
-
-        - Default will be controls='skip-equal'.
-
-        - Settings coming from CliRenamer will replace (not augment) those
-          defaults. But the CliRenamer will start with the same app-default as
-          the RenamingPlan, so the latter will need to provide that default as
-          a constant.
-
-    - Merging plan for controls:
-
-        - Start with app-default:
-
-            RenamingPlan.DEFAULT_CONTROLS
-
-        - Apply user-prefs and then command-line option (each stage can use the
-          same logic):
-
-            for c in user-pref-controls:
-                if c is valid:
-                    if c.no:
-                        remove its affirmative sibling
-                    else:
-                        add it to controls
-                else:
-                    gripe
-
-        - Check for conflicting controls.
 
 How --edit relates to SOURCES and STRUCTURES:
 

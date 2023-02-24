@@ -135,6 +135,17 @@ class ProblemControl:
             msg = MF.invalid_control.format(raw_name)
             raise MvsError(msg)
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+    @property
+    def affirmative_name(self):
+        i = 3 if self.no else 0
+        return self.name[i:]
+
     @classmethod
     def normalized_name(cls, name):
         return name.replace(CON.underscore, CON.hyphen)
