@@ -28,21 +28,26 @@ Publish with major version bump.
 road-map: Road map
 --------
 
+Support sym-link renames.
+
 Other operations:
     - copy: given old-paths, copy them to new-paths.
-    - link: given old-paths (sources), create new-paths (links, soft or hard).
+    - link: given old-paths (sources), create new-paths (links, soft or hard) pointing to old-paths.
     - chmod: given old-paths, apply "new-path" chmod-specs to old-paths.
     - times: given old-paths, apply "new-path" time-specs to old-paths.
     - touch: given old-paths, touch them.
 
-Additional failure control: backup.
+Additional failure control: backup
+    - Before clobber, backup the target (foo => foo.bak).
+    - Which really just adds a supplement renaming.
 
 Logging operations: list, prune.
 
 Convenience renaming operations: evaluate:
 
-    - In the classic rename script, these were call "rules".
-    - Multiple could be applied via command-line options and parameters.
+    - In the classic rename script, these were call "rules". Multiple could be
+      applied via command-line options and parameters. I think they were
+      executed in order.
 
     - The rule I used almost exclusively:
 
@@ -193,8 +198,47 @@ New documentation [NEW_DOCS]:
           and it will fail.
 
 New tests [NEW_TESTS].
-    - See NEW_DOCS
+
+    - New features:
+        - User-prefs.
+        - The --edit option.
+        - New problem control API.
+        - Skip-equal as default.
+        - Case-change renamings [see table below].
+
+    - Bug fixes:
+        - Windows replace.
+        - README and argparse configuration for --create was incorrect.
+
+    - Policy changes.
+
+        - Orig paths must be regular file or directory.
+
+        - Clobbering restrictions:
+
+            - Like can clobber like (file => file; dir => dir).
+
+            - Only empty directories can be clobbered.
+
+        - Renaming renames the leaf, not the leaf plus its parent. When
+          renaming something, mvs asks whether the parent of its new path
+          exists.
+
+            - If yes, then the renaming does not need to concern itself with
+              the parent and the renaming affects only the leaf node.
+
+            - If no, then the renaming will be refused unless the user requests
+              create-parent and, if so, the new-parent is created. The
+              old-parent will be unchanged.
+
+            - That behavior is reasonable: old-parent might contain other stuff
+              and mvs was not instructed modify it.
+
+            - And it most renaming scenarios, the behavior is not surprising
+              or counter-intuitive.
+
     - Double check pragma-no-cover stuff.
+
     - Case-change renaming scenarios:
 
         parent    | name      | Example: orig vs new | Note
