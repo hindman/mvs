@@ -30,14 +30,14 @@ class CliRenamerSIO(CliRenamer):
 
     OK = 'LOGS_OK'
 
-    def __init__(self, *args, pager = '', yes = True, replies = ''):
-        args = (
-            args +
-            ('--pager', pager) +
-            (('--yes',) if yes else ())
+    def __init__(self, *args, pager = None, yes = True, replies = ''):
+        pager = (
+            ('--pager', '') if pager is None else
+            ('--pager',) + pager
         )
+        yes = ('--yes',) if yes else ()
         super().__init__(
-            args,
+            args + pager + yes,
             stdout = StringIO(),
             stderr = StringIO(),
             stdin = StringIO(replies),
@@ -549,19 +549,19 @@ def test_pagination(tr, create_wa, create_outs):
     origs = tuple(ascii_lowercase)
     news = tuple(o + o for o in origs)
 
-    # Exercise the paginate() function by using cat and /dev/null.
+    # Exercise the paginate() function.
     wa = create_wa(origs, news)
     outs = create_outs(wa.origs, wa.news)
     cli = CliRenamerSIO(
         *wa.origs,
         *wa.news,
-        pager = 'cat > /dev/null',
+        pager = ('python', 'tests/empty-pager.py'),
     )
     cli.run()
     wa.check()
     assert cli.err == ''
     assert cli.logs_valid_json is cli.OK
-    assert cli.out.lstrip() == outs.paths_renamed.lstrip()
+    assert cli.out.lstrip() == outs.paths_renamed
     assert cli.success
 
 ####

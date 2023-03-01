@@ -17,10 +17,7 @@ Tests [see NEW_TESTS].
 
 New documentation [see NEW_DOCS].
 
-Editing pass:
-    - See NEW_DOCS
-
-Clipboard source test disabled for Linux: revive if possible.
+Editing pass [see NEW_DOCS].
 
 Publish with major version bump.
 
@@ -28,76 +25,25 @@ Publish with major version bump.
 road-map: Road map
 --------
 
+Clipboard source test disabled for Linux: revive if possible.
+
 Support sym-link renames.
 
-Other operations:
-    - copy: given old-paths, copy them to new-paths.
-    - link: given old-paths (sources), create new-paths (links, soft or hard) pointing to old-paths.
-    - chmod: given old-paths, apply "new-path" chmod-specs to old-paths.
-    - times: given old-paths, apply "new-path" time-specs to old-paths.
-    - touch: given old-paths, touch them.
+Other operations: copy, link, chmod, times, touch [see OTHER_OPS].
 
-Additional failure control: backup
-    - Before clobber, backup the target (foo => foo.bak).
-    - Which really just adds a supplement renaming.
+Additional failure control: backup [see CONTROL_BACKUP].
 
 Logging operations: list, prune.
 
-Convenience renaming operations: evaluate:
-
-    - In the classic rename script, these were call "rules". Multiple could be
-      applied via command-line options and parameters. I think they were
-      executed in order.
-
-    - The rule I used almost exclusively:
-
-        --expr PERLCODE
-
-    - But note that classic rename usage looked more like this, where the
-      PERLCODE was the first positional argument and the other positionals were
-      orignal paths:
-
-        rename PERLCODE PATH...
-
-    - Most performed common string changes. Here are the long options on
-      the `rename` installed on my MacOS. The classic rename scripts
-      from the past were different.
-
-        --append SUFFIX
-        --prepend PREFIX
-        --lower-case
-        --upper-case
-        --pipe COMMAND       # Pipe orig path to COMMAND; output becomes new path
-        --subst FROM TO      # Text substitution, once per orig path.
-        --subst-all FROM TO  # Same, but potentially multiple times per orig path.
-        --remove-extension
-        --keep-extension     # Remove ext; apply all other rules; then append ext.
-        --camelcase          # Capitalize every word in the orig path.
-        --urlesc             # Decode URL-escaped orig path.
-        --nows               # Replace whitespace sequences with a single underscore.
-        --rews               # Replace each underscore with single space.
-        --noctrl             # Replace control char sequences with single underscore.
-        --nometa             # Replace each shell meta-character with underscore.
-        --trim               # Remove whitespace and underscores from ends of orig path.
+Convenience renaming operations [see CONVENIENCE_OPS].
 
 Undo renaming, based on log.
 
-Options:
-    --row-delimiter [default: tab]
-    --path-delimiter [default: newline]
-    --no-strip [default: paths are stripped]
+New inputs options: delimiters and stripping [see INPUT_OPTS].
 
-Alternative dryrun output styles:
-    - same as input structures
-    - plus json
-    - could be useful if we adopt strict clobbering policy:
-        - Run mvs once to figure out which clobber-victims violate policy.
-        - List that information in a flat/useful way.
-        - User handles those issues.
-        - Then user re-runs the original mvs attempt, which should work now.
+Alternative dryrun output styles [see DRYRUN_OUTPUTS].
 
-Complex failure/validation scenarios:
-    - prior renaming would make subsequent renaming fail [eg, changing directory path before attempting a file rename]
+Complex failure/validation scenarios [see COMPLEX_SCENARIOS].
 
 --------
 dev-notes: Dev notes
@@ -197,29 +143,6 @@ New documentation [NEW_DOCS]:
           (if rp.new fails to exists-strict), so the renaming would be tried,
           and it will fail.
 
-New tests [NEW_TESTS].
-
-    - New features:
-        - User-prefs.
-        - The --edit option.
-        - New problem control API.
-        - Skip-equal as default.
-        - Case-change renamings [see table below].
-
-    - Bug fixes:
-        - Windows replace.
-        - README and argparse configuration for --create was incorrect.
-
-    - Policy changes.
-
-        - Orig paths must be regular file or directory.
-
-        - Clobbering restrictions:
-
-            - Like can clobber like (file => file; dir => dir).
-
-            - Only empty directories can be clobbered.
-
         - Renaming renames the leaf, not the leaf plus its parent. When
           renaming something, mvs asks whether the parent of its new path
           exists.
@@ -237,8 +160,17 @@ New tests [NEW_TESTS].
             - And it most renaming scenarios, the behavior is not surprising
               or counter-intuitive.
 
-    - Double check pragma-no-cover stuff.
+New tests [NEW_TESTS].
 
+    - The --edit option.
+    - User-prefs.
+    - Skip-equal as default.
+    - Case-change renamings [see table below].
+    - Bug fix: Windows replace.
+    - Orig paths must be regular file or directory.
+    - Clobbering: like can clobber like.
+    - Only empty directories can be clobbered.
+    - Double check pragma-no-cover stuff.
     - Case-change renaming scenarios:
 
         parent    | name      | Example: orig vs new | Note
@@ -252,6 +184,75 @@ New tests [NEW_TESTS].
         different | eq        | foo/bar   f/bar      | .
         "         | case      | foo/bar   f/BAR      | .
         "         | different | foo/bar   f/b        | .
+
+Other operations: copy, link, chmod, times, touch [OTHER_OPS]:
+    - copy: given old-paths, copy them to new-paths.
+    - link: given old-paths (sources), create new-paths (links, soft or hard) pointing to old-paths.
+    - chmod: given old-paths, apply "new-path" chmod-specs to old-paths.
+    - times: given old-paths, apply "new-path" time-specs to old-paths.
+    - touch: given old-paths, touch them.
+
+Additional failure control: backup [CONTROL_BACKUP]:
+    - Before clobber, backup the target (foo => foo.bak).
+    - Which really just adds a supplement renaming.
+
+New inputs options: delimiters and stripping [INPUT_OPTS]:
+    --row-delimiter [default: tab]
+    --path-delimiter [default: newline]
+    --no-strip [default: paths are stripped]
+
+Alternative dryrun output styles [DRYRUN_OUTPUTS]:
+    - same as input structures
+    - plus json
+    - could be useful if we adopt strict clobbering policy:
+        - Run mvs once to figure out which clobber-victims violate policy.
+        - List that information in a flat/useful way.
+        - User handles those issues.
+        - Then user re-runs the original mvs attempt, which should work now.
+
+Complex failure/validation scenarios [COMPLEX_SCENARIOS]:
+
+    - prior renaming would make subsequent renaming fail [eg, changing
+      directory path before attempting a file rename]
+
+Convenience renaming operations [CONVENIENCE_OPS]:
+
+    - Evaluate these ideas and make plan (or drop).
+
+    - In the classic rename script, these were call "rules". Multiple could be
+      applied via command-line options and parameters. I think they were
+      executed in order.
+
+    - The rule I used almost exclusively:
+
+        --expr PERLCODE
+
+    - But note that classic rename usage looked more like this, where the
+      PERLCODE was the first positional argument and the other positionals were
+      orignal paths:
+
+        rename PERLCODE PATH...
+
+    - Most performed common string changes. Here are the long options on
+      the `rename` installed on my MacOS. The classic rename scripts
+      from the past were different.
+
+        --append SUFFIX
+        --prepend PREFIX
+        --lower-case
+        --upper-case
+        --pipe COMMAND       # Pipe orig path to COMMAND; output becomes new path
+        --subst FROM TO      # Text substitution, once per orig path.
+        --subst-all FROM TO  # Same, but potentially multiple times per orig path.
+        --remove-extension
+        --keep-extension     # Remove ext; apply all other rules; then append ext.
+        --camelcase          # Capitalize every word in the orig path.
+        --urlesc             # Decode URL-escaped orig path.
+        --nows               # Replace whitespace sequences with a single underscore.
+        --rews               # Replace each underscore with single space.
+        --noctrl             # Replace control char sequences with single underscore.
+        --nometa             # Replace each shell meta-character with underscore.
+        --trim               # Remove whitespace and underscores from ends of orig path.
 
 Current file system interactions:
 

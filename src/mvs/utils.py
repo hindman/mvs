@@ -53,8 +53,8 @@ class CON:
     prefs_file_name = 'config.json'
 
     # Executables.
-    default_pager_cmd = 'more'
-    default_editor_cmd = 'vim'
+    default_pager_cmd = ['more']
+    default_editor_cmd = ['vim']
 
 ####
 # Structures for input paths data.
@@ -150,7 +150,7 @@ def edit_text(editor, text):
         fh.write(text)
 
     # Let user edit the file.
-    cmd = (editor, path)
+    cmd = editor + [path]
     p = run(cmd)
 
     # Read file and return its edited text.
