@@ -16,14 +16,21 @@ todos: TODOs
 Tests:
 
     x The --edit option.
+
     - User-prefs.
-    - Skip-equal as default.
-    - Case-change renamings [see table below].
-    - Bug fix: Windows replace.
+
+        - See test_preferences() for work done so far and
+          for several scenarios to exercise.
+
     - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.
+
+    - Skip-equal as default.
+    - Bug fix: Windows replace.
     - Double check pragma-no-cover stuff.
+
+    - Case-change renamings [see table below].
 
     parent    | name      | Example: orig vs new | Note
     ---------------------------------------------------------------------

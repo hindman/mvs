@@ -271,7 +271,7 @@ class CliRenamer:
         try:
             with open(path) as fh:
                 return json.load(fh)
-        except Exception as e: # pragma: no cover
+        except Exception as e:
             msg = MF.prefs_reading_failed.format(str(path))
             self.wrapup_with_tb(msg)
 

@@ -94,7 +94,8 @@ def clearlogs(c):
     Clear log files.
     '''
     home = Path.home()
-    c.run(f'rm -f {home}/.{LIB}/2*.json')
+    c.run(f'rm -f {home}/.{LIB}/20*.json')
+    c.run(f'rm -f tests/{LIB}_app/20*.json')
 
 @task
 def bump(c, kind = 'minor', edit_only = False, push = False, suffix = None):

@@ -9,6 +9,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from mvs.utils import CON
+
 ####
 # Set the mvs environment variable so that (1) the user's personal
 # mvs preferences file won't be used during testing and (2) so
@@ -18,7 +20,9 @@ from pathlib import Path
 # using a WorkArea change the working directory before renaming occurs.
 ####
 
-os.environ['MVS_APP_DIR'] = str(Path().resolve() / 'tests/mvs_app')
+APP_DIR_FOR_TESTING = str(Path().resolve() / 'tests/mvs_app')
+
+os.environ['MVS_APP_DIR'] = APP_DIR_FOR_TESTING
 
 ####
 # Fixtures.
@@ -38,9 +42,16 @@ def create_wa():
 
 @pytest.fixture
 def create_outs():
-    def f(*xs, **kws):
-        return Outputs(*xs, **kws)
-    return f
+    return Outputs
+
+@pytest.fixture
+def create_prefs():
+    def f(**kws):
+        up = UserPrefs(**kws)
+        up.create()
+        return up
+    yield f
+    UserPrefs.delete()
 
 ####
 # General testing resource: data dumping and constants.
@@ -80,9 +91,10 @@ class WPath:
     mode : str
 
 ####
-# A class (1) to initialize an empty testing work area, (2) to create file and
-# directory paths in that area, and (3) after renaming has occurred, to check
-# the resulting work area paths against expectations.
+# A class used by the create_wa() fixture (1) to initialize an empty testing
+# work area, (2) to create file and directory paths in that area, and (3) after
+# renaming has occurred, to check the resulting work area paths against
+# expectations.
 ####
 
 class WorkArea:
@@ -306,6 +318,11 @@ class WorkArea:
             assert got == exp
         return (got, exp)
 
+####
+# A class used by the create_outs() fixture to take orig and new paths
+# inside a WorkArea and return expected CliRenamer outputs.
+####
+
 class Outputs:
 
     def __init__(self, origs, news, total = None, listed = None):
@@ -350,4 +367,34 @@ class Outputs:
     @property
     def no_action(self):
         return 'No action taken.\n'
+
+####
+# A class used by the create_prefs() fixture to (1) write a user-preferences
+# file for use in testing and (2) delete that file after a test finished.
+#
+#
+# In regular use, it writes its keyword params as JSON.
+#
+# If given a blob (of presumably invalid JSON), it is
+# written directly.
+####
+
+class UserPrefs:
+
+    PATH = Path(APP_DIR_FOR_TESTING) / CON.prefs_file_name
+
+    def __init__(self, blob = None, **kws):
+        self.blob = blob
+        self.params = kws
+
+    def create(self):
+        with open(self.PATH, 'w') as fh:
+            if self.blob is None:
+                json.dump(self.params, fh, indent = 4)
+            else:
+                fh.write(self.blob)
+
+    @classmethod
+    def delete(cls):
+        cls.PATH.unlink(missing_ok = True)
 

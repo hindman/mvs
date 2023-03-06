@@ -353,8 +353,8 @@ def test_edit(tr, create_wa, create_outs):
     origs = ('a', 'b', 'c')
     news = tuple(o + '.new' for o in origs)
 
-    def do_checks(wa, cli, fail = False):
-        if fail:
+    def do_checks(wa, cli, failure = False):
+        if failure:
             assert cli.out == ''
             assert cli.log == ''
             assert cli.failure
@@ -387,7 +387,7 @@ def test_edit(tr, create_wa, create_outs):
     )
     cli.run()
     assert cli.err.rstrip() == MF.no_editor
-    do_checks(wa, cli, fail = True)
+    do_checks(wa, cli, failure = True)
 
     # Renaming attempt fails if the editor exits unsuccessfully.
     wa = create_wa(origs, news)
@@ -398,9 +398,111 @@ def test_edit(tr, create_wa, create_outs):
         '--editor', *tr.TEST_FAILER,
     )
     cli.run()
-    assert tr.msg_before_formatting(MF.editor_cmd_nonzero) in cli.err
-    assert tr.msg_before_formatting(MF.edit_failed_unexpected) in cli.err
-    do_checks(wa, cli, fail = True)
+    f = tr.msg_before_formatting
+    assert f(MF.editor_cmd_nonzero) in cli.err
+    assert f(MF.edit_failed_unexpected) in cli.err
+    do_checks(wa, cli, failure = True)
+
+####
+# Preferences.
+####
+
+def test_preferences(tr, create_wa, create_outs, create_prefs):
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+
+    # Scenario: an empty but valid preferences file.
+    prefs = create_prefs()
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(
+        *wa.origs,
+        *wa.news,
+    )
+    cli.run()
+    assert cli.success
+    assert cli.out == outs.regular_output
+    assert cli.err == ''
+    assert cli.logs_valid_json is cli.OK
+    wa.check()
+
+    # Scenario: an invalid JSON file.
+    prefs = create_prefs(blob = 'INVALID_JSON')
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(
+        *wa.origs,
+        *wa.news,
+    )
+    cli.run()
+    exp = tr.msg_before_formatting(MF.prefs_reading_failed)
+    assert cli.err.startswith(exp)
+    assert 'JSONDecodeError' in cli.err
+    assert cli.failure
+    assert cli.out == ''
+    assert cli.log == ''
+    wa.check(no_change = True)
+
+    # Scenario: a valid JSON file; confirm that we affect cli.opts.
+    default = {}
+    custom = dict(indent = 2, seq = 100, step = 10)
+    exp_default = dict(indent = 4, seq = 1, step = 1)
+    for prefs in (default, custom):
+        create_prefs(**prefs)
+        wa = create_wa(origs, news)
+        cli = CliRenamerSIO(*wa.origs, *wa.news)
+        cli.do_prepare()
+        exp = prefs or exp_default
+        got = {
+            k : getattr(cli.opts, k)
+            for k in exp
+        }
+        assert got == exp
+
+    # Scenario: invalid preferences keys.
+    prefs = dict(indent = 2, foo = 999, bar = 'fubb')
+    create_prefs(**prefs)
+    wa = create_wa(origs, news)
+    cli = CliRenamerSIO(*wa.origs, *wa.news)
+    cli.do_prepare()
+    got = cli.err
+    exp = tr.msg_before_formatting(MF.invalid_pref_keys)
+    assert got.startswith(exp)
+    assert 'foo' in got
+    assert 'bar' in got
+    assert cli.failure
+    wa.check(no_change = True)
+
+    # Scenario: invalid preferences value.
+    # Currently, no command line options take floats, so
+    # we will use that for the bad value.
+    BAD_VAL = 3.14
+    for oc in CLI.opt_configs.values():
+        prefs = {oc.name: BAD_VAL}
+        create_prefs(**prefs)
+        wa = create_wa(origs, news)
+        cli = CliRenamerSIO(*wa.origs, *wa.news)
+        cli.do_prepare()
+        exp = MF.invalid_pref_val.format(oc.name, oc.check_value(BAD_VAL), BAD_VAL)
+        assert cli.err.rstrip() == exp
+        assert cli.failure
+        wa.check(no_change = True)
+
+    # Scenario: merging precedence: opts, prefs.
+
+    # Scenario: real_default.
+
+    # Scenario: --pager and --editor disabling.
+
+    # Scenario: problem control merging: app, prefs, opts.
+
+    # Scenario: problem control: discard.
+
+    # Scenario: problem control: invalid control.
+
+    # Scenario: problem control: conflicting controls.
+
+    # Scenario: disable testing ENV variable so we can exercise the real code path once.
 
 ####
 # Dryrun and no-confirmation.
