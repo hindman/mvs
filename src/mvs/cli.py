@@ -315,9 +315,10 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Handle disabled pager.
-        if opts.pager == ['']:
-            opts.pager = []
+        # Handle disabled pager and editor.
+        for name in ('pager', 'editor'):
+            if getattr(opts, name) == ['']:
+                setattr(opts, name, [])
 
         # Merge settings for problem controls, in three stages:
         # - Start with the application defaults.
@@ -583,9 +584,6 @@ class CliRenamer:
 # Configuration for command-line argument parsing.
 ####
 
-def parse_oc_name(oc):
-    return oc['names'].split()[0].lstrip(CON.hyphen)
-
 class CLI:
 
     # Important option names or groups of options.
@@ -822,8 +820,8 @@ class CLI:
             metavar = 'ARG',
             nargs = '+',
             help = (
-                'Command arguments for editor used by --edit '
-                f'[default: `{CON.default_editor_cmd[0]}`]'
+                'Command arguments for editor used by --edit [default: '
+                f'`{CON.default_editor_cmd[0]}`; empty string to disable]'
             ),
         ),
 

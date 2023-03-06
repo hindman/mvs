@@ -281,7 +281,7 @@ def test_odd_number_inputs(tr, create_wa, create_outs):
     cli = CliRenamerSIO(*wa.origs, *wa.news)
     cli.run()
     got = cli.err
-    exp1 = MF.prepare_failed_cli.split(CON.colon)[0]
+    exp1 = tr.msg_before_formatting(MF.prepare_failed_cli)
     exp2 = PF.parsing_imbalance
     assert got.startswith(exp1)
     assert exp2 in got
@@ -344,6 +344,63 @@ def test_sources(tr, create_wa, create_outs):
     assert cli.log == ''
     wa.check(no_change = True)
     assert cli.failure
+
+####
+# The --edit and --editor options.
+####
+
+def test_edit(tr, create_wa, create_outs):
+    origs = ('a', 'b', 'c')
+    news = tuple(o + '.new' for o in origs)
+
+    def do_checks(wa, cli, fail = False):
+        if fail:
+            assert cli.out == ''
+            assert cli.log == ''
+            assert cli.failure
+            wa.check(no_change = True)
+        else:
+            assert cli.err == ''
+            assert cli.logs_valid_json is cli.OK
+            assert cli.success
+            wa.check()
+
+    # Initial scenario: it works.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(
+        *wa.origs,
+        '--edit',
+        '--editor', *tr.TEST_EDITOR,
+    )
+    cli.run()
+    assert cli.out == outs.regular_output
+    do_checks(wa, cli)
+
+    # Renaming attempt fails if we try to edit without an editor.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(
+        *wa.origs,
+        '--edit',
+        '--editor', '',
+    )
+    cli.run()
+    assert cli.err.rstrip() == MF.no_editor
+    do_checks(wa, cli, fail = True)
+
+    # Renaming attempt fails if the editor exits unsuccessfully.
+    wa = create_wa(origs, news)
+    outs = create_outs(wa.origs, wa.news)
+    cli = CliRenamerSIO(
+        *wa.origs,
+        '--edit',
+        '--editor', *tr.TEST_FAILER,
+    )
+    cli.run()
+    assert tr.msg_before_formatting(MF.editor_cmd_nonzero) in cli.err
+    assert tr.msg_before_formatting(MF.edit_failed_unexpected) in cli.err
+    do_checks(wa, cli, fail = True)
 
 ####
 # Dryrun and no-confirmation.
@@ -484,8 +541,8 @@ def test_rename_paths_raises(tr, create_wa, create_outs):
 def test_filter_all(tr, create_wa, create_outs):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
-    exp_conflict = MF.conflicting_controls.split(':')[0]
+    exp_cli_prep = tr.msg_before_formatting(MF.prepare_failed_cli)
+    exp_conflict = tr.msg_before_formatting(MF.conflicting_controls)
 
     # Initial scenario: it works.
     wa = create_wa(origs, news)
@@ -555,7 +612,7 @@ def test_pagination(tr, create_wa, create_outs):
     cli = CliRenamerSIO(
         *wa.origs,
         *wa.news,
-        pager = ('python', 'tests/empty-pager.py'),
+        pager = tr.TEST_PAGER,
     )
     cli.run()
     wa.check()
@@ -624,8 +681,8 @@ def test_some_failed_rps(tr, create_wa, create_outs):
     expecteds = ('z1', 'z2', 'A3', 'A4') + extras
     opt_skip = ('--controls', 'skip-existing')
     opt_clobber = ('--controls', 'clobber-existing')
-    exp_cli_prep = MF.prepare_failed_cli.split(':')[0]
-    exp_conflict = MF.conflicting_controls.split('{')[0]
+    exp_cli_prep = tr.msg_before_formatting(MF.prepare_failed_cli)
+    exp_conflict = tr.msg_before_formatting(MF.conflicting_controls)
 
     # Initial scenario fails: 2 of the new paths already exist.
     # No renaming occurs.
@@ -705,7 +762,7 @@ def test_wrapup_with_tb(tr, create_wa):
         assert cli.out == ''
         assert cli.log == ''
         got = cli.err
-        exp = fmt.split('{')[0]
+        exp = tr.msg_before_formatting(fmt)
         assert exp in got
         wa.check(no_change = True)
 

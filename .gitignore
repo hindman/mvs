@@ -40,4 +40,5 @@
 
 # Temp file used in testing.
 /tests/work/*
+/tests/mvs_app/*
 

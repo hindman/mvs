@@ -10,6 +10,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ####
+# Set the mvs environment variable so that (1) the user's personal
+# mvs preferences file won't be used during testing and (2) so
+# that we can exercise the preferences in various ways.
+#
+# We set it to the full (rather than relative) path because some tests
+# using a WorkArea change the working directory before renaming occurs.
+####
+
+os.environ['MVS_APP_DIR'] = str(Path().resolve() / 'tests/mvs_app')
+
+####
 # Fixtures.
 ####
 
@@ -37,6 +48,10 @@ def create_outs():
 
 class TestResource:
 
+    TEST_EDITOR = ('python', 'tests/editor.py')
+    TEST_PAGER = ('python', 'tests/empty-pager.py')
+    TEST_FAILER = ('python', 'tests/failer.py')
+
     @staticmethod
     def dump(val = None, label = 'dump()'):
         fmt = '\n--------\n{label} =>\n{val}'
@@ -47,6 +62,12 @@ class TestResource:
     def dumpj(val = None, label = 'dumpj()', indent = 4):
         val = json.dumps(val, indent = indent)
         self.dump(val, label)
+
+    @staticmethod
+    def msg_before_formatting(fmt):
+        # Takes a format string.
+        # Returns the portion before the first brace.
+        return fmt.split('{')[0]
 
 ####
 # A path within the testing work area.

@@ -13,7 +13,29 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Tests [see NEW_TESTS].
+Tests:
+
+    x The --edit option.
+    - User-prefs.
+    - Skip-equal as default.
+    - Case-change renamings [see table below].
+    - Bug fix: Windows replace.
+    - Orig paths must be regular file or directory.
+    - Clobbering: like can clobber like.
+    - Only empty directories can be clobbered.
+    - Double check pragma-no-cover stuff.
+
+    parent    | name      | Example: orig vs new | Note
+    ---------------------------------------------------------------------
+    eq        | eq        | foo/bar   foo/bar    | .
+    "         | case      | foo/bar   foo/BAR    | .
+    "         | different | foo/bar   foo/b      | .
+    case      | eq        | foo/bar   FOO/bar    | .
+    "         | case      | foo/bar   FOO/BAR    | .
+    "         | different | foo/bar   FOO/b      | .
+    different | eq        | foo/bar   f/bar      | .
+    "         | case      | foo/bar   f/BAR      | .
+    "         | different | foo/bar   f/b        | .
 
 New documentation [see NEW_DOCS].
 
@@ -159,31 +181,6 @@ New documentation [NEW_DOCS]:
 
             - And it most renaming scenarios, the behavior is not surprising
               or counter-intuitive.
-
-New tests [NEW_TESTS].
-
-    - The --edit option.
-    - User-prefs.
-    - Skip-equal as default.
-    - Case-change renamings [see table below].
-    - Bug fix: Windows replace.
-    - Orig paths must be regular file or directory.
-    - Clobbering: like can clobber like.
-    - Only empty directories can be clobbered.
-    - Double check pragma-no-cover stuff.
-    - Case-change renaming scenarios:
-
-        parent    | name      | Example: orig vs new | Note
-        ---------------------------------------------------------------------
-        eq        | eq        | foo/bar   foo/bar    | .
-        "         | case      | foo/bar   foo/BAR    | .
-        "         | different | foo/bar   foo/b      | .
-        case      | eq        | foo/bar   FOO/bar    | .
-        "         | case      | foo/bar   FOO/BAR    | .
-        "         | different | foo/bar   FOO/b      | .
-        different | eq        | foo/bar   f/bar      | .
-        "         | case      | foo/bar   f/BAR      | .
-        "         | different | foo/bar   f/b        | .
 
 Other operations: copy, link, chmod, times, touch [OTHER_OPS]:
     - copy: given old-paths, copy them to new-paths.
