@@ -1,3 +1,16 @@
+'''
+
+Refactoring status:
+
+    Next:
+        test_dryrun()
+
+    Deferred:
+        test_sources()
+
+'''
+
+
 import json
 import pytest
 import re
@@ -126,6 +139,152 @@ def parse_log(text, log_type):
     return logs[log_type]
 
 ####
+# Helper to perform common checks.
+####
+
+def run_checks(
+               # Fixtures.
+               tr,
+               creators,
+               # WorkArea (and arbitrary positionals for CliRenamer).
+               origs,
+               news,
+               *cli_xs,
+               extras = None,
+               expecteds = None,
+               rootless = False,
+               # UserPrefs.
+               prefs = None,
+               blob = None,
+               # Outputs.
+               outs_origs = None,
+               outs_news = None,
+               total = None,
+               listed = None,
+               # Assertion making.
+               early_checks = None,
+               check_wa = True,
+               check_outs = True,
+               done = True,
+               failure = False,
+               out = None,
+               err = None,
+               err_starts = None,
+               err_in = None,
+               log = None,
+               no_change = False,
+               # CliRenamer.
+               cli_cls = CliRenamerSIO,
+               include_origs = True,
+               include_news = True,
+               prepare_only = False,
+               **cli_kws):
+
+    # Get the fixtures.
+    create_wa, create_outs, create_prefs = creators
+
+    # Set up preferences.
+    if blob is not None:
+        create_prefs(blob = blob)
+    elif prefs is not None:
+        create_prefs(**prefs)
+
+    # Set up WorkArea.
+    wa = create_wa(
+        origs,
+        news,
+        extras = extras,
+        expecteds = expecteds,
+        rootless = rootless
+    )
+
+    # Set up up Outputs.
+    outs = create_outs(
+        outs_origs or wa.origs,
+        outs_news or wa.news,
+        total = total,
+        listed = listed,
+    )
+
+    # Set up CliRenamer
+    args = (
+        (wa.origs if include_origs else ()) +
+        (wa.news if include_news else ()) +
+        cli_xs
+    )
+    cli = cli_cls(*args, **cli_kws)
+
+    # Run the renaming or just the preparations.
+    if prepare_only:
+        no_change = True
+        cli.do_prepare()
+    elif rootless:
+        with wa.cd():
+            cli.run()
+    else:
+        cli.run()
+
+    # Let caller make early assertions or do other stuff.
+    if early_checks:
+        early_checks(wa, outs, cli)
+
+    # Check work area.
+    if check_wa:
+        wa.check(no_change = no_change)
+
+    # Check CliRenamer outputs and success/failure status.
+    if check_outs:
+        if failure:
+            # Error output.
+            if err_starts:
+                for exp in to_tup(err_starts):
+                    assert cli.err.startswith(exp)
+            if err_in:
+                for exp in to_tup(err_in):
+                    assert exp in cli.err
+            if err is not None:
+                assert cli.err == err
+            # Standard and log output.
+            assert cli.out == ''
+            assert cli.log == ''
+        else:
+            # Standard output.
+            if out is None:
+                assert cli.out == outs.regular_output
+            else:
+                assert cli.out == out
+            # Log output.
+            if log is None:
+                assert cli.logs_valid_json is cli.OK
+            else:
+                assert cli.log == log
+            # Error output.
+            assert cli.err == ''
+
+    # Check CliRenamer success/failure status.
+    if failure:
+        assert cli.failure
+    elif done:
+        assert cli.success
+    else:
+        assert not cli.done
+
+    # Let the caller make other custom assertions.
+    return (wa, outs, cli)
+
+def to_tup(x):
+    # Takes a value. Returns it in a tuple if its not already one.
+    if isinstance(x, tuple):
+        return x
+    else:
+        return (x,)
+
+def pre_fmt(fmt):
+    # Takes a format string.
+    # Returns the portion before the first brace.
+    return fmt.split('{')[0]
+
+####
 # Command-line arguments and options.
 ####
 
@@ -135,7 +294,7 @@ def test_version_and_help(tr):
 
     # A helper.
     def do_checks(*args):
-        cli = CliRenamerSIO('mvs', *args)
+        cli = CliRenamerSIO(*args)
         cli.run()
         assert cli.success
         assert cli.err == ''
@@ -199,31 +358,20 @@ def test_indent_and_posint(tr, create_wa, create_outs):
 # Basic renaming usage.
 ####
 
-def test_basic_use_cases(tr, create_wa, create_outs):
-    # Paths.
+def test_basic_use_cases(tr, creators):
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-
-    # Helper.
-    def do_checks(*xs, include_news = True):
-        wa = create_wa(origs, news)
-        outs = create_outs(wa.origs, wa.news)
-        args = wa.origs + (wa.news if include_news else ()) + xs
-        cli = CliRenamerSIO(*args)
-        cli.run()
-        assert cli.success
-        assert cli.out == outs.regular_output
-        assert cli.err == ''
-        assert cli.logs_valid_json is cli.OK
-        wa.check()
+    run_args = (tr, creators, origs, news)
 
     # Basic use cases:
     # - Flat structure as the default.
     # - Flat passed explicitly.
     # - Renaming via code.
-    do_checks()
-    do_checks('--flat')
-    do_checks(
+    wa, outs, cli = run_checks(*run_args)
+    wa, outs, cli = run_checks(*run_args, '--flat')
+    wa, outs, cli = run_checks(
+        *run_args,
         '--rename',
         'return p.with_name(p.name + p.name)',
         include_news = False,
@@ -233,62 +381,52 @@ def test_basic_use_cases(tr, create_wa, create_outs):
 # Input paths and sources.
 ####
 
-def test_no_input_paths(tr, create_wa, create_outs):
+def test_no_input_paths(tr, creators):
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    empty_paths = ('', '   ', ' ')
+    empty_paths = ('', '   ', ' ') * 2
+    run_args = (tr, creators, origs, news)
 
     # Initial scenario: it works.
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
-        *wa.news,
-    )
-    cli.run()
-    assert cli.err == ''
-    assert cli.out == outs.regular_output
-    assert cli.logs_valid_json is cli.OK
-    assert cli.success
-    wa.check()
+    wa, outs, cli = run_checks(*run_args)
 
     # But it fails if we omit the input paths.
-    wa = create_wa(origs, news)
-    cli = CliRenamerSIO()
-    cli.run()
-    assert cli.err.startswith(MF.opts_require_one)
-    assert cli.out == ''
-    assert cli.log == ''
-    assert cli.failure
-    for name in CLI.sources.keys():
-        assert name in cli.err
-    wa.check(no_change = True)
+    wa, outs, cli = run_checks(
+        *run_args,
+        include_origs = False,
+        include_news = False,
+        failure = True,
+        no_change = True,
+        err_starts = MF.opts_require_one,
+        err_in = CLI.sources.keys(),
+    )
 
     # It also fails if the input paths are empty.
-    wa = create_wa(origs, news)
-    cli = CliRenamerSIO(*empty_paths)
-    cli.run()
-    assert PF.parsing_no_paths in cli.err
-    assert cli.out == ''
-    assert cli.log == ''
-    assert cli.failure
+    wa, outs, cli = run_checks(
+        *run_args,
+        *empty_paths,
+        include_origs = False,
+        include_news = False,
+        failure = True,
+        no_change = True,
+        err_in = PF.parsing_no_paths,
+    )
 
-def test_odd_number_inputs(tr, create_wa, create_outs):
+def test_odd_number_inputs(tr, creators):
     # An odd number of inputs will fail.
     origs = ('z1', 'z2', 'z3')
     news = ()
-    wa = create_wa(origs, news)
-    cli = CliRenamerSIO(*wa.origs, *wa.news)
-    cli.run()
-    got = cli.err
-    exp1 = tr.msg_before_formatting(MF.prepare_failed_cli)
-    exp2 = PF.parsing_imbalance
-    assert got.startswith(exp1)
-    assert exp2 in got
-    assert cli.out == ''
-    assert cli.log == ''
-    assert cli.failure
-    wa.check(no_change = True)
+    wa, outs, cli = run_checks(
+        tr,
+        creators,
+        origs,
+        news,
+        failure = True,
+        no_change = True,
+        err_starts = pre_fmt(MF.prepare_failed_cli),
+        err_in = PF.parsing_imbalance,
+    )
 
 def test_sources(tr, create_wa, create_outs):
     # Paths and args.
@@ -349,109 +487,83 @@ def test_sources(tr, create_wa, create_outs):
 # The --edit and --editor options.
 ####
 
-def test_edit(tr, create_wa, create_outs):
+def test_edit(tr, creators):
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = tuple(o + '.new' for o in origs)
-
-    def do_checks(wa, cli, failure = False):
-        if failure:
-            assert cli.out == ''
-            assert cli.log == ''
-            assert cli.failure
-            wa.check(no_change = True)
-        else:
-            assert cli.err == ''
-            assert cli.logs_valid_json is cli.OK
-            assert cli.success
-            wa.check()
+    run_args = (tr, creators, origs, news)
 
     # Initial scenario: it works.
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
+    wa, outs, cli = run_checks(
+        *run_args,
         '--edit',
         '--editor', *tr.TEST_EDITOR,
+        include_news = False,
     )
-    cli.run()
-    assert cli.out == outs.regular_output
-    do_checks(wa, cli)
 
     # Renaming attempt fails if we try to edit without an editor.
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
+    wa, outs, cli = run_checks(
+        *run_args,
         '--edit',
         '--editor', '',
+        include_news = False,
+        failure = True,
+        no_change = True,
+        err = MF.no_editor + '\n',
     )
-    cli.run()
-    assert cli.err.rstrip() == MF.no_editor
-    do_checks(wa, cli, failure = True)
 
     # Renaming attempt fails if the editor exits unsuccessfully.
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
+    wa, outs, cli = run_checks(
+        *run_args,
         '--edit',
         '--editor', *tr.TEST_FAILER,
+        include_news = False,
+        failure = True,
+        no_change = True,
+        err_in = (
+            pre_fmt(MF.editor_cmd_nonzero),
+            pre_fmt(MF.edit_failed_unexpected),
+        ),
     )
-    cli.run()
-    f = tr.msg_before_formatting
-    assert f(MF.editor_cmd_nonzero) in cli.err
-    assert f(MF.edit_failed_unexpected) in cli.err
-    do_checks(wa, cli, failure = True)
 
 ####
 # Preferences.
 ####
 
-def test_preferences(tr, create_wa, create_outs, create_prefs):
+def test_preferences(tr, creators):
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
+    run_args = (tr, creators, origs, news)
 
-    # Scenario: an empty but valid preferences file.
-    prefs = create_prefs()
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
-        *wa.news,
+    # Scenario: an empty but valid preferences file: renaming works fine.
+    wa, outs, cli = run_checks(
+        *run_args,
+        prefs = {},
     )
-    cli.run()
-    assert cli.success
-    assert cli.out == outs.regular_output
-    assert cli.err == ''
-    assert cli.logs_valid_json is cli.OK
-    wa.check()
 
     # Scenario: an invalid JSON file.
-    prefs = create_prefs(blob = 'INVALID_JSON')
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(
-        *wa.origs,
-        *wa.news,
+    wa, outs, cli = run_checks(
+        *run_args,
+        blob = 'INVALID_JSON',
+        failure = True,
+        no_change = True,
+        err_starts = pre_fmt(MF.prefs_reading_failed),
+        err_in = 'JSONDecodeError',
     )
-    cli.run()
-    exp = tr.msg_before_formatting(MF.prefs_reading_failed)
-    assert cli.err.startswith(exp)
-    assert 'JSONDecodeError' in cli.err
-    assert cli.failure
-    assert cli.out == ''
-    assert cli.log == ''
-    wa.check(no_change = True)
 
     # Scenario: a valid JSON file; confirm that we affect cli.opts.
     default = {}
     custom = dict(indent = 2, seq = 100, step = 10)
     exp_default = dict(indent = 4, seq = 1, step = 1)
     for prefs in (default, custom):
-        create_prefs(**prefs)
-        wa = create_wa(origs, news)
-        cli = CliRenamerSIO(*wa.origs, *wa.news)
-        cli.do_prepare()
+        wa, outs, cli = run_checks(
+            *run_args,
+            prefs = prefs,
+            prepare_only = True,
+            check_outs = False,
+            done = False,
+        )
         exp = prefs or exp_default
         got = {
             k : getattr(cli.opts, k)
@@ -461,17 +573,14 @@ def test_preferences(tr, create_wa, create_outs, create_prefs):
 
     # Scenario: invalid preferences keys.
     prefs = dict(indent = 2, foo = 999, bar = 'fubb')
-    create_prefs(**prefs)
-    wa = create_wa(origs, news)
-    cli = CliRenamerSIO(*wa.origs, *wa.news)
-    cli.do_prepare()
-    got = cli.err
-    exp = tr.msg_before_formatting(MF.invalid_pref_keys)
-    assert got.startswith(exp)
-    assert 'foo' in got
-    assert 'bar' in got
-    assert cli.failure
-    wa.check(no_change = True)
+    wa, outs, cli = run_checks(
+        *run_args,
+        prefs = prefs,
+        prepare_only = True,
+        failure = True,
+        err_starts = pre_fmt(MF.invalid_pref_keys),
+        err_in = ('foo', 'bar'),
+    )
 
     # Scenario: invalid preferences value.
     # Currently, no command line options take floats, so
@@ -479,14 +588,20 @@ def test_preferences(tr, create_wa, create_outs, create_prefs):
     BAD_VAL = 3.14
     for oc in CLI.opt_configs.values():
         prefs = {oc.name: BAD_VAL}
-        create_prefs(**prefs)
-        wa = create_wa(origs, news)
-        cli = CliRenamerSIO(*wa.origs, *wa.news)
-        cli.do_prepare()
-        exp = MF.invalid_pref_val.format(oc.name, oc.check_value(BAD_VAL), BAD_VAL)
-        assert cli.err.rstrip() == exp
-        assert cli.failure
-        wa.check(no_change = True)
+        exp = MF.invalid_pref_val.format(
+            oc.name,
+            oc.check_value(BAD_VAL),
+            BAD_VAL,
+        )
+        wa, outs, cli = run_checks(
+            *run_args,
+            prefs = prefs,
+            prepare_only = True,
+            failure = True,
+            err = exp + '\n',
+        )
+
+    return
 
     # Scenario: merging precedence: opts, prefs.
 
@@ -643,8 +758,8 @@ def test_rename_paths_raises(tr, create_wa, create_outs):
 def test_filter_all(tr, create_wa, create_outs):
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    exp_cli_prep = tr.msg_before_formatting(MF.prepare_failed_cli)
-    exp_conflict = tr.msg_before_formatting(MF.conflicting_controls)
+    exp_cli_prep = pre_fmt(MF.prepare_failed_cli)
+    exp_conflict = pre_fmt(MF.conflicting_controls)
 
     # Initial scenario: it works.
     wa = create_wa(origs, news)
@@ -783,8 +898,8 @@ def test_some_failed_rps(tr, create_wa, create_outs):
     expecteds = ('z1', 'z2', 'A3', 'A4') + extras
     opt_skip = ('--controls', 'skip-existing')
     opt_clobber = ('--controls', 'clobber-existing')
-    exp_cli_prep = tr.msg_before_formatting(MF.prepare_failed_cli)
-    exp_conflict = tr.msg_before_formatting(MF.conflicting_controls)
+    exp_cli_prep = pre_fmt(MF.prepare_failed_cli)
+    exp_conflict = pre_fmt(MF.conflicting_controls)
 
     # Initial scenario fails: 2 of the new paths already exist.
     # No renaming occurs.
@@ -864,7 +979,7 @@ def test_wrapup_with_tb(tr, create_wa):
         assert cli.out == ''
         assert cli.log == ''
         got = cli.err
-        exp = tr.msg_before_formatting(fmt)
+        exp = pre_fmt(fmt)
         assert exp in got
         wa.check(no_change = True)
 

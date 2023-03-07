@@ -17,6 +17,9 @@ Tests:
 
     x The --edit option.
 
+    - Refactor test_cli.py to use run_checks().
+        - See docstring.
+
     - User-prefs.
 
         - See test_preferences() for work done so far and

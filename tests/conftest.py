@@ -53,6 +53,10 @@ def create_prefs():
     yield f
     UserPrefs.delete()
 
+@pytest.fixture
+def creators(create_wa, create_outs, create_prefs):
+    return (create_wa, create_outs, create_prefs)
+
 ####
 # General testing resource: data dumping and constants.
 ####
