@@ -47,7 +47,7 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     PN.existing_diff:          'New path exists and differs with original in type',
     PN.colliding_diff:         'New path collides with another new path, and they differ in type',
     # Not controllable.
-    PN.all_filtered:           'All paths were filtered out by failure control during processing',
+    PN.all_filtered:           'All paths were filtered out during processing',
     PN.parsing_no_paths:       'No input paths',
     PN.parsing_paragraphs:     'The --paragraphs option expects exactly two paragraphs',
     PN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',

@@ -17,21 +17,25 @@ Tests:
 
     x The --edit option.
 
-    - Refactor test_cli.py to use run_checks().
-        - See docstring.
+    . Refactor test_cli.py to use run_checks(): see docstring.
 
     - User-prefs.
 
         - See test_preferences() for work done so far and
           for several scenarios to exercise.
 
+    - Change --editor and --pager back to str:
+        - They can't actually take many useful args.
+        - Why not: argparse will interpret the args as options.
+        - Document that they are executed with shell=True.
+
     - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.
 
-    - Skip-equal as default.
-    - Bug fix: Windows replace.
-    - Double check pragma-no-cover stuff.
+    - Skip-equal as default: check that it is covered by tests [I think so].
+    x Bug fix: Windows replace.
+    x Double check pragma-no-cover stuff.
 
     - Case-change renamings [see table below].
 
