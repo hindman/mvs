@@ -1,17 +1,3 @@
-'''
-
-Refactoring status:
-
-    Remaining:
-
-        test_version_and_help()
-        test_indent_and_posint()
-        test_rename_paths_raises()
-        test_main()
-
-'''
-
-
 import json
 import pytest
 import re
@@ -110,38 +96,11 @@ class CliRenamerSIO(CliRenamer):
             )
 
 ####
-# Helper functions.
+# A mega-helper to perform common checks.
+# Used by most tests.
 ####
 
-def can_use_clipboard():
-    # I could not get pyperclip working on ubuntu in Github Actions,
-    # I'm using this to bypass clipboard checks.
-    return sys.platform != 'linux'
-
-def parse_log(text, log_type):
-    # CliRenamerSIO collects logging output from CliRenamer
-    # in a single StringIO, which means that the plan-log and
-    # the tracking-log are combined. This function takes a
-    # log_type and returns the desired portion of the log output.
-
-    # Find the index of the divider between the two logging calls.
-    # If we don't find it, all content will go to the plan-log.
-    div = '\n}{\n'
-    try:
-        i = text.index(div) + 2
-    except ValueError:
-        i = len(text)
-
-    # Partition the text into the two logs and return the requested one.
-    logs = {
-        CliRenamer.LOG_TYPE.plan:     text[0 : i],
-        CliRenamer.LOG_TYPE.tracking: text[i : None],
-    }
-    return logs[log_type]
-
-####
-# Helper to perform common checks.
-####
+BYPASS = object()
 
 def run_checks(
                # Fixtures.
@@ -181,6 +140,8 @@ def run_checks(
                include_origs = True,
                include_news = True,
                prepare_only = False,
+               rename_via_do = False,
+               skip_rename = False,
                **cli_kws):
 
     # Get the fixtures.
@@ -201,7 +162,7 @@ def run_checks(
         rootless = rootless
     )
 
-    # Set up up Outputs.
+    # Set up Outputs.
     outs = create_outs(
         outs_origs or wa.origs,
         outs_news or wa.news,
@@ -225,10 +186,13 @@ def run_checks(
     if prepare_only:
         no_change = True
         cli.do_prepare()
+    elif rename_via_do:
+        cli.do_prepare()
+        cli.do_rename()
     elif rootless:
         with wa.cd():
             cli.run()
-    else:
+    elif not skip_rename:
         cli.run()
 
     # Let caller make early assertions.
@@ -239,36 +203,38 @@ def run_checks(
     if check_wa:
         wa.check(no_change = no_change)
 
-    # Check CliRenamer outputs and success/failure status.
+    # Check CliRenamer outputs.
     if check_outs:
-        if failure:
-            # Error output.
-            if err_starts:
-                for exp in to_tup(err_starts):
-                    assert cli.err.startswith(exp)
-            if err_in:
-                for exp in to_tup(err_in):
-                    assert exp in cli.err
-            if err is not None:
-                assert cli.err == err
-            # Standard and log output.
-            assert cli.out == ''
+        # Standard output.
+        if callable(out):
+            assert cli.out == out(wa, outs, cli)
+        elif out is None:
+            exp = '' if failure else outs.regular_output
+            assert cli.out == exp
+        elif out is not BYPASS:
+            assert cli.out == out
+
+        # Error output.
+        if err_starts:
+            for exp in to_tup(err_starts):
+                assert cli.err.startswith(exp)
+        if err_in:
+            for exp in to_tup(err_in):
+                assert exp in cli.err
+        if err is not None:
+            assert cli.err == err
+
+        # Log output.
+        if log is cli.OK:
+            assert cli.logs_valid_json is cli.OK
+        elif log is BYPASS:
+            pass
+        elif log is None and failure:
             assert cli.log == ''
-        else:
-            # Standard output.
-            if out is None:
-                assert cli.out == outs.regular_output
-            elif callable(out):
-                assert cli.out == out(wa, outs, cli)
-            else:
-                assert cli.out == out
-            # Log output.
-            if log is None:
-                assert cli.logs_valid_json is cli.OK
-            else:
-                assert cli.log == log
-            # Error output.
-            assert cli.err == ''
+        elif log is None:
+            assert cli.logs_valid_json is cli.OK
+        elif log:
+            assert cli.log == log
 
     # Check CliRenamer success/failure status.
     if failure:
@@ -280,6 +246,31 @@ def run_checks(
 
     # Let the caller make other custom assertions.
     return (wa, outs, cli)
+
+####
+# Helper functions.
+####
+
+def parse_log(text, log_type):
+    # CliRenamerSIO collects logging output from CliRenamer
+    # in a single StringIO, which means that the plan-log and
+    # the tracking-log are combined. This function takes a
+    # log_type and returns the desired portion of the log output.
+
+    # Find the index of the divider between the two logging calls.
+    # If we don't find it, all content will go to the plan-log.
+    div = '\n}{\n'
+    try:
+        i = text.index(div) + 2
+    except ValueError:
+        i = len(text)
+
+    # Partition the text into the two logs and return the requested one.
+    logs = {
+        CliRenamer.LOG_TYPE.plan:     text[0 : i],
+        CliRenamer.LOG_TYPE.tracking: text[i : None],
+    }
+    return logs[log_type]
 
 def to_tup(x):
     # Takes a value. Returns it in a tuple if its not already one.
@@ -293,75 +284,94 @@ def pre_fmt(fmt):
     # Returns the portion before the first brace.
     return fmt.split('{')[0]
 
+def can_use_clipboard():
+    # I could not get pyperclip working on ubuntu in Github Actions,
+    # I'm using this to bypass clipboard checks.
+    return sys.platform != 'linux'
+
 ####
 # Command-line arguments and options.
 ####
 
-def test_version_and_help(tr):
+def test_version_and_help(tr, creators):
     # Exercise the command-line options that report
     # information about the app and exit immediately.
 
-    # A helper.
-    def do_checks(*args):
-        cli = CliRenamerSIO(*args)
-        cli.run()
-        assert cli.success
-        assert cli.err == ''
-        assert cli.log == ''
-        return cli
+    # Paths and args.
+    origs = ('a', 'b')
+    news = ()
+    run_args = (tr, creators, origs, news)
+    kws = dict(
+        include_origs = False,
+        include_news = False,
+        no_change = True,
+        log = '',
+    )
 
     # Version.
-    cli = do_checks('--version')
-    assert cli.out == MF.cli_version_msg + CON.newline
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--version',
+        out = MF.cli_version_msg + CON.newline,
+        **kws,
+    )
 
     # Details.
-    cli = do_checks('--details')
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--details',
+        out = BYPASS,
+        **kws,
+    )
     assert cli.out.split() == CLI.post_epilog.split()
 
     # Help.
-    cli = do_checks('--version', '--help')
-    assert cli.out.startswith(f'Usage: {CON.app_name}')
-    assert len(cli.out) > 2000
-    assert CLI.description[:40] in cli.out
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--help',
+        out = BYPASS,
+        **kws,
+    )
+    got = cli.out
+    N = 40
+    assert got.startswith(f'Usage: {CON.app_name}')
+    assert CLI.description[0:N] in got
     for opt in ('--clipboard', '--paragraphs', '--rename'):
-        assert f'\n  {opt}' in cli.out
+        assert f'\n  {opt}' in got
     for oc in CLI.opt_configs.values():
-        assert oc.params['help'][0:40] in cli.out
+        assert oc.params['help'][0:N] in got
 
-def test_indent_and_posint(tr, create_wa, create_outs):
+def test_indent_and_posint(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    args = ('--rename', 'return o + o', '--indent')
+    run_args = (tr, creators, origs, news)
     valid_indents = ('2', '4', '8')
     invalid_indents = ('-4', 'xx', '0', '1.2')
 
     # Valid indent values.
-    for i in valid_indents:
-        wa = create_wa(origs, news, rootless = True)
-        outs = create_outs(wa.origs, wa.news)
-        cli = CliRenamerSIO(*args, i, *wa.origs)
-        with wa.cd():
-            cli.run()
-        wa.check()
-        assert cli.success
-        assert cli.err == ''
-        assert cli.out == outs.regular_output
-        assert cli.logs_valid_json is cli.OK
+    for ind in valid_indents:
+        wa, outs, cli = run_checks(
+            *run_args,
+            '--rename', 'return o + o',
+            '--indent', ind,
+            include_news = False,
+            rootless = True,
+        )
 
     # Invalid indent values.
-    for i in invalid_indents:
-        wa = create_wa(origs, news, rootless = True)
-        cli = CliRenamerSIO(*args, i, *wa.origs)
-        with wa.cd():
-            cli.run()
-        wa.check(no_change = True)
-        assert cli.failure
-        assert cli.out == ''
-        assert cli.log == ''
-        exp = '--indent: invalid positive_int value'
-        assert exp in cli.err
-        assert cli.err.startswith(f'Usage: {CON.app_name}')
+    for ind in invalid_indents:
+        wa, outs, cli = run_checks(
+            *run_args,
+            '--rename', 'return o + o',
+            '--indent', ind,
+            include_news = False,
+            rootless = True,
+            failure = True,
+            no_change = True,
+            err_in = '--indent: invalid positive_int value',
+            err_starts = f'Usage: {CON.app_name}',
+        )
 
 ####
 # Basic renaming usage.
@@ -697,92 +707,92 @@ def test_no_confirmation(tr, creators):
 # User-supplied code.
 ####
 
-def test_rename_paths_raises(tr, create_wa, create_outs):
+def test_rename_paths_raises(tr, creators):
     # Paths, etc.
     origs = ('z1', 'z2', 'z3')
     news = ('ZZ1', 'ZZ2', 'ZZ3')
     expecteds = news[:1] + origs[1:]
     NSTART = RenamingPlan.TRACKING.not_started
-
-    def do_checks(mode):
-        wa = create_wa(origs, news)
-        outs = create_outs(wa.origs, wa.news)
-        cli = CliRenamerSIO(*wa.origs, *wa.news)
-        if mode == 'run':
-            cli.run()
-        elif mode == 'do':
-            cli.do_prepare()
-            cli.do_rename()
-        elif mode == 'multiple-do':
-            cli.do_prepare()
-            cli.do_prepare()
-            assert cli.plan.tracking_rp is None
-            cli.do_rename()
-            assert cli.plan.tracking_rp is None
-            cli.do_rename()
-            assert cli.plan.tracking_rp is None
-        else:
-            assert False
-        wa.check()
-        assert cli.err == ''
-        assert cli.out == outs.regular_output
-        assert cli.logs_valid_json is cli.OK
-        assert cli.success
-
-    # A working scenario.
-    do_checks('run')
-
-    # Same scenario, but using do_prepare() and do_rename(),
-    # either once or even multiple times.
-    do_checks('do')
-    do_checks('multiple-do')
+    run_args = (tr, creators, origs, news)
 
     # Helper to format expected error text for subsequent checks.
     def exp_err_text(tracking_index):
         msg = MF.renaming_raised.format(tracking_index)
-        return msg.strip().split(CON.colon)[0]
+        return '\n' + msg.strip().split(CON.colon)[0]
+
+    # Helpers to call do_prepare() and do_rename() in various ways.
+    def other_prep1(wa, outs, cli):
+        cli.do_prepare()
+        cli.do_prepare()
+        assert cli.plan.tracking_rp is None
+        cli.do_rename()
+        assert cli.plan.tracking_rp is None
+        cli.do_rename()
+        assert cli.plan.tracking_rp is None
+
+    def other_prep2(wa, outs, cli):
+        cli.do_prepare()
+        cli.plan.has_renamed = True
+        cli.do_rename()
+
+    def other_prep3(wa, outs, cli):
+        cli.do_prepare()
+        assert cli.plan.tracking_rp is None
+        assert cli.plan.tracking_index == NSTART
+        cli.plan.raise_at = N
+        cli.do_rename()
+
+    # Basic scenario.
+    wa, outs, cli = run_checks(*run_args)
+
+    # Same thing, but using do_prepare() and do_rename().
+    wa, outs, cli = run_checks(
+        *run_args,
+        rename_via_do = True,
+    )
+
+    # Same thing, but we can call those methods multiple times.
+    wa, outs, cli = run_checks(
+        *run_args,
+        skip_rename = True,
+        other_prep = other_prep1,
+    )
 
     # Same scenario, but we will set plan.has_renamed to trigger
     # an exception when plan.rename_paths() is called.
-    wa = create_wa(origs, news)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(*wa.origs, *wa.news)
-    cli.do_prepare()
-    cli.plan.has_renamed = True
-    cli.do_rename()
-    wa.check(no_change = True)
+    wa, outs, cli = run_checks(
+        *run_args,
+        skip_rename = True,
+        other_prep = other_prep2,
+        failure = True,
+        no_change = True,
+        err_starts = exp_err_text(NSTART),
+        err_in = 'raise MvsError(MF.rename_done_already)',
+        out = BYPASS,
+        log = CliRenamerSIO.OK,
+    )
     assert cli.plan.tracking_index == NSTART
-    got = cli.err
-    exp = exp_err_text(NSTART)
-    assert got.strip().startswith(exp)
-    assert 'raise MvsError(MF.rename_done_already)' in got
-    assert cli.failure
     assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
-    assert cli.logs_valid_json is cli.OK
 
     # Same scenario, but this time we will trigger the exception via
     # the raise_at attribute, so we can check the tracking_index in
     # the tracking log and in the command-line error message.
     N = 1
-    wa = create_wa(origs, news, (), expecteds)
-    outs = create_outs(wa.origs, wa.news)
-    cli = CliRenamerSIO(*wa.origs, *wa.news)
-    cli.do_prepare()
-    assert cli.plan.tracking_rp is None
-    assert cli.plan.tracking_index == NSTART
-    cli.plan.raise_at = N
-    cli.do_rename()
-    wa.check()
+    wa, outs, cli = run_checks(
+        *run_args,
+        expecteds = expecteds,
+        skip_rename = True,
+        other_prep = other_prep3,
+        failure = True,
+        err_starts = exp_err_text(N),
+        err_in = 'ZeroDivisionError: SIMULATED_ERROR',
+        out = BYPASS,
+        log = CliRenamerSIO.OK,
+    )
     assert cli.plan.tracking_rp.orig == wa.origs[N]
     assert cli.plan.tracking_index == N
-    assert cli.logs_valid_json is cli.OK
     assert cli.log_tracking_dict == dict(tracking_index = N)
     assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
-    got = cli.err
-    exp = exp_err_text(N)
-    assert got.strip().startswith(exp)
-    assert 'ZeroDivisionError: SIMULATED_ERROR' in got
-    assert cli.failure
 
 def test_filter_all(tr, creators):
     # Paths and args.

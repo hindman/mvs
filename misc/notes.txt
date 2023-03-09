@@ -15,10 +15,6 @@ todos: TODOs
 
 Tests:
 
-    x The --edit option.
-
-    . Refactor test_cli.py to use run_checks(): see docstring.
-
     - User-prefs.
 
         - See test_preferences() for work done so far and
@@ -33,7 +29,9 @@ Tests:
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.
 
-    - Skip-equal as default: check that it is covered by tests [I think so].
+    x Skip-equal as default: check that it is covered by tests [I think so].
+    x The --edit option.
+    x Refactor test_cli.py to use run_checks(): see docstring.
     x Bug fix: Windows replace.
     x Double check pragma-no-cover stuff.
 
