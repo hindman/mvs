@@ -315,11 +315,6 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Handle disabled pager and editor.
-        for name in ('pager', 'editor'):
-            if getattr(opts, name) == ['']:
-                setattr(opts, name, [])
-
         # Merge settings for problem controls, in three stages:
         # - Start with the application defaults.
         # - Then apply user-preferences.
@@ -556,6 +551,7 @@ class CliRenamer:
             p = subprocess.Popen(
                 self.opts.pager,
                 stdin = subprocess.PIPE,
+                shell = True,
             )
             p.stdin.write(text.encode(CON.encoding))
             p.communicate()
@@ -815,13 +811,12 @@ class CLI:
         ),
         OptConfig(
             names = '--editor',
-            validator = OptConfig.list_of_str,
+            validator = str,
             real_default = CON.default_editor_cmd,
             metavar = 'ARG',
-            nargs = '+',
             help = (
-                'Command arguments for editor used by --edit [default: '
-                f'`{CON.default_editor_cmd[0]}`; empty string to disable]'
+                'Command string for editor used by --edit [default: '
+                f'`{CON.default_editor_cmd}`; empty string to disable]'
             ),
         ),
 
@@ -854,13 +849,12 @@ class CLI:
         OptConfig(
             group = 'Listings',
             names = '--pager',
-            validator = OptConfig.list_of_str,
+            validator = str,
             real_default = CON.default_pager_cmd,
             metavar = 'ARG',
-            nargs = '+',
             help = (
-                'Command arguments for paginating listings [default: '
-                f'`{CON.default_pager_cmd[0]}`; empty string to disable]'
+                'Command string for paginating listings [default: '
+                f'`{CON.default_pager_cmd}`; empty string to disable]'
             ),
         ),
         OptConfig(

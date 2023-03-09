@@ -53,8 +53,8 @@ class CON:
     prefs_file_name = 'config.json'
 
     # Executables.
-    default_pager_cmd = ['more']
-    default_editor_cmd = ['vim']
+    default_pager_cmd = 'more'
+    default_editor_cmd = 'vim'
 
 ####
 # Structures for input paths data.
@@ -150,8 +150,8 @@ def edit_text(editor, text):
         fh.write(text)
 
     # Let user edit the file.
-    cmd = editor + [path]
-    p = run(cmd)
+    cmd = f"{editor} '{path}'"
+    p = run(cmd, shell = True)
 
     # Read file and return its edited text.
     if p.returncode == 0:
@@ -247,13 +247,6 @@ class OptConfig:
             return None
         else:
             return 'positive int'
-
-    @staticmethod
-    def list_or_str(x):
-        if isinstance(x, (str, list)):
-            return None
-        else:
-            return 'list or str'
 
     @staticmethod
     def list_of_str(xs):

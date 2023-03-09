@@ -15,20 +15,12 @@ todos: TODOs
 
 Tests:
 
-    - User-prefs.
-
-        - See test_preferences() for work done so far and
-          for several scenarios to exercise.
-
-    - Change --editor and --pager back to str:
-        - They can't actually take many useful args.
-        - Why not: argparse will interpret the args as options.
-        - Document that they are executed with shell=True.
-
+    - User-prefs: see test_preferences().
     - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.
 
+    x Change --editor and --pager back to str:
     x Skip-equal as default: check that it is covered by tests [I think so].
     x The --edit option.
     x Refactor test_cli.py to use run_checks(): see docstring.
@@ -151,6 +143,8 @@ New documentation [NEW_DOCS]:
         - In clobbering, like must overwrite like (file => file; dir => dir).
         - Only empty directories can be clobbered.
         - The --create control will create parents, not move-create.
+
+    - Document that --pager and --editor are executed with shell=True.
 
     - CHANGES file.
 

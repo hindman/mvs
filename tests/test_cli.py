@@ -33,7 +33,7 @@ class CliRenamerSIO(CliRenamer):
     def __init__(self, *args, pager = None, yes = True, replies = ''):
         pager = (
             ('--pager', '') if pager is None else
-            ('--pager',) + pager
+            ('--pager', pager)
         )
         yes = ('--yes',) if yes else ()
         super().__init__(
@@ -531,7 +531,7 @@ def test_edit(tr, creators):
     wa, outs, cli = run_checks(
         *run_args,
         '--edit',
-        '--editor', *tr.TEST_EDITOR,
+        '--editor', tr.TEST_EDITOR,
         include_news = False,
     )
 
@@ -550,7 +550,7 @@ def test_edit(tr, creators):
     wa, outs, cli = run_checks(
         *run_args,
         '--edit',
-        '--editor', *tr.TEST_FAILER,
+        '--editor', tr.TEST_FAILER,
         include_news = False,
         failure = True,
         no_change = True,

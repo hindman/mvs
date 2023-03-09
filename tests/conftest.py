@@ -63,9 +63,9 @@ def creators(create_wa, create_outs, create_prefs):
 
 class TestResource:
 
-    TEST_EDITOR = ('python', 'tests/editor.py')
-    TEST_PAGER = ('python', 'tests/empty-pager.py')
-    TEST_FAILER = ('python', 'tests/failer.py')
+    TEST_EDITOR = 'python tests/editor.py'
+    TEST_PAGER = 'python tests/empty-pager.py'
+    TEST_FAILER = 'python tests/failer.py'
 
     @staticmethod
     def dump(val = None, label = 'dump()'):
