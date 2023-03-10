@@ -15,7 +15,9 @@ todos: TODOs
 
 Tests:
 
-    - User-prefs: see test_preferences().
+    - User-prefs: see test_preferences_problem_control()
+    - User-prefs: exercise code once with ENV var unset.
+
     - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.

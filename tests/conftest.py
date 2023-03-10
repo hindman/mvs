@@ -67,16 +67,16 @@ class TestResource:
     TEST_PAGER = 'python tests/empty-pager.py'
     TEST_FAILER = 'python tests/failer.py'
 
-    @staticmethod
-    def dump(val = None, label = 'dump()'):
+    @classmethod
+    def dump(cls, val = None, label = 'dump()'):
         fmt = '\n--------\n{label} =>\n{val}'
         msg = fmt.format(label = label, val = val)
         print(msg)
 
-    @staticmethod
-    def dumpj(val = None, label = 'dumpj()', indent = 4):
+    @classmethod
+    def dumpj(cls, val = None, label = 'dumpj()', indent = 4):
         val = json.dumps(val, indent = indent)
-        self.dump(val, label)
+        cls.dump(val, label)
 
     @staticmethod
     def msg_before_formatting(fmt):

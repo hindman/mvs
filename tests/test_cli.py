@@ -19,6 +19,9 @@ from mvs.version import __version__
 # Helper class to test CliRenamer instances.
 ####
 
+BYPASS = object()
+LOGS_OK = 'LOGS_OK'
+
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer:
     #
@@ -28,11 +31,10 @@ class CliRenamerSIO(CliRenamer):
     # - Adds a convenience to feed stdin (replies).
     # - Adds various properties/etc to simplify assertion making.
 
-    OK = 'LOGS_OK'
-
     def __init__(self, *args, pager = None, yes = True, replies = ''):
         pager = (
             ('--pager', '') if pager is None else
+            () if pager is BYPASS else
             ('--pager', pager)
         )
         yes = ('--yes',) if yes else ()
@@ -87,7 +89,7 @@ class CliRenamerSIO(CliRenamer):
         try:
             json.loads(plan)
             json.loads(tracking)
-            return self.OK
+            return LOGS_OK
         except Exception as e:
             return dict(
                 plan = plan,
@@ -99,8 +101,6 @@ class CliRenamerSIO(CliRenamer):
 # A mega-helper to perform common checks.
 # Used by most tests.
 ####
-
-BYPASS = object()
 
 def run_checks(
                # Fixtures.
@@ -140,6 +140,8 @@ def run_checks(
                include_origs = True,
                include_news = True,
                prepare_only = False,
+               setup_only = False,
+               no_checks = False,
                rename_via_do = False,
                skip_rename = False,
                **cli_kws):
@@ -178,6 +180,11 @@ def run_checks(
     )
     cli = cli_cls(*args, **cli_kws)
 
+    # Return early if user does not want to do anything
+    # other than create WorkArea, Outputs, and CliRenamer.
+    if setup_only:
+        return (wa, outs, cli)
+
     # Let caller do other set up stuff before renaming.
     if other_prep:
         other_prep(wa, outs, cli)
@@ -194,6 +201,10 @@ def run_checks(
             cli.run()
     elif not skip_rename:
         cli.run()
+
+    # Return early if user does not want to check anything.
+    if no_checks:
+        return (wa, outs, cli)
 
     # Let caller make early assertions.
     if early_checks:
@@ -225,14 +236,14 @@ def run_checks(
             assert cli.err == err
 
         # Log output.
-        if log is cli.OK:
-            assert cli.logs_valid_json is cli.OK
+        if log is LOGS_OK:
+            assert cli.logs_valid_json is LOGS_OK
         elif log is BYPASS:
             pass
         elif log is None and failure:
             assert cli.log == ''
         elif log is None:
-            assert cli.logs_valid_json is cli.OK
+            assert cli.logs_valid_json is LOGS_OK
         elif log:
             assert cli.log == log
 
@@ -564,7 +575,7 @@ def test_edit(tr, creators):
 # Preferences.
 ####
 
-def test_preferences(tr, creators):
+def test_preferences_file(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
@@ -605,6 +616,12 @@ def test_preferences(tr, creators):
         }
         assert got == exp
 
+def test_preferences_validation(tr, creators):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    run_args = (tr, creators, origs, news)
+
     # Scenario: invalid preferences keys.
     prefs = dict(indent = 2, foo = 999, bar = 'fubb')
     wa, outs, cli = run_checks(
@@ -635,13 +652,85 @@ def test_preferences(tr, creators):
             err = exp + '\n',
         )
 
-    return
+def test_preferences_merging(tr, create_prefs):
+    # Paths and args.
+    origs = ('a', 'b')
+    news = ('aa', 'bb')
 
-    # Scenario: merging precedence: opts, prefs.
+    # Some user preferences that we will set.
+    PREFS = dict(
+        paragraphs = True,
+        indent = 8,
+        seq = 1000,
+        step = 10,
+        filter = 'return True',
+        edit = True,
+        editor = 'sed',
+        yes = True,
+        nolog = True,
+        limit = 20,
+    )
 
-    # Scenario: real_default.
+    # Helper to get cli.opts and confirm that CliRenamer did
+    # not gripe about invalid arguments.
+    def get_opts(*args):
+        cli = CliRenamer(origs + news + args)
+        opts = vars(cli.parse_command_line_args())
+        assert not cli.done
+        return opts
 
-    # Scenario: --pager and --editor disabling.
+    # Helper to check resulting opts against expecations.
+    def check_opts(got, exp):
+        # Should have same keys as DEFAULTS.
+        assert sorted(got) == sorted(DEFAULTS)
+        # Check values.
+        for k, v in DEFAULTS.items():
+            assert (k, got[k]) == (k, exp.get(k, v))
+
+    # Setup: get the defaults for cli.opts.
+    DEFAULTS = get_opts()
+
+    # Scenario: an empty preferences file won't change the defaults.
+    create_prefs()
+    opts = get_opts()
+    assert opts == DEFAULTS
+
+    # Scenario: set some user preferences.
+    # Those settings should be reflected in opts.
+    create_prefs(**PREFS)
+    opts = get_opts()
+    check_opts(opts, PREFS)
+
+    # Scenario: set the same preferences, but also supply some arguments on the
+    # command-line. The latter should override the prefs. The overrides also
+    # exercise the --disable option, which is used to unset a flag option that
+    # was set true in preferences.
+    OVERRIDES = dict(
+        indent = 2,
+        seq = 50,
+        step = 5,
+        filter = 'return p.suffix == ".txt"',
+        editor = 'awk',
+        limit = 100,
+        disable = ['paragraphs', 'edit', 'yes', 'nolog'],
+    )
+    create_prefs(**PREFS)
+    opts = get_opts(
+        '--disable', *OVERRIDES['disable'],
+        '--indent', '2',
+        '--seq', '50',
+        '--step', '5',
+        '--filter', OVERRIDES['filter'],
+        '--editor', 'awk',
+        '--limit', '100',
+    )
+    check_opts(opts, OVERRIDES)
+
+def test_preferences_problem_control(tr, creators):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('aa', 'bb', 'cc')
+    run_args = (tr, creators, origs, news)
 
     # Scenario: problem control merging: app, prefs, opts.
 
@@ -769,7 +858,7 @@ def test_rename_paths_raises(tr, creators):
         err_starts = exp_err_text(NSTART),
         err_in = 'raise MvsError(MF.rename_done_already)',
         out = BYPASS,
-        log = CliRenamerSIO.OK,
+        log = LOGS_OK,
     )
     assert cli.plan.tracking_index == NSTART
     assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
@@ -787,7 +876,7 @@ def test_rename_paths_raises(tr, creators):
         err_starts = exp_err_text(N),
         err_in = 'ZeroDivisionError: SIMULATED_ERROR',
         out = BYPASS,
-        log = CliRenamerSIO.OK,
+        log = LOGS_OK,
     )
     assert cli.plan.tracking_rp.orig == wa.origs[N]
     assert cli.plan.tracking_index == N
