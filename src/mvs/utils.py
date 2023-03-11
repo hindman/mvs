@@ -315,12 +315,17 @@ EXISTENCES = constants('Existences', dict(
 
 def path_type(path):
     p = Path(path)
-    return (
-        PATH_TYPES.other if p.is_symlink() else
-        PATH_TYPES.file if p.is_file() else
-        PATH_TYPES.directory if p.is_dir() else
-        PATH_TYPES.other
-    )
+    if p.exists():
+        return (
+            PATH_TYPES.other if p.is_symlink() else
+            PATH_TYPES.file if p.is_file() else
+            PATH_TYPES.directory if p.is_dir() else
+            PATH_TYPES.other
+        )
+    else:
+        # TODO: here.
+        return PATH_TYPES.other
+        raise MvsError(f'path_type() requires the path to exist', path = path)
 
 def is_valid_path_type(path):
     return path_type(path) in (PATH_TYPES.file, PATH_TYPES.directory)

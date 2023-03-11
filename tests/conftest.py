@@ -93,6 +93,11 @@ class WPath:
     path : str
     is_dir : bool
     mode : str
+    target : str
+
+    @property
+    def is_link(self):
+        return self.target is not None
 
 ####
 # A class used by the create_wa() fixture (1) to initialize an empty testing
@@ -108,6 +113,7 @@ class WorkArea:
     ####
 
     SLASH = '/'
+    LINK_SEP = '::'
     ROOT = f'tests{os.sep}work'
     USER_PERMISSSIONS = {
         'r': stat.S_IRUSR,
@@ -168,17 +174,24 @@ class WorkArea:
     def to_wpath(self, x):
         # Takes one value from a sequence supplied to WorkArea().
         # Returns a WPath.
+        #
+        # The value can be:
+        # - str: 'foo/bar.txt'
+        # - tuple: (PATH, MODE)
+        #
+        # The PATH value:
+        # - Does not (yet) include the work area root.
+        # - Uses forward slashes as separators.
+        # - Uses trailing slash to indicate that path should be a directory.
+        # - Uses double-colon to indicate a symlink: 'PATH::TARGET'.
+        #
+        # The MODE value:
+        # - Is expressed negatively.
+        # - Applies only to user permissions (not group or other).
+        # - Example: '-wr' means "removes the user write and read permissions".
+        #
 
-        # Unpack the value, which can be either a simple str
-        # like 'foo/bar.txt' or a (PATH, MODE) tuple.
-        #
-        # PATH does not (yet) include the work area root; it
-        # uses forward slashes as separators; and it uses trailing
-        # slash to indicate that the path should be a directory.
-        #
-        # MODE is expressed negatively and applies only to user
-        # permissions (not group or other). For example: '-wr'
-        # means "removes the user write and read permissions"
+        # Unpack the path and mode.
         if isinstance(x, tuple):
             path, mode = x
             mode_ok = (
@@ -191,16 +204,21 @@ class WorkArea:
             path = x
             mode = None
 
-        # If the supplied path ends with a slash, it will be a directory.
-        is_dir = path.endswith(self.SLASH)
-        path = path.rstrip(self.SLASH)
+        if self.LINK_SEP in path:
+            path, target = path.split(self.LINK_SEP, 1)
+            is_dir = False
+        else:
+            # If the supplied path ends with a slash, it will be a directory.
+            is_dir = path.endswith(self.SLASH)
+            path = path.rstrip(self.SLASH)
+            target = None
 
         # Normalize path and return.
         # - Use os.sep rather than forward slash.
         # - Include the workarea root.
         path = path.replace(self.SLASH, os.sep)
         path = self.prefix + path
-        return WPath(path, is_dir, mode)
+        return WPath(path, is_dir, mode, target)
 
     def just_paths(self, wps):
         # Takes some WPath instances. Returns their paths.
@@ -224,7 +242,9 @@ class WorkArea:
         to_create = self.origs_wp + self.extras_wp
         for wp in to_create:
             p = Path(wp.path)
-            if wp.is_dir:
+            if wp.is_link:
+                p.symlink_to(wp.target)
+            elif wp.is_dir:
                 p.mkdir()
             else:
                 p.parent.mkdir(parents = True, exist_ok = True)

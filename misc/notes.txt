@@ -15,10 +15,21 @@ todos: TODOs
 
 Tests:
 
-    - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
+
+        - Current implementation is flawed.
+
+            - path_type() should not be used if the path does not exist.
+            - check_new_collisions() needs more complex logic. See docstring for tentative plan.
+
+        - See TODO marks here:
+            check_new_collisions()
+            test_news_collide()
+            path_type()
+
     - Only empty directories can be clobbered.
 
+    x Orig paths must be regular file or directory.
     x Change --editor and --pager back to str:
     x Skip-equal as default: check that it is covered by tests [I think so].
     x The --edit option.

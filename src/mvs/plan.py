@@ -426,10 +426,51 @@ class RenamingPlan:
             self.new_groups.setdefault(rp.new, []).append(rp)
 
     def check_new_collisions(self, rp, seq_val):
+
+        '''
+        Among collisions:
+
+            - Assume all rp.orig exists
+
+            orig-type | new-exist | new-type | Notes
+            --------------------------------------------
+            f         | .         | f        | .
+            f         | Y         | f        | .
+            f         | Y         | dir      | .
+            dir       | .         | dir      | .
+            dir       | Y         | f        | .
+            dir       | Y         | dir      | .
+
+        # If multiple RenamePair instance share the same rp.new, we need to
+        # check the relevant path types among the collisions. For this check,
+        # we use either the type of rp.new (if it exists) or rp.orig.
+        others = tuple(
+            rp2.new if self.path_exists(rp2.new) else rp2.orig
+            for rp2 in g
+        )
+
+        # print('zzzzzzzzzzzz', 'NEW', rp.new, 'OTHERS', others)
+        from .utils import path_type
+        print()
+        print((rp.orig, rp.new, path_type(rp.orig), path_type(rp.new)))
+        for rp2 in g:
+            print('-', rp2.orig, path_type(rp2.orig))
+
+        if paths_have_same_type(rp.new, *others):
+            return Problem(PN.colliding)
+        else:
+            return Problem(PN.colliding_diff)
+
+        # If only one RenamePair has the path rp.new, no problem.
+
+
+        '''
+
         g = self.new_groups[rp.new]
         if len(g) == 1:
             return rp
         else:
+            # TODO.
             others = tuple(rp2.new for rp2 in g)
             if paths_have_same_type(rp.new, *others):
                 return Problem(PN.colliding)

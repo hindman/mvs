@@ -565,12 +565,33 @@ def test_missing_orig(tr, create_wa):
         plan.rename_paths()
     wa.check()
 
+def test_orig_type(tr, create_wa):
+    # Paths, including one symlink.
+    target = 'c.target'
+    origs = ('a', 'b', f'c::{target}')
+    news = ('a1', 'b1', 'c1')
+    extras = (target,)
+
+    # Renaming will be rejected if any of the origs are not
+    # regular files or directories.
+    wa = create_wa(origs, news, extras = extras)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.prepare()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.type)
+    wa.check(no_change = True)
+
 def test_new_exists(tr, create_wa):
     # Some paths where one of the news will be in extras
     # and thus will exist before renaming.
     origs = ('a', 'b', 'c')
     news = ('a1', 'b1', 'c1')
     extras = ('a1',)
+    extras_diff = ('a1/',)
     expecteds_skip = ('a', 'a1', 'b1', 'c1')
     expecteds_clobber = news
 
@@ -604,6 +625,19 @@ def test_new_exists(tr, create_wa):
     )
     plan.rename_paths()
     wa.check()
+
+    # But we cannot clobber if the victim is of a different type.
+    wa = create_wa(origs, news, extras_diff)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+        controls = 'clobber-existing',
+    )
+    plan.prepare()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.existing_diff)
+    wa.check(no_change = True)
 
 def test_new_parent_missing(tr, create_wa):
     # Paths where a parent of a new path will be missing.
@@ -648,6 +682,7 @@ def test_news_collide(tr, create_wa):
     news = ('a1', 'b1', 'a1')
     expecteds_skip = ('a', 'b1', 'c')
     expecteds_clobber = ('a1', 'b1')
+    origs_diff = ('a', 'b', 'c/')
 
     # Prepare will mark plan as failed. Rename will raise.
     wa = create_wa(origs, news)
@@ -678,6 +713,20 @@ def test_news_collide(tr, create_wa):
     )
     plan.rename_paths()
     wa.check()
+
+    # TODO: HERE.
+    if False:
+        # But clobbering among news cannot involve different file types.
+        wa = create_wa(origs, news_diff)
+        plan = RenamingPlan(
+            inputs = wa.origs + wa.news,
+        )
+        plan.prepare()
+        assert plan.failed
+        with pytest.raises(MvsError) as einfo:
+            plan.rename_paths()
+        # assert_raised_because(einfo, plan, PN.colliding_diff)
+        wa.check(no_change = True)
 
 def test_failures_skip_all(tr, create_wa):
     # Paths where all new paths collide.
