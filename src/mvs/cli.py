@@ -328,14 +328,10 @@ class CliRenamer:
         )
         for pc_names in stages:
             for name in pc_names:
-                # Make sure the supplied name is valid.
-                try:
-                    pc = ProblemControl(name)
-                except MvsError as e:
-                    self.wrapup(CON.exit_fail, e.msg)
-                    return None
-                # If it's a negative control name, remove its
-                # affirmative sibling. Otherwise, add it.
+                # Create a ProblemControl instance (the name has already been
+                # validated by argparse). If it's a negative control name,
+                # remove its affirmative sibling. Otherwise, add it.
+                pc = ProblemControl(name)
                 if pc.no:
                     controls.discard(pc.affirmative_name)
                 else:
@@ -350,7 +346,7 @@ class CliRenamer:
             return None
 
         # Set the controls and return.
-        opts.controls = list(controls)
+        opts.controls = sorted(controls)
         return opts
 
     @property

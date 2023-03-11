@@ -22,7 +22,7 @@ from mvs.utils import CON
 
 APP_DIR_FOR_TESTING = str(Path().resolve() / 'tests/mvs_app')
 
-os.environ['MVS_APP_DIR'] = APP_DIR_FOR_TESTING
+os.environ[CON.app_dir_env_var] = APP_DIR_FOR_TESTING
 
 ####
 # Fixtures.

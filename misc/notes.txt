@@ -15,9 +15,6 @@ todos: TODOs
 
 Tests:
 
-    - User-prefs: see test_preferences_problem_control()
-    - User-prefs: exercise code once with ENV var unset.
-
     - Orig paths must be regular file or directory.
     - Clobbering: like can clobber like.
     - Only empty directories can be clobbered.
@@ -28,6 +25,7 @@ Tests:
     x Refactor test_cli.py to use run_checks(): see docstring.
     x Bug fix: Windows replace.
     x Double check pragma-no-cover stuff.
+    x User-prefs: exercise code once with ENV var unset.
 
     - Case-change renamings [see table below].
 

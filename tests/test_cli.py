@@ -1,4 +1,5 @@
 import json
+import os
 import pytest
 import re
 import sys
@@ -616,6 +617,16 @@ def test_preferences_file(tr, creators):
         }
         assert got == exp
 
+    # Scenario: disable testing ENV variable and exercise the code
+    # path based on the user's home directory.
+    nm = CON.app_dir_env_var
+    prev = os.environ[nm]
+    try:
+        del os.environ[nm]
+        wa, outs, cli = run_checks(*run_args)
+    finally:
+        os.environ[nm] = prev
+
 def test_preferences_validation(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -669,6 +680,7 @@ def test_preferences_merging(tr, create_prefs):
         yes = True,
         nolog = True,
         limit = 20,
+        controls = ['create-parent', 'skip-equal'],
     )
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -680,12 +692,13 @@ def test_preferences_merging(tr, create_prefs):
         return opts
 
     # Helper to check resulting opts against expecations.
-    def check_opts(got, exp):
+    def check_opts(got, exp1, **exp2):
         # Should have same keys as DEFAULTS.
         assert sorted(got) == sorted(DEFAULTS)
         # Check values.
-        for k, v in DEFAULTS.items():
-            assert (k, got[k]) == (k, exp.get(k, v))
+        for k, def_val in DEFAULTS.items():
+            exp = exp1.get(k, exp2.get(k, def_val))
+            assert (k, got[k]) == (k, exp)
 
     # Setup: get the defaults for cli.opts.
     DEFAULTS = get_opts()
@@ -724,7 +737,7 @@ def test_preferences_merging(tr, create_prefs):
         '--editor', 'awk',
         '--limit', '100',
     )
-    check_opts(opts, OVERRIDES)
+    check_opts(opts, OVERRIDES, controls = PREFS['controls'])
 
 def test_preferences_problem_control(tr, creators):
     # Paths and args.
@@ -732,15 +745,57 @@ def test_preferences_problem_control(tr, creators):
     news = ('aa', 'bb', 'cc')
     run_args = (tr, creators, origs, news)
 
-    # Scenario: problem control merging: app, prefs, opts.
+    # Problem controls: application defaults and some other controls.
+    app_defs = [RenamingPlan.DEFAULT_CONTROLS]
+    others = ['skip-existing', 'create-parent', 'clobber-colliding']
 
-    # Scenario: problem control: discard.
+    # Helper to get cli.opts and confirm that CliRenamer did
+    # not gripe about invalid arguments.
+    def get_opts(*args, failure = False):
+        args = origs + news + args
+        cli = CliRenamerSIO(*args)
+        opts = cli.parse_command_line_args()
+        if failure:
+            assert cli.failure
+            return (cli, opts)
+        else:
+            assert not cli.done
+            return opts
 
-    # Scenario: problem control: invalid control.
+    # Scenario: with no user-prefs and command line controls,
+    # we should get the application defaults.
+    opts = get_opts()
+    assert opts.controls == app_defs
 
-    # Scenario: problem control: conflicting controls.
+    # Scenario: defaults plus some other controls.
+    opts = get_opts('--controls', *others)
+    assert sorted(opts.controls) == sorted(app_defs + others)
 
-    # Scenario: disable testing ENV variable so we can exercise the real code path once.
+    # Scenario: same, but also use a negative control, which
+    # counteracts the application default.
+    opts = get_opts('--controls', 'no-skip-equal', *others)
+    assert sorted(opts.controls) == sorted(others)
+
+    # Scenario: invalid control.
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--controls', 'no-fubb',
+        failure = True,
+        no_change = True,
+        err_in = ('--controls', 'invalid choice', 'no-fubb'),
+    )
+    assert cli.opts is None
+
+    # Scenario: conflicting controls.
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--controls', 'create-parent', 'skip-parent',
+        failure = True,
+        no_change = True,
+        err_starts = pre_fmt(MF.conflicting_controls),
+        err_in = ('parent', 'create', 'skip'),
+    )
+    assert cli.opts is None
 
 ####
 # Dryrun and no-confirmation.
