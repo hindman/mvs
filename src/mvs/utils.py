@@ -98,6 +98,8 @@ MSG_FORMATS = constants('MsgFormats', dict(
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
     cli_version_msg        = f'{CON.app_name} v{__version__}',
+    # Other.
+    path_type_existence    = 'path_type() requires the path to exist: {!r}',
 ))
 
 ####
@@ -323,9 +325,8 @@ def path_type(path):
             PATH_TYPES.other
         )
     else:
-        # TODO: here.
-        return PATH_TYPES.other
-        raise MvsError(f'path_type() requires the path to exist', path = path)
+        msg = MSG_FORMATS.path_type_existence.format(path)
+        raise MvsError(msg)
 
 def is_valid_path_type(path):
     return path_type(path) in (PATH_TYPES.file, PATH_TYPES.directory)

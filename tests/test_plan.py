@@ -714,19 +714,17 @@ def test_news_collide(tr, create_wa):
     plan.rename_paths()
     wa.check()
 
-    # TODO: HERE.
-    if False:
-        # But clobbering among news cannot involve different file types.
-        wa = create_wa(origs, news_diff)
-        plan = RenamingPlan(
-            inputs = wa.origs + wa.news,
-        )
-        plan.prepare()
-        assert plan.failed
-        with pytest.raises(MvsError) as einfo:
-            plan.rename_paths()
-        # assert_raised_because(einfo, plan, PN.colliding_diff)
-        wa.check(no_change = True)
+    # But clobbering among news cannot involve different file types.
+    wa = create_wa(origs_diff, news)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.prepare()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.colliding_diff)
+    wa.check(no_change = True)
 
 def test_failures_skip_all(tr, create_wa):
     # Paths where all new paths collide.

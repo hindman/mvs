@@ -398,11 +398,11 @@ class RenamingPlan:
         # Key question: is renaming necessary?
         # Here the check requires strict existence so we can
         # support case-change-only renamings.
-        #
-        # The problem is conditional on ORIG and NEW being different
-        # to avoid pointless reporting of multiple problems in cases
-        # where ORIG does not exist and where it equals NEW.
-        if self.path_exists(rp.new, strict = True) and not rp.equal:
+        if rp.equal:
+            # If rp.orig and rp.new are the same, no
+            # need to consider this error.
+            return rp
+        elif self.path_exists(rp.new, strict = True):
             if paths_have_same_type(rp.orig, rp.new):
                 return Problem(PN.existing)
             else:
@@ -426,53 +426,27 @@ class RenamingPlan:
             self.new_groups.setdefault(rp.new, []).append(rp)
 
     def check_new_collisions(self, rp, seq_val):
-
-        '''
-        Among collisions:
-
-            - Assume all rp.orig exists
-
-            orig-type | new-exist | new-type | Notes
-            --------------------------------------------
-            f         | .         | f        | .
-            f         | Y         | f        | .
-            f         | Y         | dir      | .
-            dir       | .         | dir      | .
-            dir       | Y         | f        | .
-            dir       | Y         | dir      | .
-
-        # If multiple RenamePair instance share the same rp.new, we need to
-        # check the relevant path types among the collisions. For this check,
-        # we use either the type of rp.new (if it exists) or rp.orig.
-        others = tuple(
-            rp2.new if self.path_exists(rp2.new) else rp2.orig
-            for rp2 in g
-        )
-
-        # print('zzzzzzzzzzzz', 'NEW', rp.new, 'OTHERS', others)
-        from .utils import path_type
-        print()
-        print((rp.orig, rp.new, path_type(rp.orig), path_type(rp.new)))
-        for rp2 in g:
-            print('-', rp2.orig, path_type(rp2.orig))
-
-        if paths_have_same_type(rp.new, *others):
-            return Problem(PN.colliding)
-        else:
-            return Problem(PN.colliding_diff)
-
-        # If only one RenamePair has the path rp.new, no problem.
-
-
-        '''
-
         g = self.new_groups[rp.new]
         if len(g) == 1:
+            # No collisions with rp.new.
+            return rp
+        elif not self.path_exists(rp.orig):
+            # If rp.orig does not exist, do need to report any
+            # errors related to collisions with its rp.new.
             return rp
         else:
-            # TODO.
-            others = tuple(rp2.new for rp2 in g)
-            if paths_have_same_type(rp.new, *others):
+            # Check for collisions among new paths. That implies
+            # checking any other paths (orig or new) that exist.
+            # I have some lingering doubts about this logic and
+            # how reporting for this problem should relate to
+            # reporting for others.
+            other_paths = tuple(
+                path
+                for other in g
+                for path in (other.orig, other.new)
+                if self.path_exists(path)
+            )
+            if paths_have_same_type(rp.orig, *other_paths):
                 return Problem(PN.colliding)
             else:
                 return Problem(PN.colliding_diff)
