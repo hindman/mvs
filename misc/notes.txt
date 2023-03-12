@@ -13,9 +13,16 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Refactor RenamePair and problem-checking [see RP_REFACTOR]
+
 Tests:
 
     - Only empty directories can be clobbered.
+
+        - I have not implemented this check yet.
+
+        - See test_new_exists_non_empty() for partial progress
+          on a test for the behavior.
 
     x Clobbering: like can clobber like.
     x Orig paths must be regular file or directory.
@@ -122,6 +129,36 @@ Tag file creation:
 --------
 misc-notes: Misc notes
 --------
+
+Refactor RenamePair and problem-checking [RP_REFACTOR]:
+
+    - Current approach requires repetitive path existence checks.
+
+    - And there are some awkward dependencies among the checks, particularly as
+      it relates to clobbering.
+
+    - Tenative refactor:
+
+        - Drop frozen status for RenamePair (and use of clone).
+
+        - When a RenamePair is created, determine existence-status for
+          both orig and new.
+
+        - Use that calculation in the checks.
+
+        - And modify the checks to mutate the rp rather than clone.
+
+            - I think that means each check function can return
+              Problem or None.
+
+            - Adjust the orchestration method accordingly.
+
+        - Assess the check for new-collisions:
+
+            - I suspect it is not appropriate for the check to be based on a
+              dict with rp.new as the key.
+
+            - The dict assumes a case-sensitive file system.
 
 New documentation [NEW_DOCS]:
 

@@ -382,9 +382,6 @@ def test_plan_as_dict(tr, create_wa):
         'seq_start',
         'seq_step',
         'controls',
-        # 'skip',
-        # 'clobber',
-        # 'create',
         'problems',
         'prefix_len',
         'rename_pairs',
@@ -637,6 +634,48 @@ def test_new_exists(tr, create_wa):
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.existing_diff)
+    wa.check(no_change = True)
+
+def test_new_exists_non_empty(tr, create_wa):
+    # But we cannot clobber if the victim is of a different type.
+    origs = ('a/', 'b', 'c')
+    news = ('a1', 'b1', 'c1')
+    extras = ('a1/', 'a1/foo')
+
+    # Basic scenario: its works.
+    wa = create_wa(origs, news)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.rename_paths()
+    wa.check()
+
+    # Scenario: but if one of the new paths exists, it will fail.
+    wa = create_wa(origs, news, extras)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.prepare()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.existing)
+    wa.check(no_change = True)
+
+    # Scenario: and it won't help to ask for clobbering because
+    # the victim is a non-empty directory.
+    # TODO
+    # ...
+    wa = create_wa(origs, news, extras)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+        controls = 'clobber-existing',
+    )
+    plan.prepare()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.existing_full)
     wa.check(no_change = True)
 
 def test_new_parent_missing(tr, create_wa):
