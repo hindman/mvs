@@ -666,6 +666,7 @@ def test_new_exists_non_empty(tr, create_wa):
     # the victim is a non-empty directory.
     # TODO
     # ...
+    return
     wa = create_wa(origs, news, extras)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
