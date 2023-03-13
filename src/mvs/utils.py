@@ -98,8 +98,6 @@ MSG_FORMATS = constants('MsgFormats', dict(
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
     cli_version_msg        = f'{CON.app_name} v{__version__}',
-    # Other.
-    path_type_existence    = 'path_type() requires the path to exist: {!r}',
 ))
 
 ####
@@ -113,14 +111,30 @@ class MvsError(Kwexception):
 # A dataclass to hold a pair of paths: original and corresponding new.
 ####
 
-@dataclass(frozen = True)
+@dataclass
 class RenamePair:
     # A data object to hold an original path and the corresponding new path.
+
+    # Paths.
     orig: str
     new: str
+
+    # Flags set during processing.
+    # - Whether user code filtered out the RenamePair.
+    # - Whether to create new-parent before renaming.
+    # - Whether renaming will clobber something.
     exclude: bool = False
     create_parent: bool = False
     clobber: bool = False
+
+    # Path EXISTENCES.
+    exist_orig: int = None
+    exist_new: int = None
+    exist_new_parent: int = None
+
+    # Path types.
+    type_orig: str = None
+    type_new: str = None
 
     @property
     def equal(self):
@@ -300,7 +314,7 @@ def wrap_text(text, width):
     )
 
 ####
-# Functions to check path type and existence-status.
+# Constants and a function for path type and existence-status.
 ####
 
 PATH_TYPES = constants('PathTypes', (
@@ -315,36 +329,33 @@ EXISTENCES = constants('Existences', dict(
     exists_strict = 2,
 ))
 
-def path_type(path):
+def path_existence_and_type(path):
+    # Setup.
+    ES = EXISTENCES
+    PTS = PATH_TYPES
     p = Path(path)
-    if p.exists():
-        return (
-            PATH_TYPES.other if p.is_symlink() else
-            PATH_TYPES.file if p.is_file() else
-            PATH_TYPES.directory if p.is_dir() else
-            PATH_TYPES.other
-        )
-    else:
-        msg = MSG_FORMATS.path_type_existence.format(path)
-        raise MvsError(msg)
 
-def is_valid_path_type(path):
-    return path_type(path) in (PATH_TYPES.file, PATH_TYPES.directory)
-
-def paths_have_same_type(path, *others):
-    pt = path_type(path)
-    return all(pt == path_type(o) for o in others)
-
-def existence_status(path):
-    E = EXISTENCES
-    p = Path(path)
+    # Determine path existence.
+    e = ES.missing
     if p.parent.exists():
         if p in p.parent.iterdir():
             # Means p exists and p.name exactly matches the name
             # as reported by file system (including case).
-            return E.exists_strict
+            e = ES.exists_strict
         elif p.exists():
             # Means only that p exists.
-            return E.exists
-    return E.missing
+            e = ES.exists
+
+    # Determine path type.
+    pt = None
+    if e is not ES.missing:
+        pt = (
+            PTS.other if p.is_symlink() else
+            PTS.file if p.is_file() else
+            PTS.directory if p.is_dir() else
+            PTS.other
+        )
+
+    # Zap!
+    return (e, pt)
 

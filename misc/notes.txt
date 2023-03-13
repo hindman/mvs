@@ -13,7 +13,49 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Refactor RenamePair and problem-checking [see RP_REFACTOR]
+Refactor RenamePair and problem-checking:
+
+    - Fix the check for new-collisions:
+
+        - Checks for collisions among new paths is done in a case-sensitive
+          way. So new-collisions among 'foo' and 'FOO' won't be reported as
+          problems.
+
+        - Based on this example, it looks like the renaming "succeeds" and
+          paths are clobbered silently [because Path.rename() allows silent
+          clobbering on Unix and MacOS if the user has sufficient permissions.]
+
+            mvs a b c x y Y
+
+            a => x
+            b => y    # Now y exists.
+            c => y    # Path stays lowercase, but it assumes the content of file c.
+
+        - A remedial step is to modify do_rename() to raise if it looks like we
+          are about to clobber something and is was not explicitly requested.
+
+            p = Path(rp.orig)
+            if Path(rp.new).exists():
+                if rp.clobber:
+                    p.replace(rp.new)
+                else:
+                    raise ...
+            else:
+                p.rename(rp.new)
+
+        - To make the checks for new-collisions more robust, I think it needs
+          to be based on the OS case-sensitivity. I could revisit that issue.
+
+              https://stackoverflow.com/questions/7870041/check-if-file-system-is-case-insensitive-in-python
+
+              Because some systems allow different settings per directory,
+              there is no perfect approach.
+
+              But there are some relatively easy checks in that SO question
+              that could be used to make a good attempt.
+
+              Add this issue -- however addressed -- to the caveats in the
+              documentation.
 
 Tests:
 
@@ -130,36 +172,6 @@ Tag file creation:
 misc-notes: Misc notes
 --------
 
-Refactor RenamePair and problem-checking [RP_REFACTOR]:
-
-    - Current approach requires repetitive path existence checks.
-
-    - And there are some awkward dependencies among the checks, particularly as
-      it relates to clobbering.
-
-    - Tenative refactor:
-
-        - Drop frozen status for RenamePair (and use of clone).
-
-        - When a RenamePair is created, determine existence-status for
-          both orig and new.
-
-        - Use that calculation in the checks.
-
-        - And modify the checks to mutate the rp rather than clone.
-
-            - I think that means each check function can return
-              Problem or None.
-
-            - Adjust the orchestration method accordingly.
-
-        - Assess the check for new-collisions:
-
-            - I suspect it is not appropriate for the check to be based on a
-              dict with rp.new as the key.
-
-            - The dict assumes a case-sensitive file system.
-
 New documentation [NEW_DOCS]:
 
     - Don't delete this until just before publish.
@@ -202,8 +214,9 @@ New documentation [NEW_DOCS]:
               the current file system: it does not check each rename against the
               future file system after some renamings have occurred.
 
-        - The package is not tested on case-insensitive operating systems. In
-          that context, regular renamings will probably work fine. Some
+        - The package is not tested on case-sensitive and case-preserving
+          operating systems, but not on case-insensitive systems. In that
+          context, regular renamings will probably work fine. Some
           case-change-only renamings won't be treated as problems by the checks
           (if rp.new fails to exists-strict), so the renaming would be tried,
           and it will fail.

@@ -3,7 +3,7 @@ import sys
 import traceback
 
 from copy import deepcopy
-from dataclasses import asdict, replace as clone
+from dataclasses import asdict
 from itertools import groupby
 from os.path import commonprefix
 from pathlib import Path
@@ -16,9 +16,8 @@ from .utils import (
     MvsError,
     RenamePair,
     STRUCTURES,
-    existence_status,
-    is_valid_path_type,
-    paths_have_same_type,
+    PATH_TYPES,
+    path_existence_and_type,
 )
 
 from .problems import (
@@ -124,6 +123,33 @@ class RenamingPlan:
     ####
 
     def prepare(self):
+
+        '''
+
+        # User code: filter and create new paths.
+        execute_user_filter()
+        execute_user_rename()
+
+        # Determine existence/type: phase 2.
+        # Set *_new attributes as needed.
+
+        # Create self.new_groups.
+
+        # Perform all checks in a single method.
+        # Take an rp. Return Problem instances.
+        check_orig_exists()
+        check_orig_type()
+        check_orig_new_differ()
+        check_new_not_exists()
+        check_new_parent_exists()
+        check_new_collisions()
+
+        # If any Problems for the rp, determine
+        # whether/how to control them.
+
+
+        '''
+
         # Don't prepare more than once.
         if self.has_prepared:
             return
@@ -143,23 +169,26 @@ class RenamingPlan:
             return
 
         # Run various steps that process the RenamePair instances individually:
-        # filtering, computing new paths, and validating.
+        # setting their path existence statuses and path types; filtering;
+        # computing new paths; and checking for problems.
         #
         # We use the processed_rps() method to execute the step, handle
         # problems appropriately, and yield a potentially-filtered collection
         # of potentially-modified RenamePair instances.
         #
         rp_steps = (
-            (None, self.execute_user_filter),
-            (None, self.execute_user_rename),
-            (None, self.check_orig_exists),
-            (None, self.check_orig_type),
-            (None, self.check_orig_new_differ),
-            (None, self.check_new_not_exists),
-            (None, self.check_new_parent_exists),
-            (self.prepare_new_groups, self.check_new_collisions),
+            (self.set_exists_and_types, None),
+            (self.execute_user_filter, None),
+            (self.execute_user_rename, None),
+            (self.set_exists_and_types, None),
+            (self.check_orig_exists, None),
+            (self.check_orig_type, None),
+            (self.check_orig_new_differ, None),
+            (self.check_new_not_exists, None),
+            (self.check_new_parent_exists, None),
+            (self.check_new_collisions, self.prepare_new_groups),
         )
-        for prep_step, step in rp_steps:
+        for step, prep_step in rp_steps:
             # Run any needed preparations and then the step.
             if prep_step:
                 prep_step()
@@ -309,8 +338,8 @@ class RenamingPlan:
         seq = self.compute_sequence_iterator()
 
         for rp in self.rps:
-            # The step() call returns a potentially-modified
-            # RenamePair instance or a Problem instance.
+            # The step() call might modify the rp and will return
+            # a Problem or None.
             #
             # - orig: never modified.
             # - new: set based on the user's renaming code.
@@ -319,14 +348,13 @@ class RenamingPlan:
             # - clobber: ditto.
             #
 
-            # Execute the step. If we get a Problem, handle it.
-            # Otherwise, set rp to the returned RenamePair.
-            result = step(rp, next(seq))
-            if isinstance(result, Problem):
-                control = self.handle_problem(result, rp = rp)
-            else:
+            # Execute the step. If we get a Problem, handle it and
+            # determine whether a control for it is active.
+            prob = step(rp, next(seq))
+            if prob is None:
                 control = None
-                rp = result
+            else:
+                control = self.handle_problem(prob, rp = rp)
 
             # Act based on the problem-control and the rp.
             if control == CONTROLS.skip:
@@ -334,29 +362,51 @@ class RenamingPlan:
                 continue
             elif control == CONTROLS.clobber:
                 # During renaming, the RenamePair will overwrite something.
-                yield clone(rp, clobber = True)
+                rp.clobber = True
+                yield rp
             elif control == CONTROLS.create:
                 # The RenamePair lacks a parent, but we will create it before renaming.
-                yield clone(rp, create_parent = True)
+                rp.create_parent = True
+                yield rp
             elif not rp.exclude:
                 # No problem: yield unless filtered out by user's code.
                 yield rp
 
     ####
     # The steps that process RenamePair instance individually.
-    # Each step returns a Problem, the orignal RenamePair, or
-    # a modified RenamePair.
+    # Each step returns a Problem or None.
     ####
+
+    def set_exists_and_types(self, rp, seq_val):
+        # This step is called twice, and the beginning and then after user-code
+        # for filtering and renaming has been executed. The initial call sets
+        # information for rp.orig and, if possible, rp.new. The second call
+        # handles rp.new if we have not done so already. The attributes set
+        # here are used for most of the subsequent steps.
+        if rp.exist_orig is None:
+            # Set existence and type for rp.orig.
+            e, pt = path_existence_and_type(rp.orig)
+            rp.exist_orig = e
+            rp.type_orig = pt
+        if rp.exist_new is None and rp.new is not None:
+            # Set existence and type for rp.new.
+            e, pt = path_existence_and_type(rp.new)
+            rp.exist_new = e
+            rp.type_new = pt
+            # Set existence for its parent.
+            e, _ = path_existence_and_type(Path(rp.new).parent)
+            rp.exist_new_parent = e
+        return None
 
     def execute_user_filter(self, rp, seq_val):
         if self.filter_code:
             try:
-                result = self.filter_func(rp.orig, Path(rp.orig), seq_val, self)
-                return rp if result else clone(rp, exclude = True)
+                keep = self.filter_func(rp.orig, Path(rp.orig), seq_val, self)
+                if not keep:
+                    rp.exclude = True
             except Exception as e:
                 return Problem(PN.filter_code_invalid, e, rp.orig)
-        else:
-            return rp
+        return None
 
     def execute_user_rename(self, rp, seq_val):
         if self.rename_code:
@@ -365,26 +415,25 @@ class RenamingPlan:
                 new = self.rename_func(rp.orig, Path(rp.orig), seq_val, self)
             except Exception as e:
                 return Problem(PN.rename_code_invalid, e, rp.orig)
-            # Validate its type and return a modified RenamePair instance.
+            # Validate its type and either set rp.new or return Problem.
             if isinstance(new, (str, Path)):
-                return clone(rp, new = str(new))
+                rp.new = str(new)
             else:
                 typ = type(new).__name__
                 return Problem(PN.rename_code_bad_return, typ, rp.orig)
-        else:
-            return rp
+        return None
 
     def check_orig_exists(self, rp, seq_val):
         # Key question: is renaming possible?
         # Strict existence not required.
-        if self.path_exists(rp.orig, strict = False):
-            return rp
+        if rp.exist_orig >= EXISTENCES.exists:
+            return None
         else:
             return Problem(PN.missing)
 
     def check_orig_type(self, rp, seq_val):
-        if is_valid_path_type(rp.orig):
-            return rp
+        if rp.type_orig in (PATH_TYPES.file, PATH_TYPES.directory):
+            return None
         else:
             return Problem(PN.type)
 
@@ -392,7 +441,7 @@ class RenamingPlan:
         if rp.equal:
             return Problem(PN.equal)
         else:
-            return rp
+            return None
 
     def check_new_not_exists(self, rp, seq_val):
         # Key question: is renaming necessary?
@@ -401,20 +450,20 @@ class RenamingPlan:
         if rp.equal:
             # If rp.orig and rp.new are the same, no
             # need to consider this error.
-            return rp
-        elif self.path_exists(rp.new, strict = True):
-            if paths_have_same_type(rp.orig, rp.new):
+            return None
+        elif rp.exist_new >= EXISTENCES.exists_strict:
+            if rp.type_orig == rp.type_new:
                 return Problem(PN.existing)
             else:
                 return Problem(PN.existing_diff)
         else:
-            return rp
+            return None
 
     def check_new_parent_exists(self, rp, seq_val):
         # Key question: does renaming also require parent creation?
-        # Mere existence is sufficient.
-        if self.path_exists(Path(rp.new).parent, strict = False):
-            return rp
+        # Any type of existence is sufficient.
+        if rp.exist_new_parent >= EXISTENCES.exists:
+            return None
         else:
             return Problem(PN.parent)
 
@@ -429,24 +478,23 @@ class RenamingPlan:
         g = self.new_groups[rp.new]
         if len(g) == 1:
             # No collisions with rp.new.
-            return rp
-        elif not self.path_exists(rp.orig):
+            return None
+        elif not rp.exist_orig >= EXISTENCES.exists:
             # If rp.orig does not exist, do need to report any
             # errors related to collisions with its rp.new.
-            return rp
+            return None
         else:
-            # Check for collisions among new paths. That implies
-            # checking any other paths (orig or new) that exist.
-            # I have some lingering doubts about this logic and
-            # how reporting for this problem should relate to
-            # reporting for others.
-            other_paths = tuple(
-                path
-                for other in g
-                for path in (other.orig, other.new)
-                if self.path_exists(path)
-            )
-            if paths_have_same_type(rp.orig, *other_paths):
+            # Check for collisions among new paths. That implies checking any
+            # other paths (orig or new) that exist. I have some lingering
+            # doubts about this logic and how reporting for this problem should
+            # relate to reporting for others.
+            types = []
+            for other in g:
+                if other.exist_orig:
+                    types.append(other.type_orig)
+                if other.exist_new:
+                    types.append(other.type_new)
+            if all(rp.type_orig == t for t in types):
                 return Problem(PN.colliding)
             else:
                 return Problem(PN.colliding_diff)
@@ -537,9 +585,9 @@ class RenamingPlan:
     # Files system operations.
     ####
 
-    def path_exists(self, path, strict = False):
-        e = EXISTENCES.exists_strict if strict else EXISTENCES.exists
-        return existence_status(path) >= e
+    # def path_exists(self, path, strict = False):
+    #     e = EXISTENCES.exists_strict if strict else EXISTENCES.exists
+    #     return path_existence_and_type(path)[0] >= e
 
     def rename_paths(self):
         # Don't rename more than once.
