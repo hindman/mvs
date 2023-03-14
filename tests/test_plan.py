@@ -47,6 +47,36 @@ def assert_raised_because(einfo, plan, pname):
     assert exp_msg in fmsgs
 
 ####
+# New stuff.
+####
+
+def test_case_clobber(tr, create_wa):
+    # TODO: this test passes, but the value for
+    # expecteds is not what we want.
+    #
+    # 1) plan should refuse to rename because the rename
+    # will clobber something (if case-preserving or case-insensitive).
+    #
+    # 2) with clobber-existing, we expect he renaming to
+    # occur and result in just 'b'.
+
+    origs = ('a',)
+    news = ('b',)
+    extras = ('B',)
+    expecteds = extras
+    wa = create_wa(origs, news, extras, expecteds)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.prepare()
+
+    # tr.dumpj(plan.as_dict)
+    # return
+
+    plan.rename_paths()
+    wa.check()
+
+####
 # Inputs and their structures.
 ####
 

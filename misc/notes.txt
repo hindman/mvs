@@ -13,72 +13,110 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Refactor RenamePair and problem-checking:
+Fix bug in check_new_not_exists():
 
-    - Fix the check for new-collisions:
+    - See TODO in test_case_clobber() for demo of incorrect behavior and
+      what we expect.
 
-        - Checks for collisions among new paths is done in a case-sensitive
-          way. So new-collisions among 'foo' and 'FOO' won't be reported as
-          problems.
+    - The check for new-exists needs to be more involved:
 
-        - Based on this example, it looks like the renaming "succeeds" and
-          paths are clobbered silently [because Path.rename() allows silent
-          clobbering on Unix and MacOS if the user has sufficient permissions.]
+        - rp.equal:
 
-            mvs a b c x y Y
+            - nothing to do: no problem
+            - situation is already covered by a prior check
 
-            a => x
-            b => y    # Now y exists.
-            c => y    # Path stays lowercase, but it assumes the content of file c.
+        - rp.new exists strictly:
 
-         - And there is a bug on case-preserving systems:
+            - nothing to do: renaming is not necessary (or possible with mvs)
+            - rp.orig and rp.new differ only in parent case, which mvs won't alter
 
-            - Clobbering can end up inherting casing of existing path.
+            - This check is a non-strict variation of rp.equal.
+            - rp.equal speaks to user input: did user ask for renaming of this rp?
+            - exists-strict speaks to whether renaming is necessary.
 
-            - Example on MacOS:
+            - Consider return a Problem('same').
+            - By default, this new problem should skip-controlled.
 
-                touch a B
-                mvs a b --yes     # Result: B
+        - rp.new exists:
 
-        - A remedial step is to modify do_rename() to raise if it looks like we
-          are about to clobber something and is was not explicitly requested.
+            - Act based on the name-portion of rp.orig and rp.new.
 
-            # If new path exists already, deal with it.
-            pnew = Path(rp.new)
-            if pnew.exists():
-                if rp.clobber:
-                    # Don't inherit casing from clobbered path.
-                    if rp.type_orig == FILE_TYPES.file:
-                        pnew.unlink()
-                    else:
-                        pnew.rmdir()
+            equal       | nothing to do        | won't occur: covered by exists-strictly
+            equal-lower | case-change renaming | self clobber: no problem
+            non-equal   | regular renaming     | clobber: Problem(existing or existing-diff)
+
+        - rp.new missing:
+            - no problem
+
+Fix bug on case-preserving systems:
+
+    - Clobbering can end up inherting casing of existing path.
+
+    - Example on MacOS:
+
+        touch a B
+        mvs a b --yes     # Result: B
+
+    - Modify do_rename() to achieve to things:
+
+        - Fix the bug.
+
+        - Add a final layer of insurance so that clobbering never
+          occurs without request.
+
+        # If new path exists already, deal with it.
+        pnew = Path(rp.new)
+        if pnew.exists():
+            if rp.clobber:
+                # Don't inherit casing from clobbered path.
+                if rp.type_orig == FILE_TYPES.file:
+                    pnew.unlink()
                 else:
-                    # Don't clobber unless requested.
-                    raise ...
+                    pnew.rmdir()
+            else:
+                # Don't clobber unless requested.
+                raise ...
 
-            # Rename orig => new.
-            Path(rp.orig).rename(rp.new)
+        # Rename orig => new.
+        Path(rp.orig).rename(rp.new)
 
-        - To make the checks for new-collisions more robust, I think it needs
-          to be based on the OS case-sensitivity. I could revisit that issue.
+Fix the check for new-collisions:
 
-              https://stackoverflow.com/questions/7870041/check-if-file-system-is-case-insensitive-in-python
+    - Checks for collisions among new paths is done in a case-sensitive
+      way. So new-collisions among 'foo' and 'FOO' won't be reported as
+      problems.
 
-              Because some systems allow different settings per directory,
-              there is no perfect approach.
+    - Based on this example, it looks like the renaming "succeeds" and
+      paths are clobbered silently [because Path.rename() allows silent
+      clobbering on Unix and MacOS if the user has sufficient permissions.]
 
-              But there are some relatively easy checks in that SO question
-              that could be used to make a good attempt.
+        mvs a b c x y Y
 
-              Add this issue -- however addressed -- to the caveats in the
-              documentation.
+        a => x
+        b => y    # Now y exists.
+        c => y    # Path stays lowercase, but it assumes the content of file c.
 
-    - Only empty directories can be clobbered.
+    - Fix: implement case_sensistive_file_sys():
 
-        - I have not implemented this check yet.
+        - True: use rp.new as dict key.
+        - False: use rp.new.lower().
 
-        - See test_new_exists_non_empty() for partial progress
-          on a test for the behavior.
+    - See SO question to determine type of file system:
+
+        https://stackoverflow.com/questions/7870041/check-if-file-system-is-case-insensitive-in-python
+
+        - Because some systems allow different settings per directory,
+          there is no perfect approach.
+
+        - But there are some relatively easy checks that could be used to
+          make a good attempt.
+
+        - Add this issue in the caveats of the documentation.
+
+Implement: only empty directories can be clobbered.
+
+    - See test_new_exists_non_empty() for partial progress
+      on a test for the behavior.
 
 Tests:
 

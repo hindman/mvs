@@ -585,10 +585,6 @@ class RenamingPlan:
     # Files system operations.
     ####
 
-    # def path_exists(self, path, strict = False):
-    #     e = EXISTENCES.exists_strict if strict else EXISTENCES.exists
-    #     return path_existence_and_type(path)[0] >= e
-
     def rename_paths(self):
         # Don't rename more than once.
         if self.has_renamed:
