@@ -31,17 +31,33 @@ Refactor RenamePair and problem-checking:
             b => y    # Now y exists.
             c => y    # Path stays lowercase, but it assumes the content of file c.
 
+         - And there is a bug on case-preserving systems:
+
+            - Clobbering can end up inherting casing of existing path.
+
+            - Example on MacOS:
+
+                touch a B
+                mvs a b --yes     # Result: B
+
         - A remedial step is to modify do_rename() to raise if it looks like we
           are about to clobber something and is was not explicitly requested.
 
-            p = Path(rp.orig)
-            if Path(rp.new).exists():
+            # If new path exists already, deal with it.
+            pnew = Path(rp.new)
+            if pnew.exists():
                 if rp.clobber:
-                    p.replace(rp.new)
+                    # Don't inherit casing from clobbered path.
+                    if rp.type_orig == FILE_TYPES.file:
+                        pnew.unlink()
+                    else:
+                        pnew.rmdir()
                 else:
+                    # Don't clobber unless requested.
                     raise ...
-            else:
-                p.rename(rp.new)
+
+            # Rename orig => new.
+            Path(rp.orig).rename(rp.new)
 
         - To make the checks for new-collisions more robust, I think it needs
           to be based on the OS case-sensitivity. I could revisit that issue.
@@ -57,14 +73,14 @@ Refactor RenamePair and problem-checking:
               Add this issue -- however addressed -- to the caveats in the
               documentation.
 
-Tests:
-
     - Only empty directories can be clobbered.
 
         - I have not implemented this check yet.
 
         - See test_new_exists_non_empty() for partial progress
           on a test for the behavior.
+
+Tests:
 
     x Clobbering: like can clobber like.
     x Orig paths must be regular file or directory.
