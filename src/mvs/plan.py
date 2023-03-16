@@ -46,7 +46,10 @@ class RenamingPlan:
     ))
 
     # Default problem controls.
-    DEFAULT_CONTROLS = f'{CONTROLS.skip}-{PN.equal}'
+    DEFAULT_CONTROLS = (
+        f'{CONTROLS.skip}-{PN.equal}',
+        f'{CONTROLS.skip}-{PN.same}',
+    )
 
     def __init__(self,
                  # Path inputs and their structure.
@@ -123,33 +126,6 @@ class RenamingPlan:
     ####
 
     def prepare(self):
-
-        '''
-
-        # User code: filter and create new paths.
-        execute_user_filter()
-        execute_user_rename()
-
-        # Determine existence/type: phase 2.
-        # Set *_new attributes as needed.
-
-        # Create self.new_groups.
-
-        # Perform all checks in a single method.
-        # Take an rp. Return Problem instances.
-        check_orig_exists()
-        check_orig_type()
-        check_orig_new_differ()
-        check_new_not_exists()
-        check_new_parent_exists()
-        check_new_collisions()
-
-        # If any Problems for the rp, determine
-        # whether/how to control them.
-
-
-        '''
-
         # Don't prepare more than once.
         if self.has_prepared:
             return
@@ -183,8 +159,7 @@ class RenamingPlan:
             (self.set_exists_and_types, None),
             (self.check_orig_exists, None),
             (self.check_orig_type, None),
-            (self.check_orig_new_differ, None),
-            (self.check_new_not_exists, None),
+            (self.check_new_exists, None),
             (self.check_new_parent_exists, None),
             (self.check_new_collisions, self.prepare_new_groups),
         )
@@ -437,26 +412,161 @@ class RenamingPlan:
         else:
             return Problem(PN.type)
 
-    def check_orig_new_differ(self, rp, seq_val):
-        if rp.equal:
-            return Problem(PN.equal)
-        else:
-            return None
+    def check_new_exists(self, rp, seq_val):
+        # Key question: does rp.new exist in any sense and
+        # thus is renaming necessary?
 
-    def check_new_not_exists(self, rp, seq_val):
-        # Key question: is renaming necessary?
-        # Here the check requires strict existence so we can
-        # support case-change-only renamings.
+        '''
+
+        Classification criteria:
+
+            - OrigEx: rp.orig exists: no, yes.
+            - NewParEx: Parent of rp.new exists: no, yes.
+            - ParEq: Orig and new parents: equal, lower-equal, unequal.
+            - NewEx: rp.new exists: strict, ex, no.
+            - NmEq: Orig and new path-names: equal, lower-equal, unequal.
+
+        Assume:
+
+            - rp.orig exists: handled by another check. Renaming impossible
+              without this existence.
+
+            - rp.equal is False. If it's true, renaming has not been requested
+              by the user's inputs. Handled by another check.
+
+            - rp.new exists in some sense: if it did not exist, the situation
+              is some type of renaming (maybe with create-parent) without any
+              clobbering or self-clobbering.
+
+            - Those assumptions mean we can ignore the first two criteria and
+              filter out all rows where NewEx=no.
+
+            - Assume a case-preserving OS in the classification table. The
+              other two types of file systems are less tricky.
+
+            - Given current mvs policies, and given that we are assuming
+              case-preserving OS, the distinction between ParEq=equal and
+              ParEq=lower-equal does not matter. We can use the distinction to
+              create renaming scenarios for each row of the table that don't
+              violate the other assumptions, but that's the only relevance.
+
+        Renaming components and outcomes:
+
+            - Re-locate: put in a different parent (maybe with create-parent).
+            - Re-name: modify Path.name.
+            - Re-case: modify Path.name in case only.
+            - Clobber: renaming would require deletion of something else.
+
+        Classification table:
+
+            ParEq     | NewEx  | NmEq    | Notes
+            ---------------------------------------------------------------------
+            unequal   | ex     | unequal | #1 Relocate, re-name, clobber differently-cased name.
+            "         | "      | low-eq  | #2 Relocate, re-case, clobber differently-cased name.
+            "         | "      | eq      | #3 Relocate, clobber differently-cased name.
+            "         | strict | unequal | #4 Relocate, re-name, clobber.
+            "         | "      | low-eq  | #5 Relocate, re-case, clobber.
+            "         | "      | eq      | #6 Relocate, clobber.
+            eq/low-eq | ex     | unequal | #7 Re-name, clobber differently-cased name.
+            "         | "      | low-eq  | #8 Re-case, clobber differently-cased name.
+            "         | "      | eq      | #9 Problem(same).
+            "         | strict | unequal | #10 Re-name, clobber.
+            "         | "      | low-eq  | #11 Pseudo re-case: rp.orig incorrectly cased; rp.new case agrees with fs.
+            "         | "      | eq      | #12 Problem(same).
+
+        Examples for each table row:
+
+            ParEq     | NewEx  | Path | NmEq=unequal | NmEq=low-eq | NmEq=eq
+            -----------------------------------------------------------------
+            unequal   | ex     | orig | foo/xyz #1   | foo/xyz #2  | foo/xyz #3
+            "         | "      | new  | BAR/xy       | BAR/XYz     | BAR/xyz
+            "         | "      | fs   | BAR/xY       | BAR/xyZ     | BAR/xyZ
+            "         | strict | orig | foo/xyz #4   | foo/xyZ #5  | foo/xyz #6
+            "         | "      | new  | BAR/xy       | BAR/xyz     | BAR/xyz
+            "         | "      | fs   | BAR/xy       | BAR/xyz     | BAR/xyz
+            -----------------------------------------------------------------
+            eq/low-eq | ex     | orig | foo/xyz #7   | foo/xyz #8  | foo/xyz #9
+            "         | "      | new  | foo/xy       | foo/XYz     | FOO/xyz
+            "         | "      | fs   | foo/xY       | foo/xyZ     | foo/xyZ
+            "         | strict | orig | foo/xyz #10  | foo/xyZ #11 | FOO/xyz #12
+            "         | "      | new  | foo/xy       | foo/xyz     | foo/xyz
+            "         | "      | fs   | foo/xy       | foo/xyz     | foo/xyz
+
+        '''
+
+        # TODO: this method is messed up and confused.
+
         if rp.equal:
-            # If rp.orig and rp.new are the same, no
-            # need to consider this error.
-            return None
+            # rp.orig and rp.new exactly equal: renaming is not possible.
+            return Problem(PN.equal)
+
         elif rp.exist_new >= EXISTENCES.exists_strict:
-            if rp.type_orig == rp.type_new:
-                return Problem(PN.existing)
+            # rp.new exists strictly: renaming not supported by the current
+            # policies of mvs. Although, rp.orig and rp.new are not exactly
+            # equal, they differ only in the casing of their parent -- which
+            # mvs does not modify. The paths are functionally the same.
+
+            # New-parent exists.
+            # New-name exists exactly within new-parent:
+            # - Might be Problem(same)
+            # - Might be clobber of something else.
+
+            return Problem(PN.same)
+
+            # foo/xyz
+            # FOO/xyz
+            # .
+
+            # foo/xyz
+            # foo/abc
+            # foo/ABC
+
+            # foo/xyz
+            # foo/abc
+            # foo/ABC
+
+            orig = Path(rp.orig).name
+            new = Path(rp.new).name
+            if orig == new:
+                # Paths differ in parent case only.
+                return None
+            elif orig.lower() == new.lower():
+                # The user is requesting a case-change renaming on a
+                # non-case-sensitive file system. The renaming is effectively
+                # a "self clobber" and thus no problem.
+                return None
             else:
-                return Problem(PN.existing_diff)
+                # If rp.orig and rp.new are different, and if rp.new exists,
+                # renaming would clobber something else.
+                if rp.type_orig == rp.type_new:
+                    return Problem(PN.existing)
+                else:
+                    return Problem(PN.existing_diff)
+
+        elif rp.exist_new >= EXISTENCES.exists:
+            # If rp.new exists, but not strictly, the name-portion of
+            # rp.new differs in casing from the file system. Some type
+            # of clobbering is involved.
+            orig = Path(rp.orig).name
+            new = Path(rp.new).name
+            if orig == new:
+                # Will not occur: identical to exists-strictly.
+                return None
+            elif orig.lower() == new.lower():
+                # The user is requesting a case-change renaming on a
+                # non-case-sensitive file system. The renaming is effectively
+                # a "self clobber" and thus no problem.
+                return None
+            else:
+                # If rp.orig and rp.new are different, and if rp.new exists,
+                # renaming would clobber something else.
+                if rp.type_orig == rp.type_new:
+                    return Problem(PN.existing)
+                else:
+                    return Problem(PN.existing_diff)
+
         else:
+            # No problem: rp.new does not exist in any sense.
             return None
 
     def check_new_parent_exists(self, rp, seq_val):

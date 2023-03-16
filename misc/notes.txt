@@ -15,38 +15,21 @@ todos: TODOs
 
 Fix bug in check_new_not_exists():
 
+    - Current state: some tests failing; check_new_not_exists() is torn
+      apart and not correct at the moment.
+
+        - rp.equal is not relevant for clobbering determination. It speaks only
+          to user inputs: if rp.equal, then the user has implicitly filtered
+          the RenamePair. That's all it tells us.
+
+        - See classifcation table. I need to implement that logic.
+
+        - Looks like I need a new Problem for scenario #11. In this case, user
+          inputs imply that a re-case is desired, but rp.new already has casing
+          that agrees with file-system. Maybe Problem('recase').
+
     - See TODO in test_case_clobber() for demo of incorrect behavior and
       what we expect.
-
-    - The check for new-exists needs to be more involved:
-
-        - rp.equal:
-
-            - nothing to do: no problem
-            - situation is already covered by a prior check
-
-        - rp.new exists strictly:
-
-            - nothing to do: renaming is not necessary (or possible with mvs)
-            - rp.orig and rp.new differ only in parent case, which mvs won't alter
-
-            - This check is a non-strict variation of rp.equal.
-            - rp.equal speaks to user input: did user ask for renaming of this rp?
-            - exists-strict speaks to whether renaming is necessary.
-
-            - Consider return a Problem('same').
-            - By default, this new problem should skip-controlled.
-
-        - rp.new exists:
-
-            - Act based on the name-portion of rp.orig and rp.new.
-
-            equal       | nothing to do        | won't occur: covered by exists-strictly
-            equal-lower | case-change renaming | self clobber: no problem
-            non-equal   | regular renaming     | clobber: Problem(existing or existing-diff)
-
-        - rp.new missing:
-            - no problem
 
 Fix bug on case-preserving systems:
 
@@ -246,6 +229,10 @@ New documentation [NEW_DOCS]:
         - In clobbering, like must overwrite like (file => file; dir => dir).
         - Only empty directories can be clobbered.
         - The --create control will create parents, not move-create.
+        - New Problem('same')
+            - This less strong variant of Problem('equal').
+            - equal speaks to user input: did user ask for renaming of this rp?
+            - same speaks to whether renaming is supported by the policies of mvs.
 
     - Document that --pager and --editor are executed with shell=True.
 

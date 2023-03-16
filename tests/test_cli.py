@@ -680,7 +680,7 @@ def test_preferences_merging(tr, create_prefs):
         yes = True,
         nolog = True,
         limit = 20,
-        controls = ['create-parent', 'skip-equal'],
+        controls = ['create-parent', 'skip-equal', 'skip-same'],
     )
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -746,7 +746,7 @@ def test_preferences_problem_control(tr, creators):
     run_args = (tr, creators, origs, news)
 
     # Problem controls: application defaults and some other controls.
-    app_defs = [RenamingPlan.DEFAULT_CONTROLS]
+    app_defs = list(RenamingPlan.DEFAULT_CONTROLS)
     others = ['skip-existing', 'create-parent', 'clobber-colliding']
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -773,7 +773,7 @@ def test_preferences_problem_control(tr, creators):
 
     # Scenario: same, but also use a negative control, which
     # counteracts the application default.
-    opts = get_opts('--controls', 'no-skip-equal', *others)
+    opts = get_opts('--controls', 'no-skip-equal', 'no-skip-same', *others)
     assert sorted(opts.controls) == sorted(others)
 
     # Scenario: invalid control.

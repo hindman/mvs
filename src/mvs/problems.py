@@ -17,6 +17,7 @@ from .utils import (
 PROBLEM_NAMES = PN = constants('ProblemNames', (
     # Controllable.
     'equal',
+    'same',
     'missing',
     'type',
     'parent',
@@ -38,7 +39,8 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
 
 PROBLEM_FORMATS = constants('ProblemFormats', {
     # Controllable.
-    PN.equal:                  'Original path and new path are the same',
+    PN.equal:                  'Original path and new path are the exactly equal',
+    PN.same:                   'Original path and new path are the functionally the same',
     PN.missing:                'Original path does not exist',
     PN.type:                   'Original path must be regular file or directory',
     PN.parent:                 'Parent directory of new path does not exist',
@@ -105,6 +107,7 @@ CONTROLS = constants('Controls', (
 CONTROLLABLES = {
     CONTROLS.skip: (
         PN.equal,
+        PN.same,
         PN.missing,
         PN.type,
         PN.parent,

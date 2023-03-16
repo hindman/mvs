@@ -629,6 +629,10 @@ def test_new_exists(tr, create_wa):
         inputs = wa.origs + wa.news,
     )
     plan.prepare()
+
+    # tr.dumpj(plan.as_dict)
+    # return
+
     assert plan.failed
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
