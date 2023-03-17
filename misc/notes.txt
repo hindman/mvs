@@ -13,9 +13,9 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Fix bug in check_new_not_exists():
+Fix bug in check_new_exists():
 
-    - Current state: some tests failing; check_new_not_exists() is torn
+    - Current state: some tests failing; check_new_exists() is torn
       apart and not correct at the moment.
 
         - rp.equal is not relevant for clobbering determination. It speaks only

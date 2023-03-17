@@ -474,6 +474,79 @@ class RenamingPlan:
             "         | "      | low-eq  | #11 Pseudo re-case: rp.orig incorrectly cased; rp.new case agrees with fs.
             "         | "      | eq      | #12 Problem(same).
 
+        Determine case-sensitivity of file system:
+        
+            The path returned by `mkstemp()` is guaranteed not to exist that
+            the moment of creation. For simplicity, let's assume the file-name
+            portion of the returned path is "tmpfoo". We know nothing about the
+            existence status of other file-names, such as "tmpFOO", "tmpFoo",
+            or "TMPFOO" -- all of which **could exist on a case-sensitive file
+            system**. On that type of file system, if "TMPFOO" exists this code
+            will give us the wrong answer.
+
+            from tempfile import TemporaryDirectory
+            from pathlib import Path
+            from os.path import samefile
+
+            with TemporaryDirectory() as dpath:
+                d = Path(dpath)
+                f1 = d / 'FoO'
+                f2 = d / 'foo'
+                f1.touch()
+                f2.touch()
+                if f1 not in f1.parent.iterdir():
+                    print('case-insensistive')
+                elif os.path.samefile(f1, f2):
+                    print('case-preserving')
+                else:
+                    print('case-sensistive')
+
+        Decision process:
+
+            if not case-preserving file system:
+                if rp.equal:
+                    - Nothing to do: user inputs did not request a renaming.
+                elif rp.new exists:
+                    - Clobber: Problem(existing) or Problem(existing_diff)
+                else:
+                    - No problem: rename freely.
+
+            else:
+                relocate = not samefile(rp.orig.parent, rp.new.parent)
+                rename_type = (
+                    NOOP if rp.orig.name == rp.new.name else
+                    RECASE if rp.orig.name.lower() == rp.new.name.lower() else
+                    RENAME
+                )
+                new_exists = rp.new.exists()
+                new_exists_strict = rp.new.exists_strictly()
+                if relocate:
+                    if new_exists:
+                        # Since we are relocating, self-clobber is a non-issue.
+                        - Clobber: Problem(existing) or Problem(existing_diff)
+                    else:
+                        - No problem: rename freely.
+                else:
+                    if new_exists:
+                        if rename_type is NOOP:
+                            # New exists because orig and new are the functionally the same.
+                            # Example #9, #12.
+                            - Problem(same)
+                        elif rename_type is RECASE:
+                            if new_exists_strict:
+                                # Example #11.
+                                # User inputs imply a re-case. But rp.new already
+                                # agrees with the case of path-name.
+                                Problem(recase)
+                            else:
+                                # Example #8.
+                                - No problem: self-clobber during a re-case.
+                        else:
+                            # Example #7, #10.
+                            - Clobber: Problem(existing) or Problem(existing_diff)
+                    else:
+                        - No problem: rename freely.
+
         Examples for each table row:
 
             ParEq     | NewEx  | Path | NmEq=unequal | NmEq=low-eq | NmEq=eq
@@ -486,8 +559,8 @@ class RenamingPlan:
             "         | "      | fs   | BAR/xy       | BAR/xyz     | BAR/xyz
             -----------------------------------------------------------------
             eq/low-eq | ex     | orig | foo/xyz #7   | foo/xyz #8  | foo/xyz #9
-            "         | "      | new  | foo/xy       | foo/XYz     | FOO/xyz
-            "         | "      | fs   | foo/xY       | foo/xyZ     | foo/xyZ
+            "         | "      | new  | foo/xy       | foo/XYZ     | FOO/xyz
+            "         | "      | fs   | foo/xY       | foo/xyz     | foo/xyZ
             "         | strict | orig | foo/xyz #10  | foo/xyZ #11 | FOO/xyz #12
             "         | "      | new  | foo/xy       | foo/xyz     | foo/xyz
             "         | "      | fs   | foo/xy       | foo/xyz     | foo/xyz
