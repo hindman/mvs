@@ -15,21 +15,18 @@ todos: TODOs
 
 Fix bug in check_new_exists():
 
-    - Current state: some tests failing; check_new_exists() is torn
-      apart and not correct at the moment.
+    - Current state:
 
-        - rp.equal is not relevant for clobbering determination. It speaks only
-          to user inputs: if rp.equal, then the user has implicitly filtered
-          the RenamePair. That's all it tells us.
+        - check_new_exists() has a new implementation that I
+          think is correct.
 
-        - See classifcation table. I need to implement that logic.
+        - test_case_clobber() is now working.
 
-        - Looks like I need a new Problem for scenario #11. In this case, user
-          inputs imply that a re-case is desired, but rp.new already has casing
-          that agrees with file-system. Maybe Problem('recase').
+    - Give the new code an editing pass.
 
-    - See TODO in test_case_clobber() for demo of incorrect behavior and
-      what we expect.
+    - Write tests for new code and new Problem types.
+
+    - Document some of the main issues and maybe the classification table.
 
 Fix bug on case-preserving systems:
 

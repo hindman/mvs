@@ -1,11 +1,13 @@
+import os
 import pyperclip
 
 from dataclasses import dataclass
+from functools import cache
 from kwexception import Kwexception
 from pathlib import Path
 from short_con import constants
 from subprocess import run
-from tempfile import gettempdir
+from tempfile import gettempdir, TemporaryDirectory
 from textwrap import dedent
 from time import time
 
@@ -119,14 +121,6 @@ class RenamePair:
     orig: str
     new: str
 
-    # Flags set during processing.
-    # - Whether user code filtered out the RenamePair.
-    # - Whether to create new-parent before renaming.
-    # - Whether renaming will clobber something.
-    exclude: bool = False
-    create_parent: bool = False
-    clobber: bool = False
-
     # Path EXISTENCES.
     exist_orig: int = None
     exist_new: int = None
@@ -136,6 +130,18 @@ class RenamePair:
     type_orig: str = None
     type_new: str = None
 
+    # The renaming type and whether orig and new have the same parents.
+    name_change_type: str = None
+    same_parents: bool = None
+
+    # Flags set when checking the RenamePair instance for problems:
+    # - Whether user code filtered out the RenamePair.
+    # - Whether to create new-parent before renaming.
+    # - Whether renaming will clobber something.
+    exclude: bool = False
+    create_parent: bool = False
+    clobber: bool = False
+
     @property
     def equal(self):
         return self.orig == self.new
@@ -143,6 +149,12 @@ class RenamePair:
     @property
     def formatted(self):
         return f'{self.orig}\n{self.new}\n'
+
+NAME_CHANGE_TYPES = constants('NameChangeTypes', (
+    'noop',
+    'name_change',
+    'case_change',
+))
 
 ####
 # Read/write: files, clipboard.
@@ -358,4 +370,40 @@ def path_existence_and_type(path):
 
     # Zap!
     return (e, pt)
+
+####
+# Constants and a function to determine file system case sensitivity.
+####
+
+FS_TYPES = constants('FileSystemTypes', (
+    'case_insensitive',
+    'case_preserving',
+    'case_sensitive',
+))
+
+@cache
+def file_system_type():
+    # Determines the file system type regarding case sensitivity.
+    # This approach ignore the complexity of per-directory
+    # sensitivity settings supported by some operating systems.
+    with TemporaryDirectory() as dpath:
+        # Create an empty temp directory.
+        # Inside it, touch two differently-cased file names.
+        d = Path(dpath)
+        f1 = d / 'FoO'
+        f2 = d / 'foo'
+        f1.touch()
+        f2.touch()
+        if f1 not in f1.parent.iterdir():
+            # On a case-insensitive system, f1.parent will
+            # report its content as 'foo' or 'FOO', not 'FoO'.
+            return FS_TYPES.case_insensitive
+        elif os.path.samefile(f1, f2):
+            # On a case-preserving system, 'FoO' will be reported
+            # among the f1.parent content, but it will resolve to
+            # the same underlying file as 'foo'.
+            return FS_TYPES.case_preserving
+        else:
+            # If there are two files, file system is case-sensitive.
+            return FS_TYPES.case_sensitive
 

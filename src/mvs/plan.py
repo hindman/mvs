@@ -5,25 +5,28 @@ import traceback
 from copy import deepcopy
 from dataclasses import asdict
 from itertools import groupby
-from os.path import commonprefix
+from os.path import commonprefix, samefile
 from pathlib import Path
 from short_con import constants
 
 from .utils import (
     CON,
     EXISTENCES,
+    FS_TYPES,
     MSG_FORMATS as MF,
     MvsError,
+    NAME_CHANGE_TYPES as NCT,
+    PATH_TYPES,
     RenamePair,
     STRUCTURES,
-    PATH_TYPES,
+    file_system_type,
     path_existence_and_type,
 )
 
 from .problems import (
     CONTROLS,
-    PROBLEM_NAMES as PN,
     PROBLEM_FORMATS as PF,
+    PROBLEM_NAMES as PN,
     Problem,
     ProblemControl,
 )
@@ -364,13 +367,25 @@ class RenamingPlan:
             rp.exist_orig = e
             rp.type_orig = pt
         if rp.exist_new is None and rp.new is not None:
+            po = Path(rp.orig)
+            pn = Path(rp.new)
             # Set existence and type for rp.new.
             e, pt = path_existence_and_type(rp.new)
             rp.exist_new = e
             rp.type_new = pt
-            # Set existence for its parent.
-            e, _ = path_existence_and_type(Path(rp.new).parent)
+            # Set existence for rp.new parent.
+            e, _ = path_existence_and_type(pn.parent)
             rp.exist_new_parent = e
+            # Set the attribute characterizing the renaming.
+            rp.same_parents = (
+                False if rp.exist_new_parent == EXISTENCES.missing else
+                samefile(po.parent, pn.parent)
+            )
+            rp.name_change_type = (
+                NCT.noop if po.name == pn.name else
+                NCT.case_change if po.name.lower() == pn.name.lower() else
+                NCT.name_change
+            )
         return None
 
     def execute_user_filter(self, rp, seq_val):
@@ -475,7 +490,7 @@ class RenamingPlan:
             "         | "      | eq      | #12 Problem(same).
 
         Determine case-sensitivity of file system:
-        
+
             The path returned by `mkstemp()` is guaranteed not to exist that
             the moment of creation. For simplicity, let's assume the file-name
             portion of the returned path is "tmpfoo". We know nothing about the
@@ -567,7 +582,64 @@ class RenamingPlan:
 
         '''
 
-        # TODO: this method is messed up and confused.
+        # Convenience variables:
+        # - Whether rp.new exists in any sense.
+        # - The type of problem to return if clobbering would occur.
+        new_exists = (rp.exist_new >= EXISTENCES.exists)
+        clobber_prob = (
+            Problem(PN.existing) if rp.type_orig == rp.type_new else
+            Problem(PN.existing_diff)
+        )
+
+        # Handle path equality. In this case, renaming is
+        # impossible and user input did not request it.
+        if rp.equal:
+            return Problem(PN.equal)
+
+        # Handle situation where rp.new does not exist in any sense.
+        # In this case, we can rename freely, regardless of file
+        # system type or other renaming details.
+        if not new_exists:
+            return None
+
+        # Handle the simplest file systems: case-sensistive or
+        # case-insensistive. Since rp.new exists, we have clobbering
+        if not file_system_type() != FS_TYPES.case_preserving:
+            return clobber_prob
+
+        # Handle case-preserving file system where rp.orig and rp.new have
+        # different parent directories. Since the parent directories differ,
+        # case-change-only renaming (ie, self clobber) is not at issue,
+        # so we have regular clobbering.
+        if not rp.same_parents:
+            return clobber_prob
+
+        # Handle case-preserving file system where rp.orig and rp.new have
+        # the same parent, which means the renaming involves only changes
+        # to the name-portion of the path.
+        if rp.name_change_type == NCT.noop:
+            # New exists because rp.orig and rp.new are
+            # functionally the same path. User inputs implied
+            # that a renaming was desired, but it is not possible.
+            # Example #9, #12.
+            return Problem(PN.same)
+        elif rp.name_change_type == NCT.case_change:
+            if rp.exist_new >= EXISTENCES.exists_strict:
+                # User inputs implied that a case-change renaming
+                # was desired, but the path's name-portion already
+                # agrees with the file system, so renaming is impossible.
+                # Example #11.
+                return Problem(PN.recase)
+            else:
+                # User wants a case-change renaming (self-clobber): no problem.
+                return None
+        else:
+            # User wants a name-change, and it would clobber something else.
+            # Example #7, #10.
+            return clobber_prob
+
+        # TODO: old code; delete soon.
+        # TODO: this old code is messed up and confused.
 
         if rp.equal:
             # rp.orig and rp.new exactly equal: renaming is not possible.

@@ -51,30 +51,22 @@ def assert_raised_because(einfo, plan, pname):
 ####
 
 def test_case_clobber(tr, create_wa):
-    # TODO: this test passes, but the value for
-    # expecteds is not what we want.
-    #
-    # 1) plan should refuse to rename because the rename
-    # will clobber something (if case-preserving or case-insensitive).
-    #
-    # 2) with clobber-existing, we expect he renaming to
-    # occur and result in just 'b'.
-
+    # TODO: this test is behaving correctly now.
+    # But the test itself may not belong here or be
+    # exactly what we need to test clobbering.
     origs = ('a',)
     news = ('b',)
     extras = ('B',)
-    expecteds = extras
-    wa = create_wa(origs, news, extras, expecteds)
+    wa = create_wa(origs, news, extras)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
     )
     plan.prepare()
-
-    # tr.dumpj(plan.as_dict)
-    # return
-
-    plan.rename_paths()
-    wa.check()
+    assert plan.failed
+    with pytest.raises(MvsError) as einfo:
+        plan.rename_paths()
+    assert_raised_because(einfo, plan, PN.existing)
+    wa.check(no_change = True)
 
 ####
 # Inputs and their structures.
