@@ -382,8 +382,8 @@ FS_TYPES = constants('FileSystemTypes', (
 ))
 
 @cache
-def file_system_type():
-    # Determines the file system type regarding case sensitivity.
+def file_system_case_sensitivity():
+    # Determines the file system's case sensitivity.
     # This approach ignore the complexity of per-directory
     # sensitivity settings supported by some operating systems.
     with TemporaryDirectory() as dpath:
@@ -394,16 +394,14 @@ def file_system_type():
         f2 = d / 'foo'
         f1.touch()
         f2.touch()
-        if f1 not in f1.parent.iterdir():
-            # On a case-insensitive system, f1.parent will
-            # report its content as 'foo' or 'FOO', not 'FoO'.
-            return FS_TYPES.case_insensitive
-        elif os.path.samefile(f1, f2):
-            # On a case-preserving system, 'FoO' will be reported
-            # among the f1.parent content, but it will resolve to
-            # the same underlying file as 'foo'.
-            return FS_TYPES.case_preserving
-        else:
-            # If there are two files, file system is case-sensitive.
-            return FS_TYPES.case_sensitive
+        # Ask the file system to report the contents of the temp directory.
+        # - If two files, system is case-sensitive.
+        # - If the parent reports having 'FoO', case-preserving.
+        # - Case-insensitive systems will report having 'foo' or 'FOO'.
+        contents = tuple(d.iterdir())
+        return (
+            FS_TYPES.case_sensitive if len(contents) == 2 else
+            FS_TYPES.case_preserving if contents == (f1,) else
+            FS_TYPES.case_insensitive
+        )
 

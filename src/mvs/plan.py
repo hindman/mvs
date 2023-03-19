@@ -19,7 +19,7 @@ from .utils import (
     PATH_TYPES,
     RenamePair,
     STRUCTURES,
-    file_system_type,
+    file_system_case_sensitivity,
     path_existence_and_type,
 )
 
@@ -428,160 +428,6 @@ class RenamingPlan:
             return Problem(PN.type)
 
     def check_new_exists(self, rp, seq_val):
-        # Key question: does rp.new exist in any sense and
-        # thus is renaming necessary?
-
-        '''
-
-        Classification criteria:
-
-            - OrigEx: rp.orig exists: no, yes.
-            - NewParEx: Parent of rp.new exists: no, yes.
-            - ParEq: Orig and new parents: equal, lower-equal, unequal.
-            - NewEx: rp.new exists: strict, ex, no.
-            - NmEq: Orig and new path-names: equal, lower-equal, unequal.
-
-        Assume:
-
-            - rp.orig exists: handled by another check. Renaming impossible
-              without this existence.
-
-            - rp.equal is False. If it's true, renaming has not been requested
-              by the user's inputs. Handled by another check.
-
-            - rp.new exists in some sense: if it did not exist, the situation
-              is some type of renaming (maybe with create-parent) without any
-              clobbering or self-clobbering.
-
-            - Those assumptions mean we can ignore the first two criteria and
-              filter out all rows where NewEx=no.
-
-            - Assume a case-preserving OS in the classification table. The
-              other two types of file systems are less tricky.
-
-            - Given current mvs policies, and given that we are assuming
-              case-preserving OS, the distinction between ParEq=equal and
-              ParEq=lower-equal does not matter. We can use the distinction to
-              create renaming scenarios for each row of the table that don't
-              violate the other assumptions, but that's the only relevance.
-
-        Renaming components and outcomes:
-
-            - Re-locate: put in a different parent (maybe with create-parent).
-            - Re-name: modify Path.name.
-            - Re-case: modify Path.name in case only.
-            - Clobber: renaming would require deletion of something else.
-
-        Classification table:
-
-            ParEq     | NewEx  | NmEq    | Notes
-            ---------------------------------------------------------------------
-            unequal   | ex     | unequal | #1 Relocate, re-name, clobber differently-cased name.
-            "         | "      | low-eq  | #2 Relocate, re-case, clobber differently-cased name.
-            "         | "      | eq      | #3 Relocate, clobber differently-cased name.
-            "         | strict | unequal | #4 Relocate, re-name, clobber.
-            "         | "      | low-eq  | #5 Relocate, re-case, clobber.
-            "         | "      | eq      | #6 Relocate, clobber.
-            eq/low-eq | ex     | unequal | #7 Re-name, clobber differently-cased name.
-            "         | "      | low-eq  | #8 Re-case, clobber differently-cased name.
-            "         | "      | eq      | #9 Problem(same).
-            "         | strict | unequal | #10 Re-name, clobber.
-            "         | "      | low-eq  | #11 Pseudo re-case: rp.orig incorrectly cased; rp.new case agrees with fs.
-            "         | "      | eq      | #12 Problem(same).
-
-        Determine case-sensitivity of file system:
-
-            The path returned by `mkstemp()` is guaranteed not to exist that
-            the moment of creation. For simplicity, let's assume the file-name
-            portion of the returned path is "tmpfoo". We know nothing about the
-            existence status of other file-names, such as "tmpFOO", "tmpFoo",
-            or "TMPFOO" -- all of which **could exist on a case-sensitive file
-            system**. On that type of file system, if "TMPFOO" exists this code
-            will give us the wrong answer.
-
-            from tempfile import TemporaryDirectory
-            from pathlib import Path
-            from os.path import samefile
-
-            with TemporaryDirectory() as dpath:
-                d = Path(dpath)
-                f1 = d / 'FoO'
-                f2 = d / 'foo'
-                f1.touch()
-                f2.touch()
-                if f1 not in f1.parent.iterdir():
-                    print('case-insensistive')
-                elif os.path.samefile(f1, f2):
-                    print('case-preserving')
-                else:
-                    print('case-sensistive')
-
-        Decision process:
-
-            if not case-preserving file system:
-                if rp.equal:
-                    - Nothing to do: user inputs did not request a renaming.
-                elif rp.new exists:
-                    - Clobber: Problem(existing) or Problem(existing_diff)
-                else:
-                    - No problem: rename freely.
-
-            else:
-                relocate = not samefile(rp.orig.parent, rp.new.parent)
-                rename_type = (
-                    NOOP if rp.orig.name == rp.new.name else
-                    RECASE if rp.orig.name.lower() == rp.new.name.lower() else
-                    RENAME
-                )
-                new_exists = rp.new.exists()
-                new_exists_strict = rp.new.exists_strictly()
-                if relocate:
-                    if new_exists:
-                        # Since we are relocating, self-clobber is a non-issue.
-                        - Clobber: Problem(existing) or Problem(existing_diff)
-                    else:
-                        - No problem: rename freely.
-                else:
-                    if new_exists:
-                        if rename_type is NOOP:
-                            # New exists because orig and new are the functionally the same.
-                            # Example #9, #12.
-                            - Problem(same)
-                        elif rename_type is RECASE:
-                            if new_exists_strict:
-                                # Example #11.
-                                # User inputs imply a re-case. But rp.new already
-                                # agrees with the case of path-name.
-                                Problem(recase)
-                            else:
-                                # Example #8.
-                                - No problem: self-clobber during a re-case.
-                        else:
-                            # Example #7, #10.
-                            - Clobber: Problem(existing) or Problem(existing_diff)
-                    else:
-                        - No problem: rename freely.
-
-        Examples for each table row:
-
-            ParEq     | NewEx  | Path | NmEq=unequal | NmEq=low-eq | NmEq=eq
-            -----------------------------------------------------------------
-            unequal   | ex     | orig | foo/xyz #1   | foo/xyz #2  | foo/xyz #3
-            "         | "      | new  | BAR/xy       | BAR/XYz     | BAR/xyz
-            "         | "      | fs   | BAR/xY       | BAR/xyZ     | BAR/xyZ
-            "         | strict | orig | foo/xyz #4   | foo/xyZ #5  | foo/xyz #6
-            "         | "      | new  | BAR/xy       | BAR/xyz     | BAR/xyz
-            "         | "      | fs   | BAR/xy       | BAR/xyz     | BAR/xyz
-            -----------------------------------------------------------------
-            eq/low-eq | ex     | orig | foo/xyz #7   | foo/xyz #8  | foo/xyz #9
-            "         | "      | new  | foo/xy       | foo/XYZ     | FOO/xyz
-            "         | "      | fs   | foo/xY       | foo/xyz     | foo/xyZ
-            "         | strict | orig | foo/xyz #10  | foo/xyZ #11 | FOO/xyz #12
-            "         | "      | new  | foo/xy       | foo/xyz     | foo/xyz
-            "         | "      | fs   | foo/xy       | foo/xyz     | foo/xyz
-
-        '''
-
         # Convenience variables:
         # - Whether rp.new exists in any sense.
         # - The type of problem to return if clobbering would occur.
@@ -604,7 +450,7 @@ class RenamingPlan:
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rp.new exists, we have clobbering
-        if not file_system_type() != FS_TYPES.case_preserving:
+        if file_system_case_sensitivity() != FS_TYPES.case_preserving:
             return clobber_prob
 
         # Handle case-preserving file system where rp.orig and rp.new have
@@ -618,101 +464,23 @@ class RenamingPlan:
         # the same parent, which means the renaming involves only changes
         # to the name-portion of the path.
         if rp.name_change_type == NCT.noop:
-            # New exists because rp.orig and rp.new are
-            # functionally the same path. User inputs implied
-            # that a renaming was desired, but it is not possible.
-            # Example #9, #12.
+            # New exists because rp.orig and rp.new are functionally the same
+            # path. User inputs implied that a renaming was desired (rp.orig
+            # and rp.new were not equal) but the only difference lies in the
+            # casing of the parent path. By policy, mvs does not rename parents.
             return Problem(PN.same)
         elif rp.name_change_type == NCT.case_change:
             if rp.exist_new >= EXISTENCES.exists_strict:
                 # User inputs implied that a case-change renaming
                 # was desired, but the path's name-portion already
                 # agrees with the file system, so renaming is impossible.
-                # Example #11.
                 return Problem(PN.recase)
             else:
                 # User wants a case-change renaming (self-clobber): no problem.
                 return None
         else:
             # User wants a name-change, and it would clobber something else.
-            # Example #7, #10.
             return clobber_prob
-
-        # TODO: old code; delete soon.
-        # TODO: this old code is messed up and confused.
-
-        if rp.equal:
-            # rp.orig and rp.new exactly equal: renaming is not possible.
-            return Problem(PN.equal)
-
-        elif rp.exist_new >= EXISTENCES.exists_strict:
-            # rp.new exists strictly: renaming not supported by the current
-            # policies of mvs. Although, rp.orig and rp.new are not exactly
-            # equal, they differ only in the casing of their parent -- which
-            # mvs does not modify. The paths are functionally the same.
-
-            # New-parent exists.
-            # New-name exists exactly within new-parent:
-            # - Might be Problem(same)
-            # - Might be clobber of something else.
-
-            return Problem(PN.same)
-
-            # foo/xyz
-            # FOO/xyz
-            # .
-
-            # foo/xyz
-            # foo/abc
-            # foo/ABC
-
-            # foo/xyz
-            # foo/abc
-            # foo/ABC
-
-            orig = Path(rp.orig).name
-            new = Path(rp.new).name
-            if orig == new:
-                # Paths differ in parent case only.
-                return None
-            elif orig.lower() == new.lower():
-                # The user is requesting a case-change renaming on a
-                # non-case-sensitive file system. The renaming is effectively
-                # a "self clobber" and thus no problem.
-                return None
-            else:
-                # If rp.orig and rp.new are different, and if rp.new exists,
-                # renaming would clobber something else.
-                if rp.type_orig == rp.type_new:
-                    return Problem(PN.existing)
-                else:
-                    return Problem(PN.existing_diff)
-
-        elif rp.exist_new >= EXISTENCES.exists:
-            # If rp.new exists, but not strictly, the name-portion of
-            # rp.new differs in casing from the file system. Some type
-            # of clobbering is involved.
-            orig = Path(rp.orig).name
-            new = Path(rp.new).name
-            if orig == new:
-                # Will not occur: identical to exists-strictly.
-                return None
-            elif orig.lower() == new.lower():
-                # The user is requesting a case-change renaming on a
-                # non-case-sensitive file system. The renaming is effectively
-                # a "self clobber" and thus no problem.
-                return None
-            else:
-                # If rp.orig and rp.new are different, and if rp.new exists,
-                # renaming would clobber something else.
-                if rp.type_orig == rp.type_new:
-                    return Problem(PN.existing)
-                else:
-                    return Problem(PN.existing_diff)
-
-        else:
-            # No problem: rp.new does not exist in any sense.
-            return None
 
     def check_new_parent_exists(self, rp, seq_val):
         # Key question: does renaming also require parent creation?

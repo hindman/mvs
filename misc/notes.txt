@@ -15,18 +15,12 @@ todos: TODOs
 
 Fix bug in check_new_exists():
 
-    - Current state:
-
-        - check_new_exists() has a new implementation that I
-          think is correct.
-
-        - test_case_clobber() is now working.
-
-    - Give the new code an editing pass.
+    - Should Problem(recase) be skipped by default?
 
     - Write tests for new code and new Problem types.
 
-    - Document some of the main issues and maybe the classification table.
+        - test_case_clobber() works but does not test things the way we would
+          want to.
 
 Fix bug on case-preserving systems:
 
@@ -452,6 +446,67 @@ Why I dropped the fake file system:
         - Stricter policy about supported file types.
         - Stricter policy about clobbering.
         - Commit to writing real tests with actual renaming.
+
+Checking for the existence of RenamePair.new:
+
+    - Start with some simplifying assumptions:
+
+        - rp.orig exists: this problem is handled in a separate problem check.
+
+        - rp.orig and rp.new are equal: we can handle this at the outset of the
+          check_new_exists().
+
+        - rp.new exists in some sense: if it does not, the situation is simple
+          and we can rename freely. Handle this check at the outset.
+
+        - The file system is case-preserving. This type of system involves the
+          most complexity. Case-sensistive and case-insensitive systems have
+          much simpler logic to determine whether clobbering would occur.
+          Handle the latter at the outset.
+
+    - Classification table for case-preserving systems, given the assumptions:
+
+        - Columns:
+            - Do rp.orig and rp.new have the same parents: will renaming require re-locate?
+            - Does file-name casing of rp.new already agree with a file that exists on file system?
+            - What type of change did the user request for the file-name portion?
+
+        - Table:
+
+            Re-locate | NameAgrees | NameChange | Notes
+            ---------------------------------------------------------------------
+            Yes       | No         | re-name    | #1 Clobber differently-cased name.
+            "         | "          | re-case    | #2 "
+            "         | "          | .          | #3 "
+            "         | Yes        | re-name    | #4 Clobber.
+            "         | "          | re-case    | #5 "
+            "         | "          | .          | #6 "
+            No        | No         | re-name    | #7 Clobber differently-cased name.
+            "         | "          | re-case    | #8 Case-change-only renaming (self clobber).
+            "         | "          | .          | #9 Problem(same).
+            "         | Yes        | re-name    | #10 Clobber.
+            "         | "          | re-case    | #11 Problem(recase).
+            "         | "          | .          | #12 Problem(same).
+
+        Examples for each table row:
+
+            Path | re-name     | re-case     | noop
+            ================================================
+            orig | foo/xyz #1  | foo/xyz #2  | foo/xyz #3
+            new  | BAR/xy      | BAR/XYz     | BAR/xyz
+            fsys | BAR/xY      | BAR/xyZ     | BAR/xyZ
+            ------------------------------------------------
+            orig | foo/xyz #4  | foo/xyZ #5  | foo/xyz #6
+            new  | BAR/xy      | BAR/xyz     | BAR/xyz
+            fsys | BAR/xy      | BAR/xyz     | BAR/xyz
+            ================================================
+            orig | foo/xyz #7  | foo/xyz #8  | foo/xyz #9
+            new  | foo/xy      | foo/XYZ     | FOO/xyz
+            fsys | foo/xY      | foo/xyz     | foo/xyZ
+            ------------------------------------------------
+            orig | foo/xyz #10 | foo/xyZ #11 | FOO/xyz #12
+            new  | foo/xy      | foo/xyz     | foo/xyz
+            fsys | foo/xy      | foo/xyz     | foo/xyz
 
 --------
 other-tools: Other tools
