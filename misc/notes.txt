@@ -13,13 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Fix bug in check_new_exists():
-
-    - Write tests for new code and new Problem types.
-
-        - test_case_clobber() works but does not test things the way we would
-          want to.
-
 Fix bug on case-preserving systems:
 
     - Clobbering can end up inherting casing of existing path.
@@ -51,6 +44,9 @@ Fix bug on case-preserving systems:
 
         # Rename orig => new.
         Path(rp.orig).rename(rp.new)
+
+    - Adjust test_new_exists_different_case() to reflect that we are
+      now achieving the desired behavior [see the TODO].
 
 Fix the check for new-collisions:
 

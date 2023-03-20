@@ -5,7 +5,14 @@ from itertools import chain
 from mvs import RenamingPlan, MvsError, __version__
 
 # Imports for testing.
-from mvs.utils import CON, STRUCTURES, MSG_FORMATS as MF
+from mvs.utils import (
+    CON,
+    FS_TYPES,
+    MSG_FORMATS as MF,
+    STRUCTURES,
+    file_system_case_sensitivity,
+)
+
 from mvs.problems import (
     CONTROLLABLES,
     CONTROLS,
@@ -45,28 +52,6 @@ def assert_raised_because(einfo, plan, pname):
     # and (b) specific Problem message.
     assert einfo.value.params['msg'] == MF.prepare_failed
     assert exp_msg in fmsgs
-
-####
-# New stuff.
-####
-
-def test_case_clobber(tr, create_wa):
-    # TODO: this test is behaving correctly now.
-    # But the test itself may not belong here or be
-    # exactly what we need to test clobbering.
-    origs = ('a',)
-    news = ('b',)
-    extras = ('B',)
-    wa = create_wa(origs, news, extras)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
-    )
-    plan.prepare()
-    assert plan.failed
-    with pytest.raises(MvsError) as einfo:
-        plan.rename_paths()
-    assert_raised_because(einfo, plan, PN.existing)
-    wa.check(no_change = True)
 
 ####
 # Inputs and their structures.
@@ -621,10 +606,6 @@ def test_new_exists(tr, create_wa):
         inputs = wa.origs + wa.news,
     )
     plan.prepare()
-
-    # tr.dumpj(plan.as_dict)
-    # return
-
     assert plan.failed
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
@@ -661,6 +642,46 @@ def test_new_exists(tr, create_wa):
         plan.rename_paths()
     assert_raised_because(einfo, plan, PN.existing_diff)
     wa.check(no_change = True)
+
+def test_new_exists_different_case(tr, create_wa):
+    # Paths where a pre-exising path is a
+    # differently-cased variation of a new path.
+    origs = ('a',)
+    news = ('b',)
+    extras = ('B',)
+    expecteds_clobber = extras
+
+    # Scenario: a pre-existing path is a
+    # differently-cased variation of a new path.
+    wa = create_wa(origs, news, extras)
+    plan = RenamingPlan(
+        inputs = wa.origs + wa.news,
+    )
+    plan.prepare()
+    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+        # On a case-sensitive system, renaming should succeed.
+        plan.rename_paths()
+        wa.check()
+    else:
+        # On a non-case-sensitive system, renaming should be rejected.
+        assert plan.failed
+        with pytest.raises(MvsError) as einfo:
+            plan.rename_paths()
+        assert_raised_because(einfo, plan, PN.existing)
+        wa.check(no_change = True)
+
+        # But if well request clobbering, we expect renaming
+        # to occur and for the paths to end up with the desired casing.
+        #
+        # TODO: currently, we don't end up with desired casing.
+        # Instead, we end up with case-preservation.
+        wa = create_wa(origs, news, extras, expecteds_clobber)
+        plan = RenamingPlan(
+            inputs = wa.origs + wa.news,
+            controls = 'clobber-existing',
+        )
+        plan.rename_paths()
+        wa.check()
 
 def test_new_exists_non_empty(tr, create_wa):
     # But we cannot clobber if the victim is of a different type.
