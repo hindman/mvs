@@ -1,3 +1,34 @@
+'''
+
+Tests to be refactored:
+    x test_top_level_imports
+    x test_no_inputs
+    x test_structure_default
+    x test_structure_paragraphs
+    x test_structure_pairs
+    x test_structure_rows
+    x test_renaming_code
+    x test_filtering_code
+    x test_code_compilation_fails
+    - test_code_execution_fails
+    - test_seq
+    - test_common_prefix
+    - test_plan_as_dict
+    - test_prepare_rename_multiple_times
+    - test_invalid_controls
+    - test_equal
+    - test_missing_orig
+    - test_orig_type
+    - test_new_exists
+    - test_new_exists_different_case
+    - test_new_exists_non_empty
+    - test_new_parent_missing
+    - test_news_collide
+    - test_failures_skip_all
+
+'''
+
+
 import pytest
 from itertools import chain
 
@@ -19,6 +50,86 @@ from mvs.problems import (
     PROBLEM_NAMES as PN,
     Problem,
 )
+
+####
+# A mega-helper to perform common checks.
+# Used by most tests.
+####
+
+def run_checks(
+               # Fixtures.
+               tr,
+               create_wa,
+               # WorkArea.
+               origs,
+               news,
+               extras = None,
+               expecteds = None,
+               rootless = False,
+               # RenamingPlan.
+               inputs = None,
+               include_origs = True,
+               include_news = True,
+               include_extras = True,
+               # Assertion making.
+               check_wa = True,
+               failure = False,
+               no_change = False,
+               reason = None,
+               # Renaming behavior.
+               prepare_only = False,
+               **plan_kws):
+
+    # Set up WorkArea.
+    wa = create_wa(
+        origs,
+        news,
+        extras = extras,
+        expecteds = expecteds,
+        rootless = rootless
+    )
+
+    # Set up RenamingPlan.
+    if inputs is None:
+        inputs = (
+            (wa.origs if include_origs else ()) +
+            (wa.news if include_news else ()) +
+            (wa.extras if include_extras else ())
+        )
+    plan = RenamingPlan(inputs, **plan_kws)
+
+    # Run the renaming or just the preparations.
+    # Check for failure and, in some case, its reason.
+    if prepare_only:
+        no_change = True
+        plan.prepare()
+        if failure:
+            assert plan.failed
+    elif failure:
+        plan.prepare()
+        assert plan.failed
+        with pytest.raises(MvsError) as einfo:
+            if rootless:
+                with wa.cd():
+                    plan.rename_paths()
+            else:
+                plan.rename_paths()
+        if reason:
+            assert_raised_because(einfo, plan, reason)
+    else:
+        if rootless:
+            with wa.cd():
+                plan.rename_paths()
+        else:
+            plan.rename_paths()
+        assert not plan.failed
+
+    # Check work area.
+    if check_wa:
+        wa.check(no_change = no_change)
+
+    # Let the caller make other custom assertions.
+    return (wa, plan)
 
 ####
 # Exercise package's top-level importables.
@@ -57,247 +168,262 @@ def assert_raised_because(einfo, plan, pname):
 # Inputs and their structures.
 ####
 
-def test_no_inputs(tr):
-    # If given no inputs, prepare() will fail
-    # and rename_paths() will raise.
-    plan = RenamingPlan(inputs = ())
-    plan.prepare()
-    assert plan.failed
-    with pytest.raises(MvsError) as einfo:
-        plan.rename_paths()
-    assert_raised_because(einfo, plan, PN.parsing_no_paths)
+def test_no_inputs(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b')
+    news = ('aa', 'bb')
+    run_args = (tr, create_wa, origs, news)
+
+    # If given no inputs, renaming will be rejected.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = (),
+        failure = True,
+        reason = PN.parsing_no_paths,
+        no_change = True,
+    )
 
 def test_structure_default(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, create_wa, origs, news)
+
     # A RenamingPlan defaults to flat input structure,
     # or the user can request flat explicitly.
-    origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    structs = (None, STRUCTURES.flat)
-    for s in structs:
-        wa = create_wa(origs, news)
-        plan = RenamingPlan(
-            inputs = wa.origs + wa.news,
+    for s in (None, STRUCTURES.flat):
+        wa, plan = run_checks(
+            *run_args,
             structure = s,
         )
         assert plan.structure == STRUCTURES.flat
-        plan.rename_paths()
-        wa.check()
 
 def test_structure_paragraphs(tr, create_wa):
-    # Paths, etc.
+    # Paths and args.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    empty = ('', '')
-    struct = STRUCTURES.paragraphs
+    news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, create_wa, origs, news)
 
-    # Helper.
-    def do_check(n, before = False, after = False):
-        include_empties = {
-            False: (),
-            True: empty,
-        }
-        wa = create_wa(origs, news)
-        inputs = (
-            include_empties[before] +
-            wa.origs +
-            empty[0:n] +
-            wa.news +
-            include_empties[after]
-        )
-        plan = RenamingPlan(
-            inputs = inputs,
-            structure = struct,
-        )
-        plan.rename_paths()
-        wa.check()
+    # Create a WorkArea to be used by assemble_inputs()
+    # to create input paths.
+    WA = create_wa(origs, news)
 
-    # Basic use cases: varying N of empty lines between origs and news,
-    # optionally with empty lines before and after.
-    do_check(1)
-    do_check(2)
-    do_check(1, before = True)
-    do_check(2, after = True)
-    do_check(1, before = True, after = True)
-
-    # Helper.
-    def do_check_raise(n_para):
-        wa = create_wa(origs, news)
-        if n_para == 3:
-            inputs = wa.origs + empty + wa.news[0:1] + empty + wa.news[1:]
+    # Helper to create variations of the --paragraphs inputs structure.
+    def assemble_inputs(n = 1, before = False, after = False, split_news = False):
+        # Set up empty lines to be included.
+        EMPTIES = ('', '')
+        before = EMPTIES if before else ()
+        between = EMPTIES[0:n]
+        after = EMPTIES if after else ()
+        # Provide the new paths either in one paragraph or two.
+        if split_news:
+            news1 = WA.news[0:1]
+            news2 = WA.news[1:]
         else:
-            inputs = wa.origs + wa.news
-        plan = RenamingPlan(
-            inputs = inputs,
-            structure = struct,
-        )
-        with pytest.raises(MvsError) as einfo:
-            plan.rename_paths()
-        assert_raised_because(einfo, plan, PN.parsing_paragraphs)
-        wa.check(no_change = True)
+            news1 = WA.news
+            news2 = ()
+        # Return the input paths.
+        return before + WA.origs + between + news1 + after + news2
 
-    # Cases that will raise due to an odd N of paragraphs (1 then 3).
-    # In both cases, there are equal numbers of origs vs news.
-    do_check_raise(1)
-    do_check_raise(3)
+    # Scenarios: varying N of empty lines between origs and news,
+    # optionally with empty lines before and after.
+    assemble_kws = (
+        dict(n = 1),
+        dict(n = 2),
+        dict(n = 1, before = True),
+        dict(n = 2, after = True),
+        dict(n = 1, before = True, after = True),
+    )
+    for kws in assemble_kws:
+        wa, plan = run_checks(
+            *run_args,
+            inputs = assemble_inputs(**kws),
+            structure = STRUCTURES.paragraphs,
+        )
+
+    # Two scenarios where renaming should be rejects:
+    # (1) no blank lines between paragraphs, and
+    # (2) three paragraphs rather than two.
+    assemble_kws = (
+        dict(n = 0),
+        dict(n = 1, after = True, split_news = True),
+    )
+    for kws in assemble_kws:
+        wa, plan = run_checks(
+            *run_args,
+            inputs = assemble_inputs(**kws),
+            structure = STRUCTURES.paragraphs,
+            failure = True,
+            reason = PN.parsing_paragraphs,
+            no_change = True,
+        )
 
 def test_structure_pairs(tr, create_wa):
-    # Paths, etc.
+    # Paths and args.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    empty = ('', '')
-    struct = STRUCTURES.pairs
+    news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, create_wa, origs, news)
 
-    # Helper to organize WorkArea paths as orig-new pairs.
-    def as_pairs(wa):
-        pairs = zip(wa.origs, wa.news)
-        return tuple(chain(*pairs))
+    # Create a WorkArea to be used by assemble_inputs()
+    # to create input paths.
+    WA = create_wa(origs, news)
 
-    # Basic use case: inputs as orig-new pairs.
-    wa = create_wa(origs, news)
-    inputs = as_pairs(wa)
-    plan = RenamingPlan(
-        inputs = inputs,
-        structure = struct,
+    # Helper to create variations of the --pairs inputs structure.
+    def assemble_inputs(include_empties = False):
+        if include_empties:
+            empties = ('',) * len(WA.origs)
+            zipped = zip(WA.origs, WA.news, empties)
+        else:
+            zipped = zip(WA.origs, WA.news)
+        return tuple(chain(*zipped))
+
+    # Scenario: inputs as orig-new pairs.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = assemble_inputs(),
+        structure = STRUCTURES.pairs,
     )
-    plan.rename_paths()
-    wa.check()
 
-    # Same, but empty lines in various spots.
-    wa = create_wa(origs, news)
-    inputs = as_pairs(wa)
-    inputs = empty + inputs[:2] + empty + inputs[2:] + empty
-    plan = RenamingPlan(
-        inputs = inputs,
-        structure = struct,
+    # Scenario: same thing, but with some empty lines thrown in.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = assemble_inputs(include_empties = True),
+        structure = STRUCTURES.pairs,
     )
-    plan.rename_paths()
-    wa.check()
 
-    # Odd number of paths: should raise.
-    wa = create_wa(origs, news)
-    inputs = as_pairs(wa)[:-1]
-    plan = RenamingPlan(
-        inputs = inputs,
-        structure = struct,
+    # Scenario: an odd number of inputs. Renaming should be rejected.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = assemble_inputs()[0:-1],
+        structure = STRUCTURES.pairs,
+        failure = True,
+        no_change = True,
+        reason = PN.parsing_imbalance,
     )
-    with pytest.raises(MvsError) as einfo:
-        plan.rename_paths()
-    assert_raised_because(einfo, plan, PN.parsing_imbalance)
-    wa.check(no_change = True)
 
 def test_structure_rows(tr, create_wa):
-    # Paths.
+    # Paths and args.
     origs = ('a', 'b', 'c')
-    empty = ('', '')
-    news = ('a1', 'b1', 'c1')
-    struct = STRUCTURES.rows
+    news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, create_wa, origs, news)
 
-    # Helper to organize WorkArea paths as rows.
-    def as_rows(wa, fmt = '{}\t{}'):
+    # Create a WorkArea to be used by assemble_inputs()
+    # to create input paths.
+    WA = create_wa(origs, news)
+
+    # Helper to create variations of the --rows inputs structure.
+    def assemble_inputs(fmt = None):
+        fmt = fmt or '{}\t{}'
+        EMPTY = ('', '')
         inputs = tuple(
             fmt.format(o, n)
-            for o, n in  zip(wa.origs, wa.news)
+            for o, n in  zip(WA.origs, WA.news)
         )
-        return empty + inputs + empty
+        return EMPTY + inputs[0:2] + EMPTY + inputs[2:] + EMPTY
 
-    # Basic use case with row inputs.
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = as_rows(wa),
-        structure = struct,
+    # Scenario: inputs as orig-new rows.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = assemble_inputs(),
+        structure = STRUCTURES.rows,
     )
-    plan.rename_paths()
-    wa.check()
 
-    # Cases that should raise du to invalid row formats:
-    # empty cells, odd number of cells, or both.
-    bad_formats = (
+    # Scenarios with invalid row formats: empty cells, odd number
+    # of cells, or both. Renaming should be rejected.
+    BAD_FORMATS = (
         '{}\t',
         '{}\t\t{}',
         '{}\t{}\t',
         '\t{}\t{}',
     )
-    for fmt in bad_formats:
-        wa = create_wa(origs, news)
-        plan = RenamingPlan(
-            inputs = as_rows(wa, fmt),
-            structure = struct,
+    for fmt in BAD_FORMATS:
+        wa, plan = run_checks(
+            *run_args,
+            inputs = assemble_inputs(fmt),
+            structure = STRUCTURES.rows,
+            failure = True,
+            no_change = True,
+            reason = PN.parsing_row,
         )
-        with pytest.raises(MvsError) as einfo:
-            plan.rename_paths()
-        assert_raised_because(einfo, plan, PN.parsing_row)
-        wa.check(no_change = True)
 
 ####
 # User-supplied code.
 ####
 
 def test_renaming_code(tr, create_wa):
-    # Paths and three variants of renaming code.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
+    run_args = (tr, create_wa, origs, news)
+
+    # Renaming code in three forms.
     code_str = 'return o + o'
     code_lambda = lambda o, p, seq, plan: o + o
     def code_func(o, p, seq, plan): return o + o
 
-    # Basic use case: generate new-paths via user-supplied code.
+    # Scenarios: generate new-paths via user-supplied code.
     for code in (code_str, code_lambda, code_func):
-        wa = create_wa(origs, news, rootless = True)
-        plan = RenamingPlan(
-            inputs = wa.origs,
+        wa, plan = run_checks(
+            *run_args,
+            inputs = origs,
             rename_code = code,
+            rootless = True,
         )
-        with wa.cd():
-            plan.rename_paths()
-        wa.check()
 
 def test_filtering_code(tr, create_wa):
-    # Filter orig paths with user-supplied code.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     extras = ('d', 'dd', 'xyz/')
-    wa = create_wa(origs, news, extras, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.extras,
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: provide orig and extras as inputs, and
+    # then use filtering code to filter out the extras.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        include_news = False,
+        include_extras = True,
         rename_code = 'return o + o',
         filter_code = 'return not ("d" in o or p.is_dir())',
+        rootless = True,
     )
-    with wa.cd():
-        plan.rename_paths()
-    wa.check()
 
 def test_code_compilation_fails(tr, create_wa):
-    # Paths and a snippet of invalid code.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
-    bad_code = 'FUBB BLORT'
+    run_args = (tr, create_wa, origs, news)
 
-    # Helper to check the plan's failures.
-    def do_checks(wa, plan):
-        with pytest.raises(MvsError) as einfo:
-            plan.rename_paths()
-        assert einfo.value.params['msg'] == MF.prepare_failed
-        f = plan.uncontrolled_problems[0]
-        assert f.name == PN.user_code_exec
-        assert bad_code in f.msg
-        assert 'invalid syntax' in f.msg
-        wa.check(no_change = True)
+    # Some bad code to use for renaming and filtering.
+    BAD_CODE = 'FUBB BLORT'
+
+    # Helper to check some details about the first uncontrolled Problem.
+    def check_problem(plan):
+        prob = plan.uncontrolled_problems[0]
+        assert BAD_CODE in prob.msg
+        assert 'invalid syntax' in prob.msg
 
     # Scenario: invalid renaming code.
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = wa.origs,
-        rename_code = bad_code,
+    wa, plan = run_checks(
+        *run_args,
+        include_news = False,
+        rename_code = BAD_CODE,
+        failure = True,
+        no_change = True,
+        reason = PN.user_code_exec,
     )
-    do_checks(wa, plan)
+    check_problem(plan)
 
     # Scenario: invalid filtering code.
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
-        filter_code = bad_code,
+    wa, plan = run_checks(
+        *run_args,
+        filter_code = BAD_CODE,
+        failure = True,
+        no_change = True,
+        reason = PN.user_code_exec,
     )
-    do_checks(wa, plan)
+    check_problem(plan)
 
 def test_code_execution_fails(tr, create_wa):
     # Paths and code that will cause the second RenamePair
@@ -307,7 +433,6 @@ def test_code_execution_fails(tr, create_wa):
     rename_code1 = 'return FUBB if seq == 2 else o + o'
     rename_code2 = 'return 9999 if seq == 2 else o + o'
     filter_code = 'return FUBB if seq == 2 else True'
-    exp_rp_fails = [False, True, False]
 
     # Helper try to rename paths and then check the plan's failures.
     def do_checks(wa, plan, pname):
@@ -421,7 +546,7 @@ def test_plan_as_dict(tr, create_wa):
 def test_prepare_rename_multiple_times(tr, create_wa):
     # Setup.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
+    news = ('a.new', 'b.new', 'c.new')
     wa = create_wa(origs, news)
     plan = RenamingPlan(
         inputs = wa.origs + wa.news,
@@ -448,7 +573,7 @@ def test_prepare_rename_multiple_times(tr, create_wa):
 def test_invalid_controls(tr, create_wa):
     # Paths.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
+    news = ('a.new', 'b.new', 'c.new')
 
     # Base scenario: it works fine.
     # In addition, we will re-use the inputs defined here
@@ -505,7 +630,7 @@ def test_equal(tr, create_wa):
     # Paths where an orig path equals its new counterpart.
     d = ('d',)
     origs = ('a', 'b', 'c') + d
-    news = ('a1', 'b1', 'c1') + d
+    news = ('a.new', 'b.new', 'c.new') + d
 
     def do_check(**kws):
         wa = create_wa(origs, news)
@@ -534,9 +659,9 @@ def test_equal(tr, create_wa):
 def test_missing_orig(tr, create_wa):
     # Paths.
     origs = ('a', 'b')
-    news = ('a1', 'b1')
+    news = ('a.new', 'b.new')
     missing_origs = ('c', 'd')
-    missing_news = ('c1', 'd1')
+    missing_news = ('c.new', 'd.new')
 
     # Helper to assemble RenamingPlan inputs.
     # We need to includes missing_news so there are equal N of
@@ -573,7 +698,7 @@ def test_orig_type(tr, create_wa):
     # Paths, including one symlink.
     target = 'c.target'
     origs = ('a', 'b', f'c::{target}')
-    news = ('a1', 'b1', 'c1')
+    news = ('a.new', 'b.new', 'c.new')
     extras = (target,)
 
     # Renaming will be rejected if any of the origs are not
@@ -593,10 +718,10 @@ def test_new_exists(tr, create_wa):
     # Some paths where one of the news will be in extras
     # and thus will exist before renaming.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    extras = ('a1',)
-    extras_diff = ('a1/',)
-    expecteds_skip = ('a', 'a1', 'b1', 'c1')
+    news = ('a.new', 'b.new', 'c.new')
+    extras = ('a.new',)
+    extras_diff = ('a.new/',)
+    expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
 
     # Scenario: one of new paths exists.
@@ -686,8 +811,8 @@ def test_new_exists_different_case(tr, create_wa):
 def test_new_exists_non_empty(tr, create_wa):
     # But we cannot clobber if the victim is of a different type.
     origs = ('a/', 'b', 'c')
-    news = ('a1', 'b1', 'c1')
-    extras = ('a1/', 'a1/foo')
+    news = ('a.new', 'b.new', 'c.new')
+    extras = ('a.new/', 'a.new/foo')
 
     # Basic scenario: its works.
     wa = create_wa(origs, news)
@@ -729,8 +854,8 @@ def test_new_exists_non_empty(tr, create_wa):
 def test_new_parent_missing(tr, create_wa):
     # Paths where a parent of a new path will be missing.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'xy/zzz/c1')
-    expecteds_skip = ('a1', 'b1', 'c')
+    news = ('a.new', 'b.new', 'xy/zzz/c.new')
+    expecteds_skip = ('a.new', 'b.new', 'c')
     expecteds_create = news + ('xy/', 'xy/zzz/')
 
     # Prepare will mark plan as failed. Rename will raise.
@@ -766,9 +891,9 @@ def test_new_parent_missing(tr, create_wa):
 def test_news_collide(tr, create_wa):
     # Paths where some of the new paths collide.
     origs = ('a', 'b', 'c')
-    news = ('a1', 'b1', 'a1')
-    expecteds_skip = ('a', 'b1', 'c')
-    expecteds_clobber = ('a1', 'b1')
+    news = ('a.new', 'b.new', 'a.new')
+    expecteds_skip = ('a', 'b.new', 'c')
+    expecteds_clobber = ('a.new', 'b.new')
     origs_diff = ('a', 'b', 'c/')
 
     # Prepare will mark plan as failed. Rename will raise.

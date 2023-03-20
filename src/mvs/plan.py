@@ -226,9 +226,11 @@ class RenamingPlan:
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
             groups = [[], []]
-            for i, line in enumerate(self.inputs):
+            i = 0
+            for line in self.inputs:
                 if line:
                     groups[i % 2].append(line)
+                    i += 1
             origs, news = groups
 
         elif self.structure == STRUCTURES.rows:

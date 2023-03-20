@@ -13,6 +13,8 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Refactor test_plan.py to use run_checks: see docstring.
+
 Fix bug on case-preserving systems:
 
     - Clobbering can end up inherting casing of existing path.
