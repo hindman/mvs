@@ -680,7 +680,7 @@ def test_preferences_merging(tr, create_prefs):
         yes = True,
         nolog = True,
         limit = 20,
-        controls = ['create-parent', 'skip-equal', 'skip-same'],
+        controls = ['create-parent', 'skip-equal', 'skip-recase', 'skip-same'],
     )
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -765,7 +765,7 @@ def test_preferences_problem_control(tr, creators):
     # Scenario: with no user-prefs and command line controls,
     # we should get the application defaults.
     opts = get_opts()
-    assert opts.controls == app_defs
+    assert sorted(opts.controls) == sorted(app_defs)
 
     # Scenario: defaults plus some other controls.
     opts = get_opts('--controls', *others)
@@ -773,7 +773,7 @@ def test_preferences_problem_control(tr, creators):
 
     # Scenario: same, but also use a negative control, which
     # counteracts the application default.
-    opts = get_opts('--controls', 'no-skip-equal', 'no-skip-same', *others)
+    opts = get_opts('--controls', 'no-skip-equal', 'no-skip-same', 'no-skip-recase', *others)
     assert sorted(opts.controls) == sorted(others)
 
     # Scenario: invalid control.

@@ -15,8 +15,6 @@ todos: TODOs
 
 Fix bug in check_new_exists():
 
-    - Should Problem(recase) be skipped by default?
-
     - Write tests for new code and new Problem types.
 
         - test_case_clobber() works but does not test things the way we would
@@ -224,6 +222,9 @@ New documentation [NEW_DOCS]:
             - This less strong variant of Problem('equal').
             - equal speaks to user input: did user ask for renaming of this rp?
             - same speaks to whether renaming is supported by the policies of mvs.
+        - New Problem('recase')
+            - skipped by default
+            - affects only case-preserving systems
 
     - Document that --pager and --editor are executed with shell=True.
 

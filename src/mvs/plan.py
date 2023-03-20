@@ -52,6 +52,7 @@ class RenamingPlan:
     DEFAULT_CONTROLS = (
         f'{CONTROLS.skip}-{PN.equal}',
         f'{CONTROLS.skip}-{PN.same}',
+        f'{CONTROLS.skip}-{PN.recase}',
     )
 
     def __init__(self,
