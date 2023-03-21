@@ -10,13 +10,13 @@ Tests to be refactored:
     x test_renaming_code
     x test_filtering_code
     x test_code_compilation_fails
-    - test_code_execution_fails
-    - test_seq
-    - test_common_prefix
-    - test_plan_as_dict
-    - test_prepare_rename_multiple_times
-    - test_invalid_controls
-    - test_equal
+    x test_code_execution_fails
+    x test_seq
+    x test_common_prefix
+    x test_plan_as_dict
+    x test_prepare_rename_multiple_times
+    x test_invalid_controls
+    x test_equal
     - test_missing_orig
     - test_orig_type
     - test_new_exists
@@ -72,12 +72,14 @@ def run_checks(
                include_news = True,
                include_extras = True,
                # Assertion making.
+               early_checks = None,
                check_wa = True,
                failure = False,
                no_change = False,
                reason = None,
                # Renaming behavior.
                prepare_only = False,
+               prepare_before = 0,
                **plan_kws):
 
     # Set up WorkArea.
@@ -98,6 +100,22 @@ def run_checks(
         )
     plan = RenamingPlan(inputs, **plan_kws)
 
+    # Let caller make early assertions.
+    if early_checks:
+        early_checks(wa, plan)
+
+    # Helper to execute plan.prepare() and plan.rename_paths().
+    def do_rename():
+        if rootless:
+            with wa.cd():
+                for _ in range(prepare_before):
+                    plan.prepare()
+                plan.rename_paths()
+        else:
+            for _ in range(prepare_before):
+                plan.prepare()
+            plan.rename_paths()
+
     # Run the renaming or just the preparations.
     # Check for failure and, in some case, its reason.
     if prepare_only:
@@ -109,19 +127,11 @@ def run_checks(
         plan.prepare()
         assert plan.failed
         with pytest.raises(MvsError) as einfo:
-            if rootless:
-                with wa.cd():
-                    plan.rename_paths()
-            else:
-                plan.rename_paths()
+            do_rename()
         if reason:
             assert_raised_because(einfo, plan, reason)
     else:
-        if rootless:
-            with wa.cd():
-                plan.rename_paths()
-        else:
-            plan.rename_paths()
+        do_rename()
         assert not plan.failed
 
     # Check work area.
@@ -426,141 +436,137 @@ def test_code_compilation_fails(tr, create_wa):
     check_problem(plan)
 
 def test_code_execution_fails(tr, create_wa):
-    # Paths and code that will cause the second RenamePair
-    # to fail during execution of user code.
-    origs = ('a', 'b', 'c')
+    # Paths and args.
+    FAILING_ORIG = 'b'
+    origs = ('a', FAILING_ORIG, 'c')
     news = ('aa', 'bb', 'cc')
+    run_args = (tr, create_wa, origs, news)
+
+    # Code that will cause the second RenamePair
+    # to fail during execution of user code.
     rename_code1 = 'return FUBB if seq == 2 else o + o'
     rename_code2 = 'return 9999 if seq == 2 else o + o'
     filter_code = 'return FUBB if seq == 2 else True'
 
-    # Helper try to rename paths and then check the plan's failures.
-    def do_checks(wa, plan, pname):
-        with pytest.raises(MvsError) as einfo:
-            with wa.cd():
-                plan.rename_paths()
-        assert_raised_because(einfo, plan, pname)
-        fails = plan.uncontrolled_problems
-        assert len(fails) == 1
-        f = fails[0]
-        assert f.name == pname
-        assert f.rp.orig == 'b'
-        wa.check(no_change = True)
-
-    # Scenario: renaming code raises an exception.
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs,
-        rename_code = rename_code1,
+    # Three scenarios that will cause renaming to be rejected:
+    # - Renaming code raises an exception.
+    # - Renaming code returns bad data type.
+    # - Filtering code raises an exception.
+    scenarios = (
+        dict(rename_code = rename_code1, reason = PN.rename_code_invalid),
+        dict(rename_code = rename_code2, reason = PN.rename_code_bad_return),
+        dict(filter_code = filter_code, reason = PN.filter_code_invalid),
     )
-    do_checks(wa, plan, PN.rename_code_invalid)
-
-    # Scenario: renaming code returns bad data type.
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs,
-        rename_code = rename_code2,
-    )
-    do_checks(wa, plan, PN.rename_code_bad_return)
-
-    # Scenario: filtering code raises an exception.
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
-        filter_code = filter_code,
-    )
-    do_checks(wa, plan, PN.filter_code_invalid)
+    for kws in scenarios:
+        wa, plan = run_checks(
+            *run_args,
+            rootless = True,
+            failure = True,
+            no_change = True,
+            include_news = 'filter_code' in kws,
+            **kws,
+        )
+        probs = plan.uncontrolled_problems
+        assert len(probs) == 1
+        p = probs[0]
+        assert p.rp.orig == FAILING_ORIG
+        assert p.name == kws['reason']
 
 def test_seq(tr, create_wa):
-    # User defines a sequence and uses its values in user-supplied code.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.20', 'b.30', 'c.40')
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs,
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: user defines a sequence and uses
+    # its values in user-supplied code.
+    wa, plan = run_checks(
+        *run_args,
+        rootless = True,
+        include_news = False,
         rename_code = 'return f"{o}.{seq * 2}"',
         seq_start = 10,
         seq_step = 5,
     )
-    with wa.cd():
-        plan.rename_paths()
-    wa.check()
 
 def test_common_prefix(tr, create_wa):
-    # User-supplied code exercises strip_prefix() helper.
+    # Paths and args.
     origs = ('blah-a', 'blah-b', 'blah-c')
     news = ('a', 'b', 'c')
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs,
+    run_args = (tr, create_wa, origs, news)
+
+    # User-supplied code exercises strip_prefix() helper.
+    wa, plan = run_checks(
+        *run_args,
+        rootless = True,
+        include_news = False,
         rename_code = 'return plan.strip_prefix(o)',
     )
-    with wa.cd():
-        plan.rename_paths()
-    wa.check()
 
 ####
 # RenamingPlan data.
 ####
 
 def test_plan_as_dict(tr, create_wa):
-    # Expected keys in plan.as_dict.
-    exp_keys = sorted((
-        'inputs',
-        'structure',
-        'rename_code',
-        'filter_code',
-        'indent',
-        'seq_start',
-        'seq_step',
-        'controls',
-        'problems',
-        'prefix_len',
-        'rename_pairs',
-        'tracking_index',
-    ))
-
-    # Set up plan.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.10', 'b.15', 'c.20')
-    wa = create_wa(origs, news, rootless = True)
-    plan = RenamingPlan(
-        inputs = wa.origs,
+    run_args = (tr, create_wa, origs, news)
+
+    # Helper to check keys in plan.as_dict.
+    def check_plan_dict(wa, plan):
+        assert sorted(plan.as_dict) == sorted((
+            'inputs',
+            'structure',
+            'rename_code',
+            'filter_code',
+            'indent',
+            'seq_start',
+            'seq_step',
+            'controls',
+            'problems',
+            'prefix_len',
+            'rename_pairs',
+            'tracking_index',
+        ))
+
+    # Define a RenamingPlan. Check its as_dict keys
+    # both before and after renaming.
+    wa, plan = run_checks(
+        *run_args,
+        rootless = True,
+        include_news = False,
         rename_code = 'return f"{o}.{seq}"',
         filter_code = 'return "d" not in o',
         seq_start = 10,
         seq_step = 5,
+        early_checks = check_plan_dict,
     )
-
-    # Check before and after renaming.
-    assert sorted(plan.as_dict) == exp_keys
-    with wa.cd():
-        plan.rename_paths()
-    wa.check()
-    assert sorted(plan.as_dict) == exp_keys
+    check_plan_dict(wa, plan)
 
 ####
 # Check unexpected usage scenarios.
 ####
 
 def test_prepare_rename_multiple_times(tr, create_wa):
-    # Setup.
+    # Paths and args.
     origs = ('a', 'b', 'c')
-    news = ('a.new', 'b.new', 'c.new')
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
+    news = ('aa', 'bb', 'cc')
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: can call plan.prepare() multiple times
+    # without causing any trouble: renaming succeeds.
+    wa, plan = run_checks(
+        *run_args,
+        rootless = True,
+        include_news = False,
+        rename_code = 'return o + o',
+        prepare_before = 3,
     )
 
-    # Can call prepare multiple times.
-    plan.prepare()
-    plan.prepare()
-
-    # Renaming plan works.
-    plan.rename_paths()
-    wa.check()
-
-    # Cannot call rename_paths multiple times.
+    # But if you try to call plan.rename_paths() a
+    # second time, an exception is raised and the work
+    # area won't be affected.
     with pytest.raises(MvsError) as einfo:
         plan.rename_paths()
     assert einfo.value.params['msg'] == MF.rename_done_already
@@ -571,19 +577,17 @@ def test_prepare_rename_multiple_times(tr, create_wa):
 ####
 
 def test_invalid_controls(tr, create_wa):
-    # Paths.
+    # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, create_wa, origs, news)
 
     # Base scenario: it works fine.
     # In addition, we will re-use the inputs defined here
     # in subsequent tests, which don't need a WorkArea
     # because the RenamingPlan will raise during initialization.
-    wa = create_wa(origs, news)
-    inputs = wa.origs + wa.news
-    plan = RenamingPlan(inputs)
-    plan.rename_paths()
-    wa.check()
+    wa, plan = run_checks(*run_args)
+    INPUTS = plan.inputs
 
     # Scenarios: can configure problem-control in various ways.
     all_controls = CONTROLLABLES[CONTROLS.skip]
@@ -593,8 +597,8 @@ def test_invalid_controls(tr, create_wa):
     )
     for label, controls in checks:
         tup = tuple(f'skip-{c}' for c in controls)
-        plan1 = RenamingPlan(inputs, controls = tup)
-        plan2 = RenamingPlan(inputs, controls = ' '.join(tup))
+        plan1 = RenamingPlan(INPUTS, controls = tup)
+        plan2 = RenamingPlan(INPUTS, controls = ' '.join(tup))
         assert (label, plan1.controls) == (label, tup)
         assert (label, plan2.controls) == (label, tup)
 
@@ -607,7 +611,7 @@ def test_invalid_controls(tr, create_wa):
     for pname, *controls in checks:
         tup = tuple(f'{c}-{pname}' for c in controls)
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(inputs, controls = tup)
+            plan = RenamingPlan(INPUTS, controls = tup)
         msg = einfo.value.params['msg']
         exp = MF.conflicting_controls.format(pname, *controls)
         assert msg == exp
@@ -621,40 +625,33 @@ def test_invalid_controls(tr, create_wa):
     for pname, control in checks:
         pc_name = f'{control}-{pname}'
         with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(inputs, controls = pc_name)
+            plan = RenamingPlan(INPUTS, controls = pc_name)
         msg = einfo.value.params['msg']
         exp = MF.invalid_control.format(pc_name)
         assert msg == exp
 
 def test_equal(tr, create_wa):
-    # Paths where an orig path equals its new counterpart.
-    d = ('d',)
-    origs = ('a', 'b', 'c') + d
-    news = ('a.new', 'b.new', 'c.new') + d
+    # Paths and args.
+    # One of the origs equals its new counterpart.
+    SAME = ('d',)
+    origs = ('a', 'b', 'c') + SAME
+    news = ('a.new', 'b.new', 'c.new') + SAME
+    run_args = (tr, create_wa, origs, news)
 
-    def do_check(**kws):
-        wa = create_wa(origs, news)
-        plan = RenamingPlan(
-            inputs = wa.origs + wa.news,
-            **kws,
-        )
-        plan.rename_paths()
-        wa.check()
+    # Scenario: renaming will succeed, because
+    # skip-equal is a default control.
+    wa, plan = run_checks(*run_args)
+    wa, plan = run_checks(*run_args, controls = 'skip-equal')
 
-    # Renaming will succeed, because skip-equal is the default.
-    do_check()
-    do_check(controls = 'skip-equal')
-
-    # Renaming attempt will raise if we cancel the default.
-    wa = create_wa(origs, news)
-    plan = RenamingPlan(
-        inputs = wa.origs + wa.news,
+    # Scenario: but renaming will be rejected
+    # if we cancel the default.
+    wa, plan = run_checks(
+        *run_args,
         controls = '',
+        failure = True,
+        no_change = True,
+        reason = PN.equal,
     )
-    with pytest.raises(MvsError) as einfo:
-        plan.rename_paths()
-    assert_raised_because(einfo, plan, PN.equal)
-    wa.check(no_change = True)
 
 def test_missing_orig(tr, create_wa):
     # Paths.

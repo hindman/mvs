@@ -13,7 +13,30 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Refactor test_plan.py to use run_checks: see docstring.
+RenamingPlan.controls: fix bug:
+
+    - If a user supplies any controls, all of the DEFAULT_CONTROLS are lost.
+
+    - Instead, they should be merged, with the user's controls taking
+      precedence.
+
+    - Related issue:
+
+        - In cli.py, we merge preferences by handling the negative
+          controls.
+
+        - Based on that, plan.py implemented its logic to forbid negative
+          controls.
+
+        - But that's a mistake. It's reasonable for an API user to do
+          RenamingPlan(controls = 'no-skip-equal') if they just want to drop
+          one of the defaults.
+
+    - After making this fix, revisit test_equal().
+
+Refactor test_plan.py:
+    - Use run_checks: see docstring.
+    - Organize test functions into related groups.
 
 Fix bug on case-preserving systems:
 
