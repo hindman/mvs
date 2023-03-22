@@ -80,6 +80,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     invalid_control        = 'Invalid problem control: {!r}',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid controls attribute',
+    unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
     # Error messages in CliRenamer.
     path_collection_failed = 'Collection of input paths failed.\n\n{}',
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',

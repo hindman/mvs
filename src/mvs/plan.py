@@ -657,14 +657,37 @@ class RenamingPlan:
         if self.tracking_index == self.raise_at:
             raise ZeroDivisionError('SIMULATED_ERROR')
 
-        # Rename.
+        # Set up Path instance.
+        po = Path(rp.orig)
+        pn = Path(rp.new)
+
+        # Create new parent if requested.
         if rp.create_parent:
-            Path(rp.new).parent.mkdir(parents = True, exist_ok = True)
-        p = Path(rp.orig)
-        if rp.clobber:
-            p.replace(rp.new)
-        else:
-            p.rename(rp.new)
+            pn.parent.mkdir(parents = True, exist_ok = True)
+
+        # If new path exists already, deal with it before
+        # we attempt to renaming from rp.orig to rp.new.
+        #
+        # (1) User requested clobbering. Delete the current
+        # path at rp.new. We do this so that the renaming won't
+        # inherit casing from the current path.
+        #
+        # (2) User did not request clobber, but the path at rp.new
+        # exists nonetheless (presumably it was creating between
+        # the check for new-existing and now). Raise an exception.
+        # This is the final line of defense against unintended clobbering.
+        #
+        if pn.exists():
+            if rp.clobber:
+                if rp.type_orig == PATH_TYPES.file:
+                    pn.unlink()
+                else:
+                    pn.rmdir()
+            else:
+                raise MvsError(MF.unrequested_clobber, orig = rp.orig, new = rp.new)
+
+        # Rename.
+        po.rename(rp.new)
 
     ####
     # Other info.

@@ -771,7 +771,6 @@ def test_new_exists_different_case(tr, create_wa):
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('B.NEW',)
-    expecteds_clobber = ('a.new', 'B.NEW', 'c.new')
     run_args = (tr, create_wa, origs, news)
 
     if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
@@ -793,15 +792,13 @@ def test_new_exists_different_case(tr, create_wa):
         )
 
         # Scenario: renaming will succeed if we request clobbering.
-        #
-        # TODO: currently, we don't end up with desired casing.
-        # Instead, we end up with case-preservation even though
-        # the user requested a lowercase b.new.
-        #
+        # Also note that the case of b.new will agree the the
+        # users inputs (in news), not the original case of
+        # that path (B.NEW).
         wa, plan = run_checks(
             *run_args,
             extras = extras,
-            expecteds = expecteds_clobber,
+            expecteds = news,
             controls = 'clobber-existing',
         )
 

@@ -13,41 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Fix bug on case-preserving systems:
-
-    - Clobbering can end up inherting casing of existing path.
-
-    - Example on MacOS:
-
-        touch a B
-        mvs a b --yes     # Result: B
-
-    - Modify do_rename() to achieve two things:
-
-        - Fix the bug.
-
-        - Add a final layer of insurance so that clobbering never
-          occurs without request.
-
-        # If new path exists already, deal with it.
-        pnew = Path(rp.new)
-        if pnew.exists():
-            if rp.clobber:
-                # Don't inherit casing from clobbered path.
-                if rp.type_orig == FILE_TYPES.file:
-                    pnew.unlink()
-                else:
-                    pnew.rmdir()
-            else:
-                # Don't clobber unless requested.
-                raise ...
-
-        # Rename orig => new.
-        Path(rp.orig).rename(rp.new)
-
-    - Adjust test_new_exists_different_case() to reflect that we are
-      now achieving the desired behavior [see the TODO].
-
 Fix the check for new-collisions:
 
     - Checks for collisions among new paths is done in a case-sensitive
