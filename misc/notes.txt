@@ -14,30 +14,9 @@ todos: TODOs
 --------
 
 Tests:
-
-    x Clobbering: like can clobber like.
-    x Orig paths must be regular file or directory.
-    x Change --editor and --pager back to str:
-    x Skip-equal as default: check that it is covered by tests [I think so].
-    x The --edit option.
-    x Refactor test_cli.py to use run_checks(): see docstring.
-    x Bug fix: Windows replace.
-    x Double check pragma-no-cover stuff.
-    x User-prefs: exercise code once with ENV var unset.
-
-    - Case-change renamings [see table below].
-
-    parent    | name      | Example: orig vs new | Note
-    ---------------------------------------------------------------------
-    eq        | eq        | foo/bar   foo/bar    | .
-    "         | case      | foo/bar   foo/BAR    | .
-    "         | different | foo/bar   foo/b      | .
-    case      | eq        | foo/bar   FOO/bar    | .
-    "         | case      | foo/bar   FOO/BAR    | .
-    "         | different | foo/bar   FOO/b      | .
-    different | eq        | foo/bar   f/bar      | .
-    "         | case      | foo/bar   f/BAR      | .
-    "         | different | foo/bar   f/b        | .
+    - Assess coverage
+    - See if I can run test on Github to check for failures on Linux/Windows.
+        - Maybe change tests to run on demand only?
 
 New documentation [see NEW_DOCS].
 
