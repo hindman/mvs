@@ -93,6 +93,10 @@ class RenamingPlan:
 
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
+        self.new_collision_key_func = (
+            str if file_system_case_sensitivity() == FS_TYPES.case_sensitive else
+            str.lower
+        )
 
         # Convert the problem-control inputs into a normalized tuple. Then
         # build a lookup mapping each Problem name to the user's requested
@@ -495,12 +499,16 @@ class RenamingPlan:
     def prepare_new_groups(self):
         # A preparation-step for check_new_collisions().
         # Organize rps into dict-of-list, keyed by the new path.
+        # Those keys are stored as-is for case-sensistive file
+        # systems and in lowercase for non-sensistive systems.
         self.new_groups = {}
         for rp in self.rps:
-            self.new_groups.setdefault(rp.new, []).append(rp)
+            k = self.new_collision_key_func(rp.new)
+            self.new_groups.setdefault(k, []).append(rp)
 
     def check_new_collisions(self, rp, seq_val):
-        g = self.new_groups[rp.new]
+        k = self.new_collision_key_func(rp.new)
+        g = self.new_groups[k]
         if len(g) == 1:
             # No collisions with rp.new.
             return None

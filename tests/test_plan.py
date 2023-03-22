@@ -912,6 +912,34 @@ def test_news_collide(tr, create_wa):
         reason = PN.colliding_diff,
     )
 
+def test_news_collide_case(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'B.NEW')
+    expecteds_clobber = ('a.new', 'B.NEW')
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: new paths "collide" in a case-insensitive way.
+    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+        # If file system is case-sensitive, there is no collision.
+        # Renaming will succeed.
+        wa, plan = run_checks(*run_args)
+    else:
+        # Otherwise, renaming will be rejected.
+        wa, plan = run_checks(
+            *run_args,
+            failure = True,
+            no_change = True,
+            reason = PN.colliding,
+        )
+
+        # And it will succeed if we request clobbering.
+        wa, plan = run_checks(
+            *run_args,
+            controls = 'clobber-colliding',
+            expecteds = expecteds_clobber,
+        )
+
 def test_failures_skip_all(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
