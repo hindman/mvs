@@ -13,10 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Refactor test_plan.py:
-    - Use run_checks: see docstring.
-    - Organize test functions into related groups.
-
 Fix bug on case-preserving systems:
 
     - Clobbering can end up inherting casing of existing path.
@@ -26,7 +22,7 @@ Fix bug on case-preserving systems:
         touch a B
         mvs a b --yes     # Result: B
 
-    - Modify do_rename() to achieve to things:
+    - Modify do_rename() to achieve two things:
 
         - Fix the bug.
 
@@ -73,22 +69,12 @@ Fix the check for new-collisions:
         - True: use rp.new as dict key.
         - False: use rp.new.lower().
 
-    - See SO question to determine type of file system:
-
-        https://stackoverflow.com/questions/7870041/check-if-file-system-is-case-insensitive-in-python
-
-        - Because some systems allow different settings per directory,
-          there is no perfect approach.
-
-        - But there are some relatively easy checks that could be used to
-          make a good attempt.
-
-        - Add this issue in the caveats of the documentation.
-
 Implement: only empty directories can be clobbered.
 
     - See test_new_exists_non_empty() for partial progress
       on a test for the behavior.
+
+    - We might neeed a new Problem(existing_full)?
 
 Tests:
 

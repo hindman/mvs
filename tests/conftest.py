@@ -113,7 +113,7 @@ class WorkArea:
     ####
 
     SLASH = '/'
-    LINK_SEP = '::'
+    LINK_SEP = '->'
     ROOT = f'tests{os.sep}work'
     USER_PERMISSSIONS = {
         'r': stat.S_IRUSR,
@@ -183,7 +183,7 @@ class WorkArea:
         # - Does not (yet) include the work area root.
         # - Uses forward slashes as separators.
         # - Uses trailing slash to indicate that path should be a directory.
-        # - Uses double-colon to indicate a symlink: 'PATH::TARGET'.
+        # - Uses an arrow to indicate a symlink: 'PATH->TARGET'.
         #
         # The MODE value:
         # - Is expressed negatively.
