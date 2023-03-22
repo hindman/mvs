@@ -89,7 +89,7 @@ class RenamingPlan:
         self.has_prepared = False
         self.has_renamed = False
         self.tracking_index = self.TRACKING.not_started
-        self.raise_at = None
+        self.call_at = None
 
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
@@ -652,10 +652,11 @@ class RenamingPlan:
     def do_rename(self, rp):
         # Takes a RenamePair and executes its renaming.
 
-        # For testing purposes, raise a simulated error at
-        # the desired tracking_index.
-        if self.tracking_index == self.raise_at:
-            raise ZeroDivisionError('SIMULATED_ERROR')
+        # For testing purposes, call any needed code in
+        # the middle of renaming -- eg, to raise an error
+        # of some kind or to affect the file system in some way.
+        if self.call_at and self.tracking_index == self.call_at[0]:
+            self.call_at[1](self)
 
         # Set up Path instance.
         po = Path(rp.orig)

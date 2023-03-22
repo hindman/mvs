@@ -884,8 +884,11 @@ def test_rename_paths_raises(tr, creators):
         cli.do_prepare()
         assert cli.plan.tracking_rp is None
         assert cli.plan.tracking_index == NSTART
-        cli.plan.raise_at = N
+        cli.plan.call_at = (N, raiser)
         cli.do_rename()
+
+    def raiser(plan):
+        raise ZeroDivisionError('SIMULATED_ERROR')
 
     # Basic scenario.
     wa, outs, cli = run_checks(*run_args)
@@ -920,7 +923,7 @@ def test_rename_paths_raises(tr, creators):
     assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
 
     # Same scenario, but this time we will trigger the exception via
-    # the raise_at attribute, so we can check the tracking_index in
+    # the call_at attribute, so we can check the tracking_index in
     # the tracking log and in the command-line error message.
     N = 1
     wa, outs, cli = run_checks(
