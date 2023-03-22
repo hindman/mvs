@@ -372,6 +372,10 @@ def path_existence_and_type(path):
     # Zap!
     return (e, pt)
 
+def is_non_empty_dir(path):
+    # Returns true if the given directory path has stuff in it.
+    return any(Path(path).iterdir())
+
 ####
 # Constants and a function to determine file system case sensitivity.
 ####

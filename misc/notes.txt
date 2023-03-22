@@ -13,13 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Implement: only empty directories can be clobbered.
-
-    - See test_new_exists_non_empty() for partial progress
-      on a test for the behavior.
-
-    - We might neeed a new Problem(existing_full)?
-
 Tests:
 
     x Clobbering: like can clobber like.

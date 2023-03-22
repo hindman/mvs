@@ -810,9 +810,7 @@ def test_new_exists_non_empty(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: don't include the extras. Renaming succeeds.
-    wa, plan = run_checks(
-        *run_args,
-    )
+    wa, plan = run_checks(*run_args)
 
     # Scenario: include extras. Renaming is rejected because
     # the a.new directory already exists.
@@ -821,23 +819,27 @@ def test_new_exists_non_empty(tr, create_wa):
         extras = extras,
         failure = True,
         no_change = True,
-        reason = PN.existing,
+        reason = PN.existing_non_empty,
     )
 
     # Scenario: include extras and ask for clobbering.
     # Renaming will still be rejected because the a.new
     # directory is not empty.
-    #
-    # TODO: enforcement not implemented yet.
-    #
-    return
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         controls = 'clobber-existing',
         failure = True,
         no_change = True,
-        reason = PN.existing_full,
+        reason = PN.existing_non_empty,
+    )
+
+    # Scenario: same, but this time the directory is empty.
+    # Renaming succeeds.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras[:-1],
+        controls = 'clobber-existing',
     )
 
 def test_new_parent_missing(tr, create_wa):

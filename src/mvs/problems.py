@@ -26,6 +26,7 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'colliding',
     'existing_diff',
     'colliding_diff',
+    'existing_non_empty',
     # Not controllable.
     'all_filtered',
     'parsing_no_paths',
@@ -50,6 +51,7 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     PN.colliding:              'New path collides with another new path',
     PN.existing_diff:          'New path exists and differs with original in type',
     PN.colliding_diff:         'New path collides with another new path, and they differ in type',
+    PN.existing_non_empty:     'New path collides with a non-empty directory',
     # Not controllable.
     PN.all_filtered:           'All paths were filtered out during processing',
     PN.parsing_no_paths:       'No input paths',
@@ -118,6 +120,7 @@ CONTROLLABLES = {
         PN.colliding,
         PN.existing_diff,
         PN.colliding_diff,
+        PN.existing_non_empty,
     ),
     CONTROLS.clobber: (
         PN.existing,

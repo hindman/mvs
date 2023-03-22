@@ -20,6 +20,7 @@ from .utils import (
     RenamePair,
     STRUCTURES,
     file_system_case_sensitivity,
+    is_non_empty_dir,
     path_existence_and_type,
 )
 
@@ -434,15 +435,6 @@ class RenamingPlan:
             return Problem(PN.type)
 
     def check_new_exists(self, rp, seq_val):
-        # Convenience variables:
-        # - Whether rp.new exists in any sense.
-        # - The type of problem to return if clobbering would occur.
-        new_exists = (rp.exist_new >= EXISTENCES.exists)
-        clobber_prob = (
-            Problem(PN.existing) if rp.type_orig == rp.type_new else
-            Problem(PN.existing_diff)
-        )
-
         # Handle path equality. In this case, renaming is
         # impossible and user input did not request it.
         if rp.equal:
@@ -451,8 +443,17 @@ class RenamingPlan:
         # Handle situation where rp.new does not exist in any sense.
         # In this case, we can rename freely, regardless of file
         # system type or other renaming details.
+        new_exists = (rp.exist_new >= EXISTENCES.exists)
         if not new_exists:
             return None
+
+        # Determine the type of Problem to return if clobbering would occur.
+        if rp.type_new == PATH_TYPES.directory and is_non_empty_dir(rp.new):
+            clobber_prob = Problem(PN.existing_non_empty)
+        elif rp.type_orig == rp.type_new:
+            clobber_prob = Problem(PN.existing)
+        else:
+            clobber_prob = Problem(PN.existing_diff)
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rp.new exists, we have clobbering
