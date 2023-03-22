@@ -14,9 +14,14 @@ todos: TODOs
 --------
 
 Tests:
+
+    - Issues: fix:
+
+        tests/work : does not exist in a fresh clone of repo
+
+    - Rerun workflow on drop-fakefs branch.
+
     - Assess coverage
-    - See if I can run test on Github to check for failures on Linux/Windows.
-        - Maybe change tests to run on demand only?
 
 New documentation [see NEW_DOCS].
 

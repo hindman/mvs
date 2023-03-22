@@ -2,7 +2,6 @@ import os
 import pyperclip
 
 from dataclasses import dataclass
-from functools import cache
 from kwexception import Kwexception
 from pathlib import Path
 from short_con import constants
@@ -386,11 +385,15 @@ FS_TYPES = constants('FileSystemTypes', (
     'case_sensitive',
 ))
 
-@cache
 def file_system_case_sensitivity():
     # Determines the file system's case sensitivity.
     # This approach ignore the complexity of per-directory
     # sensitivity settings supported by some operating systems.
+
+    # Return cached value if we have one.
+    if file_system_case_sensitivity.cached is not None:
+        return file_system_case_sensitivity.cached
+
     with TemporaryDirectory() as dpath:
         # Create an empty temp directory.
         # Inside it, touch two differently-cased file names.
@@ -404,9 +407,13 @@ def file_system_case_sensitivity():
         # - If the parent reports having 'FoO', case-preserving.
         # - Case-insensitive systems will report having 'foo' or 'FOO'.
         contents = tuple(d.iterdir())
-        return (
+        fs_type = (
             FS_TYPES.case_sensitive if len(contents) == 2 else
             FS_TYPES.case_preserving if contents == (f1,) else
             FS_TYPES.case_insensitive
         )
+        file_system_case_sensitivity.cached = fs_type
+        return fs_type
+
+file_system_case_sensitivity.cached = None
 
