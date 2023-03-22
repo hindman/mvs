@@ -763,18 +763,19 @@ def test_preferences_problem_control(tr, creators):
             return opts
 
     # Scenario: with no user-prefs and command line controls,
-    # we should get the application defaults.
+    # we should get no controls.
     opts = get_opts()
-    assert sorted(opts.controls) == sorted(app_defs)
+    assert opts.controls == []
 
-    # Scenario: defaults plus some other controls.
+    # Scenario: some other controls.
     opts = get_opts('--controls', *others)
-    assert sorted(opts.controls) == sorted(app_defs + others)
+    assert opts.controls == others
 
     # Scenario: same, but also use a negative control, which
     # counteracts the application default.
-    opts = get_opts('--controls', 'no-skip-equal', 'no-skip-same', 'no-skip-recase', *others)
-    assert sorted(opts.controls) == sorted(others)
+    negatives = ['no-skip-equal', 'no-skip-same', 'no-skip-recase']
+    opts = get_opts('--controls', *negatives, *others)
+    assert opts.controls == negatives + others
 
     # Scenario: invalid control.
     wa, outs, cli = run_checks(

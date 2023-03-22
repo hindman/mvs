@@ -315,27 +315,15 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Merge settings for problem controls, in three stages:
-        # - Start with the application defaults.
-        # - Then apply user-preferences.
-        # - Finally command-line.
-        controls = set()
-        normalized = RenamingPlan.normalized_controls
-        stages = (
-            normalized(RenamingPlan.DEFAULT_CONTROLS),
-            normalized(prefs.get('controls', '')),
-            normalized(opts.controls or ''),
+        # Combine the controls from pref and then opts.
+        # Values latter in the sequence will have precedence
+        # when the RenamingPlan builds the control-lookup.
+        # Here we just remove duplicates and standardize names.
+        norm = RenamingPlan.normalized_controls
+        controls = norm(
+            norm(prefs.get('controls', '')) +
+            norm(opts.controls)
         )
-        for pc_names in stages:
-            for name in pc_names:
-                # Create a ProblemControl instance (the name has already been
-                # validated by argparse). If it's a negative control name,
-                # remove its affirmative sibling. Otherwise, add it.
-                pc = ProblemControl(name)
-                if pc.no:
-                    controls.discard(pc.affirmative_name)
-                else:
-                    controls.add(pc.name)
 
         # Check for conflicting controls.
         # We ignore returned lookup: just validating here.
@@ -346,7 +334,7 @@ class CliRenamer:
             return None
 
         # Set the controls and return.
-        opts.controls = sorted(controls)
+        opts.controls = list(controls)
         return opts
 
     @property

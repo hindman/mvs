@@ -152,8 +152,8 @@ class ProblemControl:
         i = 3 if self.no else 0
         return self.name[i:]
 
-    @classmethod
-    def normalized_name(cls, name):
+    @staticmethod
+    def normalized_name(name):
         return name.replace(CON.underscore, CON.hyphen)
 
     @classmethod

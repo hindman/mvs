@@ -97,9 +97,8 @@ class RenamingPlan:
         # Convert the problem-control inputs into a normalized tuple. Then
         # build a lookup mapping each Problem name to the user's requested
         # control mechanism.
-        if controls is None:
-            controls = self.DEFAULT_CONTROLS
-        self.controls = self.normalized_controls(controls)
+        norm = self.normalized_controls
+        self.controls = norm(norm(self.DEFAULT_CONTROLS) + norm(controls))
         self.control_lookup = self.build_control_lookup(self.controls)
 
         # Problems that occur during the prepare() phase are stored in a dict.
@@ -531,17 +530,36 @@ class RenamingPlan:
 
     @staticmethod
     def normalized_controls(controls):
-        # Takes user's input controls and returns them as
-        # a tuple of normalized values using hyphens.
+        # Takes user's input controls and returns them as a
+        # de-duplicated tuple of standardized ProblemControl names.
+
+        # Handle empty.
         if controls is None:
             return ()
-        elif isinstance(controls, str):
-            return tuple(controls.split())
+
+        # Convert to tuple.
+        if isinstance(controls, str):
+            controls_tup = tuple(controls.split())
         else:
             try:
-                return tuple(controls)
+                controls_tup = tuple(controls)
             except Exception as e:
                 raise MvsError(MF.invalid_controls, controls = controls)
+
+        # Remove duplicates and normalize each name.
+        # We do this in reverse order so that the ordering
+        # of the final no-dups list respects the ordering
+        # of the last-appearance of each value.
+        uniq = []
+        seen = set()
+        for c in reversed(controls_tup):
+            c = ProblemControl.normalized_name(c)
+            if c not in seen:
+                uniq.append(c)
+                seen.add(c)
+
+        # Return as a tuple in the forward order.
+        return tuple(reversed(uniq))
 
     @staticmethod
     def build_control_lookup(pc_names):
@@ -559,16 +577,18 @@ class RenamingPlan:
         )
         lookup = {}
         for pc in pcs:
-            pname = pc.pname
+            prob = pc.pname
             if pc.no:
-                msg = MF.invalid_control.format(pc.name)
-                raise MvsError(msg)
-            elif pname in lookup:
-                fmt = MF.conflicting_controls
-                msg = fmt.format(pname, lookup[pname], pc.control)
-                raise MvsError(msg)
+                lookup.pop(prob, None)
+            elif prob in lookup:
+                if lookup[prob] == pc.control:
+                    continue
+                else:
+                    fmt = MF.conflicting_controls
+                    msg = fmt.format(prob, lookup[prob], pc.control)
+                    raise MvsError(msg)
             else:
-                lookup[pname] = pc.control
+                lookup[prob] = pc.control
         return lookup
 
     def handle_problem(self, p, rp = None):
