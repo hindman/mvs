@@ -135,7 +135,7 @@ class ProblemControl:
         tup = self.all_controls().get(self.name, None)
         if tup:
             self.control = tup[0]
-            self.pname = tup[1]
+            self.prob = tup[1]
             self.no = tup[2]
         else:
             msg = MF.invalid_control.format(raw_name)
@@ -161,11 +161,11 @@ class ProblemControl:
         prefixes = ('', 'no-') if no else ('',)
         d = {}
         for no in prefixes:
-            for control, pnames in CONTROLLABLES.items():
-                for pname in pnames:
-                    pname = cls.normalized_name(pname)
-                    k = f'{no}{control}-{pname}'
-                    d[k] = (control, pname, bool(no))
+            for control, probs in CONTROLLABLES.items():
+                for prob in probs:
+                    prob = cls.normalized_name(prob)
+                    k = f'{no}{control}-{prob}'
+                    d[k] = (control, prob, bool(no))
         if names_only:
             return tuple(d)
         else:

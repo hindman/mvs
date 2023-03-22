@@ -13,16 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-RenamingPlan.controls: merge controls rather than replacing:
-
-    - STATUS:
-        - Implementation is done.
-        - Need to fix test_invalid_controls()
-
-    - If a user supplies any controls, all of the DEFAULT_CONTROLS are lost.
-      Instead, they should be merged, with the user's controls taking
-      precedence.
-
 Refactor test_plan.py:
     - Use run_checks: see docstring.
     - Organize test functions into related groups.

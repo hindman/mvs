@@ -577,7 +577,7 @@ class RenamingPlan:
         )
         lookup = {}
         for pc in pcs:
-            prob = pc.pname
+            prob = pc.prob
             if pc.no:
                 lookup.pop(prob, None)
             elif prob in lookup:

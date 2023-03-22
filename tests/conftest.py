@@ -69,7 +69,7 @@ class TestResource:
 
     @classmethod
     def dump(cls, val = None, label = 'dump()'):
-        fmt = '\n--------\n{label} =>\n{val}'
+        fmt = '\n--------\n# {label} =>\n{val}'
         msg = fmt.format(label = label, val = val)
         print(msg)
 

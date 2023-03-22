@@ -49,6 +49,7 @@ from mvs.problems import (
     CONTROLS,
     PROBLEM_NAMES as PN,
     Problem,
+    ProblemControl,
 )
 
 ####
@@ -155,12 +156,12 @@ def test_top_level_imports(tr):
 # Helper to confirm that a RenamingPlan raised for the expected reason.
 ####
 
-def assert_raised_because(einfo, plan, pname):
+def assert_raised_because(einfo, plan, prob):
     # Takes (1) an einfo for an exception that was raised by,
     # (2) the given RenamingPlan, and (3) an expected Problem name.
 
     # Get the part of the Problem message format before any string formatting.
-    exp_msg = Problem.format_for(pname).split('{')[0]
+    exp_msg = Problem.format_for(prob).split('{')[0]
     size = len(exp_msg)
 
     # Grab the plan's uncontrolled failure messages, trimmed to the same size.
@@ -589,34 +590,71 @@ def test_invalid_controls(tr, create_wa):
     wa, plan = run_checks(*run_args)
     INPUTS = plan.inputs
 
-    # def do_checks(controls, exp):
-    #     plan1 = RenamingPlan(INPUTS, controls = controls)
-    #     plan2 = RenamingPlan(INPUTS, controls = ' '.join(controls))
-    #     assert plan1.control_lookup == exp
-    #     assert plan2.control_lookup == exp
+    # Helper to create a RenamingPlan and checks its
+    # controls and control_lookup.
+    def check_controls(controls, exp_controls, exp_lookup):
+        # Pass controls as a tuple and a str.
+        p1 = RenamingPlan(INPUTS, controls = controls)
+        p2 = RenamingPlan(INPUTS, controls = ' '.join(controls))
+        # Check.
+        assert p1.controls == exp_controls
+        assert p2.controls == exp_controls
+        assert p1.control_lookup == exp_lookup
+        assert p2.control_lookup == exp_lookup
 
-    # TODO: get test working.
-    # What am I trying to do here?
-    # Scenarios: can configure problem-control in various ways.
-    # Should check the control_lookup.
-
-    return
-
-    controls = tuple(
-        ProblemControl(f'skip-{prob}').name
+    # Prepare some tuples holding ProblemControl instances
+    # and their names for all problems that are skippable.
+    ALL_SKIP_PCS = tuple(
+        ProblemControl(f'skip-{prob}')
         for prob in CONTROLLABLES[CONTROLS.skip]
     )
+    ALL_SKIP_NAMES = tuple(pc.name for pc in ALL_SKIP_PCS)
 
-    all_controls = tuple(f'skip-{c}' for c in all_controls)
-    checks = (
-        ('all', all_controls, all_controls),
-        ('first2', ('no-skip-recase', 'no-skip-same'), ('skip-equal',)),
+    # Various scenarios to set the controls for a RenamingPlan.
+    # Each scenario defines arguments for check_controls().
+    scenarios = dict(
+        # All skippable controls.
+        all_skips = (
+            ALL_SKIP_NAMES,
+            ALL_SKIP_NAMES,
+            {pc.prob : pc.control for pc in ALL_SKIP_PCS},
+        ),
+        # Caller wants to cancel two of the defaults.
+        drop2_defaults = (
+            ('no-skip-recase', 'no-skip-same'),
+            RenamingPlan.DEFAULT_CONTROLS + ('no-skip-recase', 'no-skip-same'),
+            {'equal': 'skip'},
+        ),
+        # Unusual combination.
+        combo = (
+            (
+                'no-skip-equal',     # Cancel the default.
+                'create-parent',     # Add some others.
+                'clobber-existing',
+                'skip-equal',        # Re-add the default.
+            ),
+            (
+                'skip-same',
+                'skip-recase',
+                'no-skip-equal',
+                'create-parent',
+                'clobber-existing',
+                'skip-equal',        # Should appear last.
+            ),
+            {
+                'same': 'skip',
+                'recase': 'skip',
+                'parent': 'create',
+                'existing': 'clobber',
+                'equal': 'skip',
+            },
+        ),
     )
-    for label, controls, exp in checks:
-        plan1 = RenamingPlan(INPUTS, controls = controls)
-        plan2 = RenamingPlan(INPUTS, controls = ' '.join(controls))
-        assert (label, plan1.controls) == (label, exp)
-        assert (label, plan2.controls) == (label, exp)
+
+    # Check those scenarios. They are valid configurations.
+    check_controls(*scenarios['all_skips'])
+    check_controls(*scenarios['drop2_defaults'])
+    check_controls(*scenarios['combo'])
 
     # But we cannot control the same problem in two different ways.
     checks = (
@@ -624,12 +662,12 @@ def test_invalid_controls(tr, create_wa):
         (PN.existing, CONTROLS.skip, CONTROLS.clobber),
         (PN.colliding, CONTROLS.skip, CONTROLS.clobber),
     )
-    for pname, *controls in checks:
-        tup = tuple(f'{c}-{pname}' for c in controls)
+    for prob, *controls in checks:
+        tup = tuple(f'{c}-{prob}' for c in controls)
         with pytest.raises(MvsError) as einfo:
             plan = RenamingPlan(INPUTS, controls = tup)
         msg = einfo.value.params['msg']
-        exp = MF.conflicting_controls.format(pname, *controls)
+        exp = MF.conflicting_controls.format(prob, *controls)
         assert msg == exp
 
     # And we cannot control a problem in an inappropriate way.
@@ -638,8 +676,8 @@ def test_invalid_controls(tr, create_wa):
         (PN.missing, CONTROLS.create),
         (PN.parent, CONTROLS.clobber),
     )
-    for pname, control in checks:
-        pc_name = f'{control}-{pname}'
+    for prob, control in checks:
+        pc_name = f'{control}-{prob}'
         with pytest.raises(MvsError) as einfo:
             plan = RenamingPlan(INPUTS, controls = pc_name)
         msg = einfo.value.params['msg']
