@@ -115,6 +115,7 @@ class WorkArea:
     SLASH = '/'
     LINK_SEP = '->'
     ROOT = f'tests{os.sep}work'
+    KEEP_FILE = '.keep'
     USER_PERMISSSIONS = {
         'r': stat.S_IRUSR,
         'w': stat.S_IWUSR,
@@ -257,13 +258,22 @@ class WorkArea:
 
     def initialize(self):
         # Creates an empty work area.
+
+        # Make the directory tree fully accessible.
         r = self.ROOT
         self.make_subdirs_accessible()
+
+        # Remove the directory.
         try:
             shutil.rmtree(r)
         except FileNotFoundError:
             pass
-        Path(r).mkdir()
+
+        # Create directory and KEEP_FILE.
+        p = Path(r)
+        p.mkdir()
+        k = p / self.KEEP_FILE
+        k.touch()
 
     def make_subdirs_accessible(self):
         # Helper used before we need to traverse the work area.
@@ -330,11 +340,13 @@ class WorkArea:
             wps = self.news_wp + self.extras_wp
         exp = sorted(set(wp.path for wp in wps))
 
-        # Actual content of the work area.
+        # Actual content of the work area (other than KEEP_FILE).
+        keep = Path(self.ROOT) / self.KEEP_FILE
         self.make_subdirs_accessible()
         got = sorted(
             str(p)
             for p in Path(self.ROOT).glob('**/*')
+            if p != keep
         )
 
         # Assert and return.

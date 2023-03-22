@@ -17,7 +17,7 @@ Tests:
 
     - Issues: fix:
 
-        tests/work : does not exist in a fresh clone of repo
+        ...
 
     - Rerun workflow on drop-fakefs branch.
 
