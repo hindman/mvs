@@ -15,19 +15,22 @@ todos: TODOs
 
 Fix the check for new-collisions:
 
-    - Checks for collisions among new paths is done in a case-sensitive
-      way. So new-collisions among 'foo' and 'FOO' won't be reported as
-      problems.
+    - The check for collisions among new paths is done in a case-sensitive way.
+      So new-collisions among 'foo' and 'FOO' won't be reported as problems.
 
-    - Based on this example, it looks like the renaming "succeeds" and
-      paths are clobbered silently [because Path.rename() allows silent
-      clobbering on Unix and MacOS if the user has sufficient permissions.]
+    - Based on this example, it looks like the renaming "succeeds" and paths
+      are clobbered silently [because Path.rename() allows silent clobbering on
+      Unix and MacOS if the user has sufficient permissions.] UPDATE: now that
+      do_rename() includes a last line of defense against unrequested
+      clobbering, the clobber does not occur, but renaming does raise
+      in the middle.
 
         mvs a b c x y Y
 
         a => x
         b => y    # Now y exists.
-        c => y    # Path stays lowercase, but it assumes the content of file c.
+        c => y    # Path stays lowercase, but it assumes the content of file c. [OLD BEHAVIOR]
+                  # Renaming halts before c=>Y [NEW BEHAVIOR]
 
     - Fix: implement case_sensistive_file_sys():
 
