@@ -15,12 +15,6 @@ todos: TODOs
 
 Tests:
 
-    - Issues: fix:
-
-        ...
-
-    - Rerun workflow on drop-fakefs branch.
-
     - Assess coverage
 
 New documentation [see NEW_DOCS].
