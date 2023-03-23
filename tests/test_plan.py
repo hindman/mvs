@@ -1,5 +1,6 @@
 import pytest
 from itertools import chain
+from pathlib import Path
 
 from mvs.plan import RenamingPlan
 
@@ -42,9 +43,11 @@ def run_checks(
                # Assertion making.
                early_checks = None,
                check_wa = True,
+               check_failure = True,
                failure = False,
                no_change = False,
                reason = None,
+               return_einfo = False,
                # Renaming behavior.
                prepare_only = False,
                prepare_before = 0,
@@ -73,41 +76,50 @@ def run_checks(
         early_checks(wa, plan)
 
     # Helper to execute plan.prepare() and plan.rename_paths().
-    def do_rename():
-        if rootless:
-            with wa.cd():
-                for _ in range(prepare_before):
-                    plan.prepare()
-                plan.rename_paths()
-        else:
-            for _ in range(prepare_before):
-                plan.prepare()
-            plan.rename_paths()
+    def do_prepare_and_rename():
+        # Prepare.
+        n_preps = int(prepare_before or prepare_only)
+        for _ in range(n_preps):
+            plan.prepare()
+        if prepare_only:
+            return None
 
-    # Run the renaming or just the preparations.
-    # Check for failure and, in some case, its reason.
-    if prepare_only:
-        no_change = True
-        plan.prepare()
+        # Rename.
         if failure:
-            assert plan.failed
-    elif failure:
-        plan.prepare()
-        assert plan.failed
-        with pytest.raises(MvsError) as einfo:
-            do_rename()
-        if reason:
-            assert_raised_because(einfo, plan, reason)
+            with pytest.raises(MvsError) as einfo:
+                plan.rename_paths()
+            return einfo
+        else:
+            plan.rename_paths()
+            return None
+
+    # Run the preparation and renaming.
+    if rootless:
+        with wa.cd():
+            einfo = do_prepare_and_rename()
     else:
-        do_rename()
-        assert not plan.failed
+        einfo = do_prepare_and_rename()
+
+    # Check for plan failure and its reason.
+    if check_failure:
+        if failure:
+            if reason:
+                assert_raised_because(einfo, plan, reason)
+            assert plan.failed
+        else:
+            assert not plan.failed
 
     # Check work area.
     if check_wa:
+        if prepare_only:
+            no_change = True
         wa.check(no_change = no_change)
 
     # Let the caller make other custom assertions.
-    return (wa, plan)
+    if return_einfo:
+        return (wa, plan, einfo)
+    else:
+        return (wa, plan)
 
 ####
 # Helper to confirm that a RenamingPlan raised for the expected reason.
@@ -140,16 +152,21 @@ def test_no_inputs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
     news = ('aa', 'bb')
+    rename_code = 'return o + o'
     run_args = (tr, create_wa, origs, news)
 
-    # If given no inputs, renaming will be rejected.
-    wa, plan = run_checks(
-        *run_args,
-        inputs = (),
-        failure = True,
-        reason = PN.parsing_no_paths,
-        no_change = True,
-    )
+    # Scenario: if given no inputs, renaming will be rejected.
+    # We run the scenario with and without rename_code just
+    # to exercise an additional code path.
+    for code in (None, rename_code):
+        wa, plan = run_checks(
+            *run_args,
+            inputs = (),
+            rename_code = code,
+            failure = True,
+            reason = PN.parsing_no_paths,
+            no_change = True,
+        )
 
 def test_structure_default(tr, create_wa):
     # Paths and args.
@@ -534,7 +551,7 @@ def test_prepare_rename_multiple_times(tr, create_wa):
 # Problems and problem-control.
 ####
 
-def test_invalid_controls(tr, create_wa):
+def test_controls(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
@@ -588,7 +605,10 @@ def test_invalid_controls(tr, create_wa):
                 'no-skip-equal',     # Cancel the default.
                 'create-parent',     # Add some others.
                 'clobber-existing',
+                'clobber-existing',  # Multiple times has no effect.
                 'skip-equal',        # Re-add the default.
+                'skip-equal',
+                'skip-equal',
             ),
             (
                 'skip-same',
@@ -641,6 +661,14 @@ def test_invalid_controls(tr, create_wa):
         exp = MF.invalid_control.format(pc_name)
         assert msg == exp
 
+    # Or in a completely invalid way.
+    BAD_VAL = 999
+    with pytest.raises(MvsError) as einfo:
+        plan = RenamingPlan(INPUTS, controls = BAD_VAL)
+    err = einfo.value
+    assert err.msg == MF.invalid_controls
+    assert err.params['controls'] == BAD_VAL
+
 def test_equal(tr, create_wa):
     # Paths and args.
     # One of the origs equals its new counterpart.
@@ -663,6 +691,51 @@ def test_equal(tr, create_wa):
         no_change = True,
         reason = PN.equal,
     )
+
+def test_same(tr, create_wa):
+    # Paths and args.
+    origs = ('foo/xyz', 'BAR/xyz', 'a')
+    news = ('FOO/xyz', 'bar/xyz', 'a.new')
+    expecteds_create = ('foo', 'FOO', 'FOO/xyz', 'BAR', 'bar', 'bar/xyz', 'a.new')
+    expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
+    expecteds_no_skip = origs + ('foo', 'BAR')
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenarios: for the first two RenamePair instances,
+    # orig and new differ only in the casing of their parent.
+    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+        # Scenario: case-sensitive system: renaming will be rejected
+        # due to the missing parents.
+        wa, plan = run_checks(
+            *run_args,
+            failure = True,
+            no_change = True,
+            reason = PN.parent,
+        )
+
+        # Scenario: but it will succeed if we request create-parent.
+        wa, plan = run_checks(
+            *run_args,
+            expecteds = expecteds_create,
+            controls = 'create-parent',
+        )
+    else:
+        # Scenario: case-insensitive system: renaming will succeed
+        # because skip-same is a default problem control.
+        wa, plan = run_checks(
+            *run_args,
+            expecteds = expecteds_skip,
+        )
+
+        # Scenario: but it will fail if we disable skip-same.
+        wa, plan = run_checks(
+            *run_args,
+            controls = 'no-skip-same',
+            expecteds = expecteds_no_skip,
+            failure = True,
+            no_change = True,
+            reason = PN.same,
+        )
 
 def test_missing_orig(tr, create_wa):
     # Paths and args.
@@ -965,4 +1038,42 @@ def test_failures_skip_all(tr, create_wa):
         no_change = True,
         reason = PN.all_filtered,
     )
+
+####
+# Other.
+####
+
+def test_unexpected_clobber(tr, create_wa):
+    # Paths and args.
+    VICTIM = 'b.new'
+    origs = ('a', 'b', 'c')
+    news = ('a.new', VICTIM, 'c.new')
+    expecteds = ('a.new', 'b', 'c', VICTIM)
+    run_args = (tr, create_wa, origs, news)
+
+    # Helper to create an unexpected clobbering situation
+    # in the middle of renaming.
+    def set_call_at(wa, plan):
+        f = lambda _: Path(VICTIM).touch()
+        plan.call_at = (news.index(VICTIM), f)
+
+    # Scenario: basic renaming; it works.
+    wa, plan = run_checks(*run_args, rootless = True)
+
+    # Scenario: but if we create the clobbering victim in the middle of
+    # renaming, RenamingPlan.rename_paths() will raise an exception and
+    # renaming will be aborted in the midway through.
+    wa, plan, einfo = run_checks(
+        *run_args,
+        rootless = True,
+        expecteds = expecteds,
+        early_checks = set_call_at,
+        failure = True,
+        check_failure = False,
+        return_einfo = True,
+    )
+    err = einfo.value
+    assert err.msg == MF.unrequested_clobber
+    assert err.params['orig'] == 'b'
+    assert err.params['new'] == VICTIM
 

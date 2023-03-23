@@ -329,11 +329,14 @@ class WorkArea:
 
     def check(self, do_assert = True, no_change = False):
         # What we expect to find.
+        #
+        # Note the this logic is too simple for situations
+        # where the input paths in WorkArea contain subdirectories.
+        # So far, there are not too many tests where this kind
+        # of scenario is used, and it has been handled via
+        # an explicit declaration of expecteds.
         if self.expecteds_wp:
             wps = self.expecteds_wp
-            if no_change:
-                msg = 'WorkArea.check(): do not use both expecteds and no_change'
-                raise RuntimeError(msg)
         elif no_change:
             wps = self.origs_wp + self.extras_wp
         else:

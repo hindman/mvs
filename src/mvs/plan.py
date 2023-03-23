@@ -577,9 +577,7 @@ class RenamingPlan:
         # Returns a dict mapping each Problem name that the user wants
         # to control to the desired control mechanism.
         #
-        # Raises if the user (1) supplies an invalid problem control,
-        # (2) suplies a negative problem control, or
-        # (3) tries to control the same Problem in different ways.
+        # Raises if user tries to control the same Problem in different ways.
         pcs = tuple(
             ProblemControl(name)
             for name in pc_names
@@ -589,13 +587,10 @@ class RenamingPlan:
             prob = pc.prob
             if pc.no:
                 lookup.pop(prob, None)
-            elif prob in lookup:
-                if lookup[prob] == pc.control:
-                    continue
-                else:
-                    fmt = MF.conflicting_controls
-                    msg = fmt.format(prob, lookup[prob], pc.control)
-                    raise MvsError(msg)
+            elif prob in lookup and lookup[prob] != pc.control:
+                fmt = MF.conflicting_controls
+                msg = fmt.format(prob, lookup[prob], pc.control)
+                raise MvsError(msg)
             else:
                 lookup[prob] = pc.control
         return lookup

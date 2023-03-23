@@ -13,9 +13,7 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Tests:
-
-    - Assess coverage
+Tests: address coverage gaps for plan.py
 
 New documentation [see NEW_DOCS].
 

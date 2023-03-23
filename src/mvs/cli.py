@@ -125,7 +125,7 @@ class CliRenamer:
                 controls = opts.controls,
             )
             plan = self.plan
-        except MvsError as e:
+        except MvsError as e: # pragma: no cover
             self.wrapup(CON.exit_fail, e.msg)
             return
         except Exception as e: # pragma: no cover
