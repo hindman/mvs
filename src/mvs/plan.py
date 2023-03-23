@@ -457,7 +457,8 @@ class RenamingPlan:
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rp.new exists, we have clobbering
-        if file_system_case_sensitivity() != FS_TYPES.case_preserving:
+        fs_type = file_system_case_sensitivity()
+        if fs_type != FS_TYPES.case_preserving: # pragma: no cover
             return clobber_prob
 
         # Handle case-preserving file system where rp.orig and rp.new have
@@ -483,7 +484,8 @@ class RenamingPlan:
                 # agrees with the file system, so renaming is impossible.
                 return Problem(PN.recase)
             else:
-                # User wants a case-change renaming (self-clobber): no problem.
+                # User wants a case-change renaming (self-clobber).
+                rp.clobber_self = True
                 return None
         else:
             # User wants a name-change, and it would clobber something else.
@@ -673,17 +675,22 @@ class RenamingPlan:
         # If new path exists already, deal with it before
         # we attempt to renaming from rp.orig to rp.new.
         #
-        # (1) User requested clobbering. Delete the current
+        # (1) User requested case-change renaming (self clobber).
+        # No problem.
+        #
+        # (2) User requested clobbering. Delete the current
         # path at rp.new. We do this so that the renaming won't
         # inherit casing from the current path.
         #
-        # (2) User did not request clobber, but the path at rp.new
+        # (3) User did not request clobber, but the path at rp.new
         # exists nonetheless (presumably it was creating between
         # the check for new-existing and now). Raise an exception.
         # This is the final line of defense against unintended clobbering.
         #
         if pn.exists():
-            if rp.clobber:
+            if rp.clobber_self:
+                pass
+            elif rp.clobber:
                 if rp.type_orig == PATH_TYPES.file:
                     pn.unlink()
                 else:

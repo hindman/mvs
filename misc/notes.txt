@@ -15,6 +15,13 @@ todos: TODOs
 
 Tests: address coverage gaps for plan.py
 
+    - The only gaps are in check-new-collisions, where rp collides with other
+      new paths:
+
+        1. Scenario: rp.orig does not exist
+
+        2. Scenario: one of other.new also exists
+
 New documentation [see NEW_DOCS].
 
 Editing pass [see NEW_DOCS].

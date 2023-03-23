@@ -696,6 +696,7 @@ def test_same(tr, create_wa):
     # Paths and args.
     origs = ('foo/xyz', 'BAR/xyz', 'a')
     news = ('FOO/xyz', 'bar/xyz', 'a.new')
+    expecteds_no_create = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a')
     expecteds_create = ('foo', 'FOO', 'FOO/xyz', 'BAR', 'bar', 'bar/xyz', 'a.new')
     expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
     expecteds_no_skip = origs + ('foo', 'BAR')
@@ -709,7 +710,7 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             failure = True,
-            no_change = True,
+            expecteds = expecteds_no_create,
             reason = PN.parent,
         )
 
@@ -839,6 +840,33 @@ def test_new_exists(tr, create_wa):
         reason = PN.existing_diff,
     )
 
+def test_new_exists_diff_parents(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b')
+    news = ('a.new', 'xy/b.new')
+    extras = ('xy/', 'xy/b.new')
+    expecteds = ('a.new', 'b') + extras
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: one of new paths already exists and
+    # it parent directory is different than orig path.
+    # Renaming will be rejected.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        failure = True,
+        no_change = True,
+        reason = PN.existing,
+    )
+
+    # Scenario: renaming will succeed if we skip the offending paths.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = expecteds,
+        controls = 'skip-existing',
+    )
+
 def test_new_exists_different_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -874,6 +902,51 @@ def test_new_exists_different_case(tr, create_wa):
             expecteds = news,
             controls = 'clobber-existing',
         )
+
+def test_new_exists_case_change_renaming(tr, create_wa):
+    # Paths and args.
+    origs = ('x/a',)
+    news = ('x/A',)
+    expecteds = ('x',) + news
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: renaming should succeed regardless of
+    # the file system case-sensitivivity because the rename
+    # operation involves a case-change renaming.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds,
+    )
+
+def test_new_exists_recase(tr, create_wa):
+    # Paths and args.
+    origs = ('xyz',)
+    news = ('xyZ',)
+    run_args = (tr, create_wa, origs, news)
+
+    # Reason for failure will vary by file system type.
+    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+        reason = PN.missing
+    else:
+        reason = PN.all_filtered
+
+    # Scenarios: user reverses order of news and origs
+    # when supplying inputs. Renaming will be rejected.
+    #
+    # - Case-sensitive system: because orig path won't exist.
+    #
+    # - Case-insensitive system: because new path already agrees
+    #   with the casing found on the file system, resuling in a
+    #   Problem(recase), which is skipped by default, leaving
+    #   nothing to be renamed.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = news + origs,
+        rootless = True,
+        failure = True,
+        no_change = True,
+        reason = reason,
+    )
 
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.

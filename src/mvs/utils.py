@@ -139,9 +139,11 @@ class RenamePair:
     # - Whether user code filtered out the RenamePair.
     # - Whether to create new-parent before renaming.
     # - Whether renaming will clobber something.
+    # - Whether renaming will involve case-change-only renaming (ie self-clobber).
     exclude: bool = False
     create_parent: bool = False
     clobber: bool = False
+    clobber_self: bool = False
 
     @property
     def equal(self):
