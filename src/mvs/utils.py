@@ -1,5 +1,6 @@
 import os
 import pyperclip
+import sys
 
 from dataclasses import dataclass
 from kwexception import Kwexception
@@ -178,7 +179,8 @@ def edit_text(editor, text):
         fh.write(text)
 
     # Let user edit the file.
-    cmd = f"{editor} '{path}'"
+    q = '"' if sys.platform == 'win32' else "'"
+    cmd = f"{editor} {q}{path}{q}"
     p = run(cmd, shell = True)
 
     # Read file and return its edited text.

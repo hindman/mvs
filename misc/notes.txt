@@ -17,8 +17,7 @@ Tests:
 
     - Issues: fix:
 
-        Failures on Python 3.7
-        Failures on all Windows builds.
+        ...
 
     - Rerun workflow on drop-fakefs branch.
 

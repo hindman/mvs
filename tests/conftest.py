@@ -432,5 +432,8 @@ class UserPrefs:
 
     @classmethod
     def delete(cls):
-        cls.PATH.unlink(missing_ok = True)
+        try:
+            cls.PATH.unlink()
+        except FileNotFoundError:
+            pass
 
