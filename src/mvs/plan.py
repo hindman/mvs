@@ -10,6 +10,7 @@ from pathlib import Path
 from short_con import constants
 
 from .utils import (
+    ANY_EXISTENCE,
     CON,
     EXISTENCES,
     FS_TYPES,
@@ -423,7 +424,7 @@ class RenamingPlan:
     def check_orig_exists(self, rp, seq_val):
         # Key question: is renaming possible?
         # Strict existence not required.
-        if rp.exist_orig >= EXISTENCES.exists:
+        if rp.exist_orig in ANY_EXISTENCE:
             return None
         else:
             return Problem(PN.missing)
@@ -443,7 +444,7 @@ class RenamingPlan:
         # Handle situation where rp.new does not exist in any sense.
         # In this case, we can rename freely, regardless of file
         # system type or other renaming details.
-        new_exists = (rp.exist_new >= EXISTENCES.exists)
+        new_exists = (rp.exist_new in ANY_EXISTENCE)
         if not new_exists:
             return None
 
@@ -478,7 +479,7 @@ class RenamingPlan:
             # casing of the parent path. By policy, mvs does not rename parents.
             return Problem(PN.same)
         elif rp.name_change_type == NCT.case_change:
-            if rp.exist_new >= EXISTENCES.exists_strict:
+            if rp.exist_new == EXISTENCES.exists_strict:
                 # User inputs implied that a case-change renaming
                 # was desired, but the path's name-portion already
                 # agrees with the file system, so renaming is impossible.
@@ -494,7 +495,7 @@ class RenamingPlan:
     def check_new_parent_exists(self, rp, seq_val):
         # Key question: does renaming also require parent creation?
         # Any type of existence is sufficient.
-        if rp.exist_new_parent >= EXISTENCES.exists:
+        if rp.exist_new_parent in ANY_EXISTENCE:
             return None
         else:
             return Problem(PN.parent)
@@ -510,30 +511,33 @@ class RenamingPlan:
             self.new_groups.setdefault(k, []).append(rp)
 
     def check_new_collisions(self, rp, seq_val):
+        # Get the other RenamePair instances that have
+        # the same new-path as the current rp.
         k = self.new_collision_key_func(rp.new)
-        g = self.new_groups[k]
-        if len(g) == 1:
-            # No collisions with rp.new.
+        others = self.new_groups[k]
+
+        # No problem if rp.new is unique.
+        if len(others) == 1:
             return None
-        elif not rp.exist_orig >= EXISTENCES.exists:
-            # If rp.orig does not exist, do need to report any
-            # errors related to collisions with its rp.new.
-            return None
+
+        # Determine which kind of new-collision problem we have:
+        # collisions among files with same types or different types.
+        #
+        # Collisions will occur between (1) the path-type of rp.orig,
+        # (2) the path-types of all OTHER.orig, and (3) the path-types
+        # of any OTHER.new that happen to exist.
+        #
+        # First collect the path types.
+        ptypes = (
+            [o.type_orig for o in others] +
+            [o.type_new for o in others if o.exist_new]
+        )
+
+        # Return appropriate collision problem.
+        if all(rp.type_orig == pt for pt in ptypes):
+            return Problem(PN.colliding)
         else:
-            # Check for collisions among new paths. That implies checking any
-            # other paths (orig or new) that exist. I have some lingering
-            # doubts about this logic and how reporting for this problem should
-            # relate to reporting for others.
-            types = []
-            for other in g:
-                if other.exist_orig:
-                    types.append(other.type_orig)
-                if other.exist_new:
-                    types.append(other.type_new)
-            if all(rp.type_orig == t for t in types):
-                return Problem(PN.colliding)
-            else:
-                return Problem(PN.colliding_diff)
+            return Problem(PN.colliding_diff)
 
     ####
     # Methods related to problem control.

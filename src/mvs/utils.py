@@ -345,6 +345,8 @@ EXISTENCES = constants('Existences', dict(
     exists_strict = 2,
 ))
 
+ANY_EXISTENCE = (EXISTENCES.exists, EXISTENCES.exists_strict)
+
 def path_existence_and_type(path):
     # Setup.
     ES = EXISTENCES

@@ -1060,6 +1060,31 @@ def test_news_collide(tr, create_wa):
         reason = PN.colliding_diff,
     )
 
+def test_news_collide_orig_missing(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c', 'd')
+    news = ('a.new', 'b.new', 'c.new', 'a.new')
+    inputs = origs + news
+    run_args = (tr, create_wa, origs[:-1], news)
+
+    # Scenario: inputs to RenamingPlan include all origs and news,
+    # but we tell the WorkArea to create only the first 3 origs.
+    #
+    # As a result, the 'd' path has two problem: orig is missing
+    # and its new path collides with another new path.
+    #
+    # But only the first problem will be reported.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = inputs,
+        rootless = True,
+        failure = True,
+        no_change = True,
+        reason = PN.missing,
+    )
+    probs = plan.uncontrolled_problems
+    assert len(probs) == 1
+
 def test_news_collide_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
