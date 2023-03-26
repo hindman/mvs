@@ -50,13 +50,6 @@ class RenamingPlan:
         done = None,
     ))
 
-    # Default problem controls.
-    DEFAULT_CONTROLS = (
-        f'{CONTROLS.skip}-{PN.equal}',
-        f'{CONTROLS.skip}-{PN.same}',
-        f'{CONTROLS.skip}-{PN.recase}',
-    )
-
     def __init__(self,
                  # Path inputs and their structure.
                  inputs,
@@ -100,24 +93,26 @@ class RenamingPlan:
             str.lower
         )
 
-        # Convert the problem-control inputs into a normalized tuple. Then
-        # build a lookup mapping each Problem name to the user's requested
-        # control mechanism.
-        norm = self.normalized_controls
-        self.controls = norm(norm(self.DEFAULT_CONTROLS) + norm(controls))
-        self.control_lookup = self.build_control_lookup(self.controls)
+        # Validate and standardize the user's problem controls.
+        # Then merge the defaults problem controls with the user's into
+        # a lookup dict mapping each Problem name to its control mechanism.
+        self.controls = ProblemControl.merge(controls)
+        self.control_lookup = ProblemControl.merge(
+            ProblemControl.DEFAULTS,
+            self.controls,
+            want_map = True,
+        )
 
         # Problems that occur during the prepare() phase are stored in a dict.
-        # A problem can be either controlled (as requested by the user) or not.
-        # The dict maps each control mechanism to the problems that were
-        # controlled by that mechanism. If the dict ends up having any
-        # uncontrolled problems (under the None key), the RenamingPlan will
-        # have failed.
+        # A problem can be either controlled (as requested by the user) or not
+        # (meaning that the only control is CONTROLS.halt). The dict maps each
+        # control mechanism to the problems that were controlled by that
+        # mechanism. If the dict ends up having any uncontrolled problems, the
+        # RenamingPlan will have failed.
         self.problems = {
             c : []
             for c in CONTROLS.keys()
         }
-        self.problems[None] = []
 
     ####
     #
@@ -316,7 +311,9 @@ class RenamingPlan:
         # Takes a "step", which is a RenamingPlan method.
         # Executes that method for each RenamePair.
         # Yields potentially-modified RenamePair instances,
-        # handling problems along the way.
+        # handling problems along the way. The modification
+        # of each RenamePair can occur during the step call
+        # or within this processing loop.
 
         # Prepare common-prefix and sequence numbering, which might
         # be used by the user-suppled renaming/filtering code.
@@ -324,38 +321,31 @@ class RenamingPlan:
         seq = self.compute_sequence_iterator()
 
         for rp in self.rps:
-            # The step() call might modify the rp and will return
-            # a Problem or None.
-            #
-            # - orig: never modified.
-            # - new: set based on the user's renaming code.
-            # - exclude: set true if user's filtering code rejected the instance.
-            # - create_parent: can be set here if a controlled problem occurred.
-            # - clobber: ditto.
-            #
-
             # Execute the step. If we get a Problem, handle it and
-            # determine whether a control for it is active.
+            # determine which control is active for it.
             prob = step(rp, next(seq))
             if prob is None:
                 control = None
             else:
                 control = self.handle_problem(prob, rp = rp)
 
-            # Act based on the problem-control and the rp.
-            if control == CONTROLS.skip:
-                # Skip RenamePair because a problem occurred, but proceed with others.
+            # Respond to the problem control, if any.
+            #
+            # - skip or halt: bypass this RenamePair, but proceeed
+            #   with others in this step. If halt, that will prevent
+            #   the next step from being called.
+            #
+            # - clobber or create: set the needed RenamePair attribute
+            #   to guide renaming behavior when it occurs.
+            if control in (CONTROLS.skip, CONTROLS.halt):
                 continue
             elif control == CONTROLS.clobber:
-                # During renaming, the RenamePair will overwrite something.
                 rp.clobber = True
-                yield rp
             elif control == CONTROLS.create:
-                # The RenamePair lacks a parent, but we will create it before renaming.
                 rp.create_parent = True
-                yield rp
-            elif not rp.exclude:
-                # No problem: yield unless filtered out by user's code.
+
+            # Yield unless RenamePair was filtered out by user code.
+            if not rp.exclude:
                 yield rp
 
     ####
@@ -543,72 +533,14 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
-    @staticmethod
-    def normalized_controls(controls):
-        # Takes user's input controls and returns them as a
-        # de-duplicated tuple of standardized ProblemControl names.
-
-        # Handle empty.
-        if controls is None:
-            return ()
-
-        # Convert to tuple.
-        if isinstance(controls, str):
-            controls_tup = tuple(controls.split())
-        else:
-            try:
-                controls_tup = tuple(controls)
-            except Exception as e:
-                raise MvsError(MF.invalid_controls, controls = controls)
-
-        # Remove duplicates and normalize each name.
-        # We do this in reverse order so that the ordering
-        # of the final no-dups list respects the ordering
-        # of the last-appearance of each value.
-        uniq = []
-        seen = set()
-        for c in reversed(controls_tup):
-            c = ProblemControl.normalized_name(c)
-            if c not in seen:
-                uniq.append(c)
-                seen.add(c)
-
-        # Return as a tuple in the forward order.
-        return tuple(reversed(uniq))
-
-    @staticmethod
-    def build_control_lookup(pc_names):
-        # Takes an iterable of ProblemControl names.
-        #
-        # Returns a dict mapping each Problem name that the user wants
-        # to control to the desired control mechanism.
-        #
-        # Raises if user tries to control the same Problem in different ways.
-        pcs = tuple(
-            ProblemControl(name)
-            for name in pc_names
-        )
-        lookup = {}
-        for pc in pcs:
-            prob = pc.prob
-            if pc.no:
-                lookup.pop(prob, None)
-            elif prob in lookup and lookup[prob] != pc.control:
-                fmt = MF.conflicting_controls
-                msg = fmt.format(prob, lookup[prob], pc.control)
-                raise MvsError(msg)
-            else:
-                lookup[prob] = pc.control
-        return lookup
-
     def handle_problem(self, p, rp = None):
         # Takes a Problem and optionally a RenamePair.
         #
-        # - Determines whether a problem-control is active for the problem type.
+        # - Determines which problem-control is active for the problem.
         # - Stores a new Problem containing original Problem info, plus the RenamePair.
-        # - Returns the control (which might be None).
+        # - Returns the control.
         #
-        control = self.control_lookup.get(p.name, None)
+        control = self.control_lookup[p.name]
         p = Problem(p.name, msg = p.msg, rp = rp)
         self.problems[control].append(p)
         return control
@@ -620,7 +552,7 @@ class RenamingPlan:
 
     @property
     def uncontrolled_problems(self):
-        return self.problems[None]
+        return self.problems[CONTROLS.halt]
 
     ####
     # Sequence number and common prefix.
@@ -651,7 +583,7 @@ class RenamingPlan:
         # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
-            raise MvsError(MF.prepare_failed, problems = self.problems[None])
+            raise MvsError(MF.prepare_failed, problems = self.uncontrolled_problems)
 
         # Rename paths.
         for i, rp in enumerate(self.rps):

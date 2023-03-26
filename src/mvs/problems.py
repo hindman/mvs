@@ -6,6 +6,8 @@ from .utils import (
     MSG_FORMATS as MF,
     MvsError,
     RenamePair,
+    seq_or_str,
+    underscores_to_hyphens,
 )
 
 ####
@@ -94,78 +96,120 @@ class Problem:
     def format_for(name):
         return PROBLEM_FORMATS[name]
 
-    @staticmethod
-    def names_for(control):
-        return CONTROLLABLES[control]
-
 ####
 # Problem controls.
 ####
 
-CONTROLS = constants('Controls', (
-    'skip',
-    'clobber',
-    'create',
+CONTROLS = C = constants('Controls', (
+    'halt',     # Halt RenamingPlan before any renaming occurs.
+    'skip',     # Skip affected RenamePair (rp).
+    'clobber',  # Delete rp.new before renaming old-to-new.
+    'create',   # Create missing parent of rp.new before renaming old-to-new.
 ))
-
-CONTROLLABLES = {
-    CONTROLS.skip: (
-        PN.equal,
-        PN.same,
-        PN.recase,
-        PN.missing,
-        PN.type,
-        PN.parent,
-        PN.existing,
-        PN.colliding,
-        PN.existing_diff,
-        PN.colliding_diff,
-        PN.existing_non_empty,
-    ),
-    CONTROLS.clobber: (
-        PN.existing,
-        PN.colliding,
-    ),
-    CONTROLS.create: (
-        PN.parent,
-    ),
-}
 
 class ProblemControl:
 
+    # A dict defining the valid controls for each Problem name.
+    # The first control in each tuple is the default.
+    # Values in comments could be allowed in the future.
+    VALID_CONTROLS = {
+        PN.equal:                  (C.skip, C.halt),
+        PN.same:                   (C.skip, C.halt),
+        PN.recase:                 (C.skip, C.halt),
+        PN.missing:                (C.skip, C.halt),
+        PN.type:                   (C.skip, C.halt),
+        PN.parent:                 (C.skip, C.halt, C.create),
+        PN.existing:               (C.skip, C.halt, C.clobber),
+        PN.colliding:              (C.skip, C.halt, C.clobber),
+        PN.existing_diff:          (C.skip, C.halt),  # C.clobber
+        PN.colliding_diff:         (C.skip, C.halt),  # C.clobber
+        PN.existing_non_empty:     (C.skip, C.halt),  # C.clobber
+        PN.filter_code_invalid:    (C.halt,),         # C.skip
+        PN.rename_code_invalid:    (C.halt,),         # C.skip
+        PN.rename_code_bad_return: (C.halt,),         # C.skip
+        PN.all_filtered:           (C.halt,),
+        PN.parsing_no_paths:       (C.halt,),
+        PN.parsing_paragraphs:     (C.halt,),
+        PN.parsing_row:            (C.halt,),
+        PN.parsing_imbalance:      (C.halt,),
+        PN.user_code_exec:         (C.halt,),
+    }
+
+    # A dict mapping each ProblemControl names to its
+    # corresponding (PROBLEM_NAME, CONTROL_NAME) tuple.
+    LOOKUP_BY_NAME = {
+        underscores_to_hyphens(f'{c}-{prob}') : (prob, c)
+        for prob, controls in VALID_CONTROLS.items()
+        for c in controls
+    }
+
+    # ProblemControl names: all of them.
+    ALL_NAMES = tuple(LOOKUP_BY_NAME)
+
+    # ProblemControl names: just the defaults.
+    DEFAULTS = {
+        underscores_to_hyphens(f'{controls[0]}-{prob}')
+        for prob, controls in VALID_CONTROLS.items()
+    }
+
     def __init__(self, raw_name):
-        self.name = self.normalized_name(raw_name)
-        tup = self.all_controls().get(self.name, None)
+        self.name = underscores_to_hyphens(raw_name)
+        tup = self.LOOKUP_BY_NAME.get(self.name, None)
         if tup:
-            self.control = tup[0]
-            self.prob = tup[1]
-            self.no = tup[2]
+            self.prob = tup[0]
+            self.control = tup[1]
         else:
             msg = MF.invalid_control.format(raw_name)
             raise MvsError(msg)
 
-    def __hash__(self):
-        return hash(self.name)
-
-    def __eq__(self, other):
-        return self.name == other.name
-
-    @staticmethod
-    def normalized_name(name):
-        return name.replace(CON.underscore, CON.hyphen)
-
     @classmethod
-    def all_controls(cls, no = True, names_only = False):
-        prefixes = ('', 'no-') if no else ('',)
-        d = {}
-        for no in prefixes:
-            for control, probs in CONTROLLABLES.items():
-                for prob in probs:
-                    prob = cls.normalized_name(prob)
-                    k = f'{no}{control}-{prob}'
-                    d[k] = (control, prob, bool(no))
-        if names_only:
-            return tuple(d)
+    def merge(cls, *batches, want_map = False):
+        # Takes ProblemControl names from one or more sources. For example,
+        # (1) controls from user-prefs and command-line options, or
+        # (2) defaults controls and controls given to RenamingPlan.
+        #
+        # Each batch of names can be a sequence of strings or
+        # a space-delimited string.
+        #
+        # Standardizes and validates the names in each batch. Within each
+        # batch, the user should not try to control the same problem in
+        # different ways.
+        #
+        # Merges the controls from different batches together. Controls from
+        # later batches trump those from earlier ones.
+        #
+        # Returns the merged data either as a tuple of ProblemControl
+        # names or as a dict mapping each problem name to its
+        # desired control mechanism.
+
+        # Convert each batch into a validated dict
+        # mapping problem name to desired control.
+        validated = []
+        for b in batches:
+            d = {}
+            pc_names = seq_or_str(b)
+            for name in pc_names:
+                pc = cls(name)
+                prob = pc.prob
+                if prob in d and d[prob] != pc.control:
+                    fmt = MF.conflicting_controls
+                    msg = fmt.format(prob, d[prob], pc.control)
+                    raise MvsError(msg)
+                else:
+                    d[prob] = pc.control
+            validated.append(d)
+
+        # Merge those dicts, giving highest precedence to later batches.
+        merged = {}
+        for d in validated:
+            merged.update(d)
+
+        # Return the merged data.
+        if want_map:
+            return merged
         else:
-            return d
+            return tuple(
+                f'{control}-{prob}'
+                for prob, control in merged.items()
+            )
 

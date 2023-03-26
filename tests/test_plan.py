@@ -14,7 +14,6 @@ from mvs.utils import (
 )
 
 from mvs.problems import (
-    CONTROLLABLES,
     CONTROLS,
     PROBLEM_NAMES as PN,
     Problem,
@@ -682,11 +681,10 @@ def test_equal(tr, create_wa):
     wa, plan = run_checks(*run_args)
     wa, plan = run_checks(*run_args, controls = 'skip-equal')
 
-    # Scenario: but renaming will be rejected
-    # if we cancel the default.
+    # Scenario: but renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
-        controls = 'no-skip-equal',
+        controls = 'halt-equal',
         failure = True,
         no_change = True,
         reason = PN.equal,
@@ -722,7 +720,7 @@ def test_same(tr, create_wa):
         )
     else:
         # Scenario: case-insensitive system: renaming will succeed
-        # because skip-same is a default problem control.
+        # because skip-same is the default.
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
@@ -731,7 +729,7 @@ def test_same(tr, create_wa):
         # Scenario: but it will fail if we disable skip-same.
         wa, plan = run_checks(
             *run_args,
-            controls = 'no-skip-same',
+            controls = 'halt-same',
             expecteds = expecteds_no_skip,
             failure = True,
             no_change = True,
@@ -748,22 +746,22 @@ def test_missing_orig(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are missing.
-    # Renaming will be rejected.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
         inputs = inputs,
+        controls = 'halt-missing',
         rootless = True,
         failure = True,
         no_change = True,
         reason = PN.missing,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         inputs = inputs,
         rootless = True,
-        controls = 'skip-missing',
     )
 
 def test_orig_type(tr, create_wa):
@@ -776,21 +774,21 @@ def test_orig_type(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are not regular files.
-    # Renaming will be rejected.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
+        controls = 'halt-type',
         failure = True,
         no_change = True,
         reason = PN.type,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds,
-        controls = 'skip-type',
     )
 
 def test_new_exists(tr, create_wa):
@@ -804,21 +802,21 @@ def test_new_exists(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
-    # Renaming will be rejected.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
+        controls = 'halt-existing',
         failure = True,
         no_change = True,
         reason = PN.existing,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds_skip,
-        controls = 'skip-existing',
     )
 
     # Scenario: renaming will also succeed if we clobber the offending paths.
@@ -827,17 +825,6 @@ def test_new_exists(tr, create_wa):
         extras = extras,
         expecteds = expecteds_clobber,
         controls = 'clobber-existing',
-    )
-
-    # Scenario: but we cannot clobber if the victim is of a different type.
-    # Renaming will be rejected.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras_diff_type,
-        controls = 'clobber-existing',
-        failure = True,
-        no_change = True,
-        reason = PN.existing_diff,
     )
 
 def test_new_exists_diff_parents(tr, create_wa):
@@ -850,21 +837,21 @@ def test_new_exists_diff_parents(tr, create_wa):
 
     # Scenario: one of new paths already exists and
     # it parent directory is different than orig path.
-    # Renaming will be rejected.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
+        controls = 'halt-existing',
         failure = True,
         no_change = True,
         reason = PN.existing,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds,
-        controls = 'skip-existing',
     )
 
 def test_new_exists_different_case(tr, create_wa):
@@ -883,10 +870,11 @@ def test_new_exists_different_case(tr, create_wa):
         )
     else:
         # Scenario: but on a non-case-sensitive system,
-        # renaming should be rejected.
+        # renaming will be rejected if we set the control to halt.
         wa, plan = run_checks(
             *run_args,
             extras = extras,
+            controls = 'halt-existing',
             failure = True,
             no_change = True,
             reason = PN.existing,
@@ -958,30 +946,20 @@ def test_new_exists_non_empty(tr, create_wa):
     # Scenario: don't include the extras. Renaming succeeds.
     wa, plan = run_checks(*run_args)
 
-    # Scenario: include extras. Renaming is rejected because
-    # the a.new directory already exists.
+    # Scenario: include extras and set the relevant
+    # control to halt. Renaming is rejected because
+    # the a.new directory already exists and is non-empty.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
+        controls = 'halt-existing-non-empty',
         failure = True,
         no_change = True,
         reason = PN.existing_non_empty,
     )
 
-    # Scenario: include extras and ask for clobbering.
-    # Renaming will still be rejected because the a.new
-    # directory is not empty.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        controls = 'clobber-existing',
-        failure = True,
-        no_change = True,
-        reason = PN.existing_non_empty,
-    )
-
-    # Scenario: same, but this time the directory is empty.
-    # Renaming succeeds.
+    # Scenario: if we exclude the last extras path, the
+    # existing directory will be empty and renaming succeeds.
     wa, plan = run_checks(
         *run_args,
         extras = extras[:-1],
@@ -996,19 +974,20 @@ def test_new_parent_missing(tr, create_wa):
     expecteds_create = news + ('xy/', 'xy/zzz/')
     run_args = (tr, create_wa, origs, news)
 
-    # Scenario: a new-parent is missing. Renaming will be rejected.
+    # Scenario: a new-parent is missing.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
+        controls = 'halt-parent',
         failure = True,
         no_change = True,
         reason = PN.parent,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_skip,
-        controls = 'skip-parent',
     )
 
     # Scenario: renaming will succeed if we create the missing parents.
@@ -1028,19 +1007,20 @@ def test_news_collide(tr, create_wa):
     origs_diff = ('a', 'b', 'c/')
     run_args_diff = (tr, create_wa, origs_diff, news)
 
-    # Scenario: some new paths collide. Renaming will be rejected.
+    # Scenario: some new paths collide.
+    # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
+        controls = 'halt-colliding',
         failure = True,
         no_change = True,
         reason = PN.colliding,
     )
 
-    # Scenario: renaming will succeed if we skip the offending paths.
+    # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_skip,
-        controls = 'skip-colliding',
     )
 
     # Scenario: renaming will succeed if we request clobbering.
@@ -1048,16 +1028,6 @@ def test_news_collide(tr, create_wa):
         *run_args,
         expecteds = expecteds_clobber,
         controls = 'clobber-colliding',
-    )
-
-    # Scenario: but requesting clobbering when the colliding paths
-    # are of different type won't help. Renaming will be rejected.
-    wa, plan = run_checks(
-        *run_args_diff,
-        controls = 'clobber-colliding',
-        failure = True,
-        no_change = True,
-        reason = PN.colliding_diff,
     )
 
 def test_news_collide_orig_missing(tr, create_wa):
@@ -1077,6 +1047,7 @@ def test_news_collide_orig_missing(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         inputs = inputs,
+        controls = 'halt-missing',
         rootless = True,
         failure = True,
         no_change = True,
@@ -1089,6 +1060,7 @@ def test_news_collide_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'B.NEW')
+    expecteds_skip = ('a.new', 'b', 'c')
     expecteds_clobber = ('a.new', 'B.NEW')
     run_args = (tr, create_wa, origs, news)
 
@@ -1098,19 +1070,20 @@ def test_news_collide_case(tr, create_wa):
         # Renaming will succeed.
         wa, plan = run_checks(*run_args)
     else:
-        # Otherwise, renaming will be rejected.
+        # On case-insensitive system, renaming will succeed
+        # because offending paths will be skipped.
         wa, plan = run_checks(
             *run_args,
+            expecteds = expecteds_skip,
+        )
+
+        # Renaming will be rejected if we set the control to halt.
+        wa, plan = run_checks(
+            *run_args,
+            controls = 'halt-colliding',
             failure = True,
             no_change = True,
             reason = PN.colliding,
-        )
-
-        # And it will succeed if we request clobbering.
-        wa, plan = run_checks(
-            *run_args,
-            controls = 'clobber-colliding',
-            expecteds = expecteds_clobber,
         )
 
 def test_failures_skip_all(tr, create_wa):
@@ -1119,19 +1092,11 @@ def test_failures_skip_all(tr, create_wa):
     news = ('Z', 'Z', 'Z')
     run_args = (tr, create_wa, origs, news)
 
-    # Scenario: all new paths collide. Renaming will be rejected.
+    # Scenario: all new paths collide. Renaming will be rejected
+    # because by default offending paths will be filtered out,
+    # leaving nothing to rename.
     wa, plan = run_checks(
         *run_args,
-        failure = True,
-        no_change = True,
-        reason = PN.colliding,
-    )
-
-    # Scenario: and skipping offending paths won't help because that
-    # that will filter everything out. Renaming will be rejected.
-    wa, plan = run_checks(
-        *run_args,
-        controls = 'skip-colliding',
         failure = True,
         no_change = True,
         reason = PN.all_filtered,

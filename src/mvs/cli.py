@@ -315,27 +315,16 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Combine the controls from pref and then opts.
-        # Values latter in the sequence will have precedence
-        # when the RenamingPlan builds the control-lookup.
-        # Here we just remove duplicates and standardize names.
-        norm = RenamingPlan.normalized_controls
-        controls = norm(
-            norm(prefs.get('controls', '')) +
-            norm(opts.controls)
-        )
-
-        # Check for conflicting controls.
-        # We ignore returned lookup: just validating here.
+        # Validate and merge the controls from pref and then opts.
         try:
-            RenamingPlan.build_control_lookup(controls)
+            opts.controls = list(ProblemControl.merge(
+                prefs.get('controls'),
+                opts.controls,
+            ))
+            return opts
         except MvsError as e:
             self.wrapup(CON.exit_fail, e.msg)
             return None
-
-        # Set the controls and return.
-        opts.controls = list(controls)
-        return opts
 
     @property
     def user_prefs_path(self):
@@ -856,7 +845,7 @@ class CLI:
             group = 'Problem control and other configuration',
             names = '--controls',
             validator = OptConfig.list_of_str,
-            choices = ProblemControl.all_controls(names_only = True),
+            choices = ProblemControl.ALL_NAMES,
             nargs = '+',
             metavar = 'PC',
             help = 'Configure how to respond to problems (see --details)',

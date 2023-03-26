@@ -199,7 +199,7 @@ def write_to_clipboard(text):
     pyperclip.copy(text)
 
 ####
-# Functions given to argparse to validate arguments.
+# Functions given to argparse to convert or validate arguments.
 ####
 
 def positive_int(x):
@@ -208,6 +208,19 @@ def positive_int(x):
         if x >= 1:
             return x
     raise ValueError
+
+def underscores_to_hyphens(s):
+    return s.replace(CON.underscore, CON.hyphen)
+
+def seq_or_str(xs):
+    # Takes a sequence or space-delimited string.
+    # Returns a tuple.
+    if xs is None:
+        return ()
+    elif isinstance(xs, str):
+        return tuple(xs.split())
+    else:
+        return tuple(xs)
 
 ####
 
