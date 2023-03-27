@@ -13,13 +13,17 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Problems: reconsidered:
+Problems refactor:
 
-    - Support --strict mode: all problem controls set to halt.
+    - Include ability to list skipped rps in cli.py.
 
     - Support skip and clobber where possible: assess.
+        - Doing this would require simplifying the affected Problem names
+        - For non-empty dirs, we might need to store some info on the rp.
 
     - Test coverage: fill gaps.
+        - strict behavior
+        - listing behavior for skips
 
 New documentation [see NEW_DOCS].
 

@@ -107,6 +107,9 @@ CONTROLS = C = constants('Controls', (
     'create',   # Create missing parent of rp.new before renaming old-to-new.
 ))
 
+def pcname(control, problem):
+    return underscores_to_hyphens(f'{control}-{problem}')
+
 class ProblemControl:
 
     # A dict defining the valid controls for each Problem name.
@@ -135,10 +138,10 @@ class ProblemControl:
         PN.user_code_exec:         (C.halt,),
     }
 
-    # A dict mapping each ProblemControl names to its
+    # A dict mapping each ProblemControl name to its
     # corresponding (PROBLEM_NAME, CONTROL_NAME) tuple.
     LOOKUP_BY_NAME = {
-        underscores_to_hyphens(f'{c}-{prob}') : (prob, c)
+        pcname(c, prob) : (prob, c)
         for prob, controls in VALID_CONTROLS.items()
         for c in controls
     }
@@ -147,10 +150,16 @@ class ProblemControl:
     ALL_NAMES = tuple(LOOKUP_BY_NAME)
 
     # ProblemControl names: just the defaults.
-    DEFAULTS = {
-        underscores_to_hyphens(f'{controls[0]}-{prob}')
+    DEFAULTS = tuple(
+        pcname(controls[0], prob)
         for prob, controls in VALID_CONTROLS.items()
-    }
+    )
+
+    # ProblemControl names: halt for all problems.
+    HALT_ALL = tuple(
+        pcname(C.halt, prob)
+        for prob in VALID_CONTROLS
+    )
 
     def __init__(self, raw_name):
         self.name = underscores_to_hyphens(raw_name)

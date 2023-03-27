@@ -498,6 +498,7 @@ def test_plan_as_dict(tr, create_wa):
             'seq_start',
             'seq_step',
             'controls',
+            'strict',
             'problems',
             'prefix_len',
             'rename_pairs',

@@ -123,6 +123,7 @@ class CliRenamer:
                 filter_code = opts.filter,
                 indent = opts.indent,
                 controls = opts.controls,
+                strict = opts.strict,
             )
             plan = self.plan
         except MvsError as e: # pragma: no cover
@@ -786,7 +787,7 @@ class CLI:
             names = '--editor',
             validator = str,
             real_default = CON.default_editor_cmd,
-            metavar = 'ARG',
+            metavar = 'CMD',
             help = (
                 'Command string for editor used by --edit [default: '
                 f'`{CON.default_editor_cmd}`; empty string to disable]'
@@ -824,7 +825,7 @@ class CLI:
             names = '--pager',
             validator = str,
             real_default = CON.default_pager_cmd,
-            metavar = 'ARG',
+            metavar = 'CMD',
             help = (
                 'Command string for paginating listings [default: '
                 f'`{CON.default_pager_cmd}`; empty string to disable]'
@@ -851,8 +852,14 @@ class CLI:
             help = 'Configure how to respond to problems (see --details)',
         ),
         OptConfig(
-            names = '--disable',
+            names = '--strict',
             validator = bool,
+            action = 'store_true',
+            help = 'Handle all problem strictly: halt renaming plan (overrides --controls)',
+        ),
+        OptConfig(
+            names = '--disable',
+            validator = OptConfig.list_of_str,
             nargs = '+',
             metavar = 'FLAG',
             default = [],

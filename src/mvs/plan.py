@@ -63,6 +63,7 @@ class RenamingPlan:
                  seq_step = 1,
                  # Problem controls.
                  controls = None,
+                 strict = False,
                  ):
 
         # Input paths, input structure, and RenamePair instances.
@@ -96,6 +97,7 @@ class RenamingPlan:
         # Validate and standardize the user's problem controls.
         # Then merge the defaults problem controls with the user's into
         # a lookup dict mapping each Problem name to its control mechanism.
+        self.strict = strict
         try:
             self.controls = ProblemControl.merge(controls)
         except MvsError as e:
@@ -105,6 +107,7 @@ class RenamingPlan:
         self.control_lookup = ProblemControl.merge(
             ProblemControl.DEFAULTS,
             self.controls,
+            ProblemControl.HALT_ALL if self.strict else (),
             want_map = True,
         )
 
@@ -669,6 +672,7 @@ class RenamingPlan:
             seq_start = self.seq_start,
             seq_step = self.seq_step,
             controls = self.controls,
+            strict = self.strict,
             # Other.
             prefix_len = self.prefix_len,
             rename_pairs = [
