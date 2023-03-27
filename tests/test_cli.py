@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from mvs.cli import main, CliRenamer, CLI
 from mvs.plan import RenamingPlan
-from mvs.problems import CONTROLS, PROBLEM_FORMATS as PF
+from mvs.problems import CONTROLS, PROBLEM_FORMATS as PF, ProblemControl
 from mvs.utils import write_to_clipboard, CON, MSG_FORMATS as MF
 from mvs.version import __version__
 
@@ -746,7 +746,7 @@ def test_preferences_problem_control(tr, creators):
     run_args = (tr, creators, origs, news)
 
     # Problem controls: application defaults and some other controls.
-    app_defs = list(RenamingPlan.DEFAULT_CONTROLS)
+    app_defs = list(ProblemControl.DEFAULTS)
     others = ['skip-existing', 'create-parent', 'clobber-colliding']
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -770,12 +770,6 @@ def test_preferences_problem_control(tr, creators):
     # Scenario: some other controls.
     opts = get_opts('--controls', *others)
     assert opts.controls == others
-
-    # Scenario: same, but also use a negative control, which
-    # counteracts the application default.
-    negatives = ['no-skip-equal', 'no-skip-same', 'no-skip-recase']
-    opts = get_opts('--controls', *negatives, *others)
-    assert opts.controls == negatives + others
 
     # Scenario: invalid control.
     wa, outs, cli = run_checks(
@@ -1063,9 +1057,10 @@ def test_some_failed_rps(tr, creators):
     WA = creators[0](origs, news)
 
     # Initial scenario: two of the new paths already exist.
-    # No renaming occurs.
+    # No renaming occurs if with set control to halt.
     wa, outs, cli = run_checks(
         *run_args,
+        '--controls', 'halt-existing',
         extras = extras,
         no_change = True,
         failure = True,
@@ -1073,8 +1068,7 @@ def test_some_failed_rps(tr, creators):
         err_in = PF.existing,
     )
 
-    # Scenario: skip the items with problems.
-    # Renaming works.
+    # Scenario: but it works if well leave the skip default in place.
     wa, outs, cli = run_checks(
         *run_args,
         '--controls', 'skip-existing',
@@ -1084,7 +1078,7 @@ def test_some_failed_rps(tr, creators):
         outs_news = WA.news[2:],
     )
 
-    # Scenario: pass conflict failure-control options.
+    # Scenario: pass conflicting failure-control options.
     # No renaming occurs.
     wa, outs, cli = run_checks(
         *run_args,

@@ -96,7 +96,12 @@ class RenamingPlan:
         # Validate and standardize the user's problem controls.
         # Then merge the defaults problem controls with the user's into
         # a lookup dict mapping each Problem name to its control mechanism.
-        self.controls = ProblemControl.merge(controls)
+        try:
+            self.controls = ProblemControl.merge(controls)
+        except MvsError as e:
+            raise e
+        except Exception as e:
+            raise MvsError(MF.invalid_controls, controls = controls)
         self.control_lookup = ProblemControl.merge(
             ProblemControl.DEFAULTS,
             self.controls,

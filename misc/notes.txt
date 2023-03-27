@@ -15,15 +15,11 @@ todos: TODOs
 
 Problems: reconsidered:
 
-    - Fix tests.
-
-        test_preferences_problem_control | AttributeError: type object 'RenamingPlan' has no attribute 'DEFAULT_CONTROLS'
-        test_some_failed_rps             | AssertionError: assert ['tests/work/...ests/work/z2'] == ['tests/work/...es...
-        test_controls                    | NameError: name 'CONTROLLABLES' is not defined
-
     - Support --strict mode: all problem controls set to halt.
 
     - Support skip and clobber where possible: assess.
+
+    - Test coverage: fill gaps.
 
 New documentation [see NEW_DOCS].
 

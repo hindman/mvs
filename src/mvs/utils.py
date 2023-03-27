@@ -79,7 +79,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem control: {!r}',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
-    invalid_controls       = 'Invalid controls attribute',
+    invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
     unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
     # Error messages in CliRenamer.
     path_collection_failed = 'Collection of input paths failed.\n\n{}',
