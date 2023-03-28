@@ -17,13 +17,81 @@ Problems refactor:
 
     - Include ability to list skipped rps in cli.py.
 
-    - Support skip and clobber where possible: assess.
-        - Doing this would require simplifying the affected Problem names
-        - For non-empty dirs, we might need to store some info on the rp.
+        - Modify messages:
+
+            Paths to be renamed (active 30, listed 10).
+            Paths to be renamed (skipped 2, active 30, listed 10).
+
+            Rename paths [yes]?
+
+        - Add --list-all:
+
+            - List skipped renamings.
+
+            - For active renamings, indicate create/clobber as needed.
+
+        - Store skipped RenamePair instances. Add a skip attribute. Set it
+          during processing. After getting the tuple from processed_rps(),
+          split contents into active and skipped.
+
+    - Support skip and clobber where possible:
+
+        - Make problem names simpler and more compact.
+
+            Problem                | New name    | Note
+            -------------------------------------------------------------------
+            equal                  | .           | .
+            same                   | .           | .
+            recase                 | .           | .
+            missing                | .           | .
+            type                   | .           | .
+            parent                 | .           | .
+            existing               | exists      | .
+            colliding              | collides    | .
+            existing_diff          | exists_diff | has SKIP, HALT; add CLOBBER
+            colliding_diff         | exists_diff | "
+            existing_non_empty     | exists_full | "
+            filter_code_invalid    | filter      | has HALT; add SKIP
+            rename_code_invalid    | rename      | "
+            rename_code_bad_return | .           | Drop problem
+
+        - Adding SKIP to the code-related problems is easy. Just add/fix tests.
+
+        - Adjust set_exists_and_types() to set.dir_full.
+
+        - Adjust do_rename() logic for clobbering:
+
+            - Select the delete-operation based on rp.new type. This breaks a
+              test: figure out why and fix the test.
+
+            - Implement the delete so that we first try the delete operation
+              based on rp.new. Failing that, we try the other way.
+
+            - Emphasize issue in README:
+
+                Complex interactions among renamings are not guarded against
+                with any rigor. One example: multiple new-collisions on the
+                same new-path.
+
+            - Document in dev notes:
+
+                Determining the delete operation based on the type of rp.orig
+                or rp.new is flawed in the face of multiple renamings (of
+                different types) colliding on the same new path.
+
+                    Initial paths: a/ b c /x
+
+                    orig | new | rp.orig | rp.new |
+                    ---------------------------------------------------
+                    a/   | x/  | ok      | ok     | .
+                    b    | x   | fails   | ok     | .
+                    c    | x   | ok      | fails  | .
 
     - Test coverage: fill gaps.
         - strict behavior
         - listing behavior for skips
+        - more problems are skippable
+        - new clobber behaviors
 
 New documentation [see NEW_DOCS].
 

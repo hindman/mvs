@@ -627,7 +627,7 @@ class RenamingPlan:
         # inherit casing from the current path.
         #
         # (3) User did not request clobber, but the path at rp.new
-        # exists nonetheless (presumably it was creating between
+        # exists nonetheless (presumably it was created between
         # the check for new-existing and now). Raise an exception.
         # This is the final line of defense against unintended clobbering.
         #
