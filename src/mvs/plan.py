@@ -20,7 +20,7 @@ from .utils import (
     PATH_TYPES,
     RenamePair,
     STRUCTURES,
-    file_system_case_sensitivity,
+    case_sensitivity,
     is_non_empty_dir,
     path_existence_and_type,
 )
@@ -74,9 +74,11 @@ class RenamingPlan:
         # - active
         # - filtered by user code
         # - skipped via problem-control
+        # - initial N of rps (before filtering, etc)
         self.rps = []
         self.filtered = []
         self.skipped = []
+        self.n_initial = None
 
         # User-supplied code.
         self.rename_code = rename_code
@@ -97,7 +99,7 @@ class RenamingPlan:
         # Information used when checking RenamePair instance for problems.
         self.new_groups = None
         self.new_collision_key_func = (
-            str if file_system_case_sensitivity() == FS_TYPES.case_sensitive else
+            str if case_sensitivity() == FS_TYPES.case_sensitive else
             str.lower
         )
 
@@ -153,6 +155,7 @@ class RenamingPlan:
 
         # Get the input paths and parse them to get RenamePair instances.
         self.rps = self.parse_inputs()
+        self.n_initial = len(self.rps)
         if self.failed:
             return
 
@@ -166,11 +169,6 @@ class RenamingPlan:
         # Run various steps that process the RenamePair instances individually:
         # setting their path existence statuses and path types; filtering;
         # computing new paths; and checking for problems.
-        #
-        # We use the processed_rps() method to execute the step, handle
-        # problems appropriately, and yield a potentially-filtered collection
-        # of potentially-modified RenamePair instances.
-        #
         rp_steps = (
             (self.set_exists_and_types, None),
             (self.execute_user_filter, None),
@@ -183,13 +181,26 @@ class RenamingPlan:
             (self.check_new_collisions, self.prepare_new_groups),
         )
         for step, prep_step in rp_steps:
-            # Run any needed preparations.
+            # Run preparatory step.
             if prep_step:
                 prep_step()
 
-            # Execute the step, adding the yielded rps to the appropriate list.
+            # Prepare common-prefix and sequence numbering, which might
+            # be used by the user-suppled renaming/filtering code.
+            self.prefix_len = self.compute_prefix_len()
+            seq = self.compute_sequence_iterator()
+
+            # Execute the step for each rp. Some steps set attributes on the rp
+            # to guide subsequent filtering, skipping, clobbering, etc.
             active = []
-            for rp in self.processed_rps(step):
+            for rp in self.rps:
+                # If the step returns a Problem, handle it and
+                # set the corresponding attribute on rp.
+                prob = step(rp, next(seq))
+                if prob:
+                    control = self.handle_problem(prob, rp = rp)
+                    setattr(rp, control, True)
+                # Add each resulting rp to the appropriate list.
                 xs = (
                     self.filtered if rp.exclude else
                     self.skipped if rp.skip else
@@ -198,14 +209,10 @@ class RenamingPlan:
                 xs.append(rp)
             self.rps = active
 
-            # Register problem if the step filtered out everything.
-            if not self.rps:
-                p = Problem(PN.all_filtered)
-                self.handle_problem(p)
-
-            # Stop if the plan has failed either directly or via filtering.
-            if self.failed:
-                return
+        # Register problem if everything was filtered out.
+        if not self.rps:
+            p = Problem(PN.all_filtered)
+            self.handle_problem(p)
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -219,15 +226,15 @@ class RenamingPlan:
         def do_fail(name, *xs):
             p = Problem(name, *xs)
             self.handle_problem(p)
-            return ()
+            return []
 
         # If we have rename_code, inputs are just original paths.
         if self.rename_code:
-            rps = tuple(
+            rps = [
                 RenamePair(orig, None)
                 for orig in self.inputs
                 if orig
-            )
+            ]
             if rps:
                 return rps
             else:
@@ -284,10 +291,10 @@ class RenamingPlan:
             return do_fail(PN.parsing_imbalance)
 
         # Return the RenamePair instances.
-        return tuple(
+        return [
             RenamePair(orig, new)
             for orig, new in zip(origs, news)
-        )
+        ]
 
     ####
     # Creating the user-defined functions for filtering and renaming.
@@ -327,35 +334,6 @@ class RenamingPlan:
             p = Problem(PN.user_code_exec, msg)
             self.handle_problem(p)
             return None
-
-    ####
-    # A method to execute the steps that process RenamePair instance individually.
-    ####
-
-    def processed_rps(self, step):
-        # Takes a "step", which is a RenamingPlan method.
-        # Executes that method for each RenamePair.
-        # Yields potentially-modified RenamePair instances,
-        # handling problems along the way. The modification
-        # of each RenamePair can occur during the step call
-        # or within this processing loop.
-
-        # Prepare common-prefix and sequence numbering, which might
-        # be used by the user-suppled renaming/filtering code.
-        self.prefix_len = self.compute_prefix_len()
-        seq = self.compute_sequence_iterator()
-
-        for rp in self.rps:
-            # Execute the step. If we get a Problem, handle it and
-            # set the corresponding attribute on rp.
-            prob = step(rp, next(seq))
-            if prob:
-                control = self.handle_problem(prob, rp = rp)
-                setattr(rp, control, True)
-
-            # Yield unless RenamePair was filtered out by user code.
-            if not rp.exclude:
-                yield rp
 
     ####
     # The steps that process RenamePair instance individually.
@@ -457,8 +435,7 @@ class RenamingPlan:
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rp.new exists, we have clobbering
-        fs_type = file_system_case_sensitivity()
-        if fs_type != FS_TYPES.case_preserving: # pragma: no cover
+        if case_sensitivity() != FS_TYPES.case_preserving: # pragma: no cover
             return clobber_prob
 
         # Handle case-preserving file system where rp.orig and rp.new have
@@ -649,6 +626,14 @@ class RenamingPlan:
     ####
     # Other info.
     ####
+
+    @property
+    def creates(self):
+        return [rp for rp in self.rps if rp.create]
+
+    @property
+    def clobbers(self):
+        return [rp for rp in self.rps if rp.clobber]
 
     @property
     def tracking_rp(self):

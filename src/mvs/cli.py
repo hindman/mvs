@@ -22,6 +22,7 @@ from .utils import (
     OptConfig,
     STRUCTURES,
     edit_text,
+    hyphens_to_underscores,
     positive_int,
     read_from_clipboard,
     read_from_file,
@@ -144,8 +145,7 @@ class CliRenamer:
             return
 
         # Print the renaming listing.
-        listing = self.listing_msg(MF.paths_to_be_renamed, plan.rps)
-        self.paginate(listing)
+        self.paginate(self.renaming_listing())
 
         # Stop if dryrun mode.
         if opts.dryrun:
@@ -264,16 +264,26 @@ class CliRenamer:
     def load_preferences(self):
         # Return empty if there is no user-preferences file.
         path = self.user_prefs_path
-        if not path.is_file():
+        if path.is_file():
+            path = str(path)
+        else:
             return {}
 
-        # Try to read the preferences.
+        # Try to read the preferences and ensure
+        # that the JSON represents a dict.
         try:
             with open(path) as fh:
-                return json.load(fh)
+                prefs = dict(json.load(fh))
         except Exception as e:
-            msg = MF.prefs_reading_failed.format(str(path))
+            msg = MF.prefs_reading_failed.format(path)
             self.wrapup_with_tb(msg)
+            return None
+
+        # Return dict with normalized keys.
+        return {
+            hyphens_to_underscores(k) : v
+            for k, v in prefs.items()
+        }
 
     def merge_opts_prefs(self, opts, prefs):
         # Confirm that the prefs keys are valid.
@@ -499,17 +509,53 @@ class CliRenamer:
     # Listings and pagination.
     ####
 
-    def listing_msg(self, fmt, xs):
-        # Takes a message format and a sequence of items
-        # (either RenamePair or Problem instances).
-        # Attaches a tally of the items to the message format.
+    def renaming_listing(self):
+        # Assemble summary table of tallies if any renamings
+        # were filtered, skipped, or otherwise controlled.
+        p = self.plan
+        controlled = dict(
+            n_filtered = len(p.filtered),
+            n_skipped = len(p.skipped),
+            n_create = len(p.creates),
+            n_clobber = len(p.clobbers),
+        )
+        table = ''
+        if any(controlled.values()):
+            table = MF.summary_table.format(
+                n_initial = p.n_initial,
+                n_active = len(p.rps),
+                **controlled,
+            ) + CON.newline
+
+        # Assemble the renaming listing.
+        sections = (
+            (MF.listing_rename, p.rps),
+            (MF.listing_filter, p.filtered),
+            (MF.listing_skip, p.skipped),
+            (MF.listing_create, p.creates),
+            (MF.listing_clobber, p.clobbers),
+        )
+        stop = None if self.opts.list_all else 1
+        listing = CON.newline.join(
+            self.listing_msg(fmt, items)
+            for fmt, items in sections[0 : stop]
+            if items
+        )
+
+        # Return the full renaming listing.
+        return table + listing
+
+    def listing_msg(self, fmt, items):
+        # Takes a message format and a sequence of items,
+        # either either RenamePair or Problem.
+        # Attaches a tally of the items to the message.
         # Returns that message followed by a
         # potentially-limited listing of those items.
-        n = len(xs)
+        n = len(items)
         lim = n if self.opts.limit is None else self.opts.limit
-        counts = f' (active {n}, listed {lim})'
-        msg = fmt.format(counts)
-        items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
+        tally = f' (total {n})'
+        msg = fmt.format(tally)
+        items = CON.newline.join(x.formatted for x in items[0:self.opts.limit])
         return f'{msg}\n{items}'
 
     def paginate(self, text):
@@ -826,6 +872,12 @@ class CLI:
             ),
         ),
         OptConfig(
+            names = '--list-all',
+            validator = bool,
+            action = 'store_true',
+            help = 'Also lists filtered, skipped, and controlled renamings',
+        ),
+        OptConfig(
             names = '--limit',
             validator = OptConfig.posint,
             metavar = 'N',
@@ -888,7 +940,7 @@ class CLI:
     # Convert opt_configs from tuple to dict so that
     # we can look them up by name.
     opt_configs = {
-        oc.name : oc
+        hyphens_to_underscores(oc.name) : oc
         for oc in opt_configs
     }
 

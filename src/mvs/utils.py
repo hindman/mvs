@@ -73,6 +73,19 @@ STRUCTURES = constants('Structures', (
 # Message formats.
 ####
 
+SUMMARY_TABLE = '''
+Summary:
+    Inputs: {n_initial}
+    ----
+    Renamings: {n_active}
+    Filtered: {n_filtered}
+    Skipped: {n_skipped}
+    ----
+    Create parent: {n_create}
+    Clobber existing: {n_clobber}
+'''
+
+
 MSG_FORMATS = constants('MsgFormats', dict(
     # MvsError instances in RenamingPlan.
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
@@ -96,7 +109,12 @@ MSG_FORMATS = constants('MsgFormats', dict(
     editor_cmd_nonzero     = 'Editor process exited unsuccessfully: editor={!r}, path={!r}',
     edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
     # Other messages in CliRenamer.
-    paths_to_be_renamed    = 'Paths to be renamed{}.\n',
+    summary_table          = SUMMARY_TABLE.lstrip(),
+    listing_rename         = 'Paths to be renamed{}.\n',
+    listing_filter         = 'Renamings filtered out by user code{}.\n',
+    listing_skip           = 'Renamings skipped due to problems{}.\n',
+    listing_create         = 'Renamings that will create new parent{}.\n',
+    listing_clobber        = 'Renamings that will clobber existing paths{}.\n',
     confirm_prompt         = '\nRename paths',
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
@@ -113,6 +131,12 @@ class MvsError(Kwexception):
 ####
 # A dataclass to hold a pair of paths: original and corresponding new.
 ####
+
+NAME_CHANGE_TYPES = constants('NameChangeTypes', (
+    'noop',
+    'name_change',
+    'case_change',
+))
 
 @dataclass
 class RenamePair:
@@ -156,12 +180,6 @@ class RenamePair:
     @property
     def formatted(self):
         return f'{self.orig}\n{self.new}\n'
-
-NAME_CHANGE_TYPES = constants('NameChangeTypes', (
-    'noop',
-    'name_change',
-    'case_change',
-))
 
 ####
 # Read/write: files, clipboard.
@@ -213,9 +231,6 @@ def positive_int(x):
             return x
     raise ValueError
 
-def underscores_to_hyphens(s):
-    return s.replace(CON.underscore, CON.hyphen)
-
 def seq_or_str(xs):
     # Takes a sequence or space-delimited string.
     # Returns a tuple.
@@ -227,14 +242,9 @@ def seq_or_str(xs):
         return tuple(xs)
 
 ####
-
 # A class to hold configuration information for each argparse add_argument()
 # call, along with other information used by the mvs library validate
 # user-preferences and to merge user-preferences with command-line arguments.
-
-
-# The preferences checkers return None on success or the expected type
-# as a str for use in error messages.
 ####
 
 class OptConfig:
@@ -305,8 +315,14 @@ class OptConfig:
             return 'list[str]'
 
 ####
-# Text wrapping.
+# Text wrapping and other string conversion utilities.
 ####
+
+def underscores_to_hyphens(s):
+    return s.replace(CON.underscore, CON.hyphen)
+
+def hyphens_to_underscores(s):
+    return s.replace(CON.hyphen, CON.underscore)
 
 def wrap_text(text, width):
     # Takes some text and a max width.
@@ -347,7 +363,7 @@ def wrap_text(text, width):
     )
 
 ####
-# Constants and a function for path type and existence-status.
+# Constants and functions for path type and existence-status.
 ####
 
 PATH_TYPES = constants('PathTypes', (
@@ -408,14 +424,14 @@ FS_TYPES = constants('FileSystemTypes', (
     'case_sensitive',
 ))
 
-def file_system_case_sensitivity():
+def case_sensitivity():
     # Determines the file system's case sensitivity.
     # This approach ignore the complexity of per-directory
     # sensitivity settings supported by some operating systems.
 
     # Return cached value if we have one.
-    if file_system_case_sensitivity.cached is not None:
-        return file_system_case_sensitivity.cached
+    if case_sensitivity.cached is not None:
+        return case_sensitivity.cached
 
     with TemporaryDirectory() as dpath:
         # Create an empty temp directory.
@@ -435,8 +451,8 @@ def file_system_case_sensitivity():
             FS_TYPES.case_preserving if contents == (f1,) else
             FS_TYPES.case_insensitive
         )
-        file_system_case_sensitivity.cached = fs_type
+        case_sensitivity.cached = fs_type
         return fs_type
 
-file_system_case_sensitivity.cached = None
+case_sensitivity.cached = None
 

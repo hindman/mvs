@@ -10,7 +10,7 @@ from mvs.utils import (
     MSG_FORMATS as MF,
     MvsError,
     STRUCTURES,
-    file_system_case_sensitivity,
+    case_sensitivity,
 )
 
 from mvs.problems import (
@@ -634,7 +634,7 @@ def test_same(tr, create_wa):
 
     # Scenarios: for the first two RenamePair instances,
     # orig and new differ only in the casing of their parent.
-    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+    if case_sensitivity() == FS_TYPES.case_sensitive:
         # Scenario: case-sensitive system: renaming will be rejected
         # due to the missing parents.
         wa, plan = run_checks(
@@ -793,7 +793,7 @@ def test_new_exists_different_case(tr, create_wa):
     extras = ('B.NEW',)
     run_args = (tr, create_wa, origs, news)
 
-    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+    if case_sensitivity() == FS_TYPES.case_sensitive:
         # Scenario: on a case-sensitive system, renaming should
         # succeed because b.new and B.NEW are different files.
         wa, plan = run_checks(
@@ -845,7 +845,7 @@ def test_new_exists_recase(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Reason for failure will vary by file system type.
-    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+    if case_sensitivity() == FS_TYPES.case_sensitive:
         reason = PN.missing
     else:
         reason = PN.all_filtered
@@ -997,7 +997,7 @@ def test_news_collide_case(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: new paths "collide" in a case-insensitive way.
-    if file_system_case_sensitivity() == FS_TYPES.case_sensitive:
+    if case_sensitivity() == FS_TYPES.case_sensitive:
         # If file system is case-sensitive, there is no collision.
         # Renaming will succeed.
         wa, plan = run_checks(*run_args)

@@ -364,30 +364,29 @@ class WorkArea:
 
 class Outputs:
 
-    def __init__(self, origs, news, total = None, listed = None):
+    def __init__(self, origs, news, total = None):
         self.origs = origs
         self.news = news
         self.total = len(origs) if total is None else total
-        self.listed = self.total if listed is None else listed
 
     @property
     def totlist(self):
-        return f'(active {self.total}, listed {self.listed})'
+        return f'(total {self.total})'
 
     @property
     def regular_output(self):
-        return self.paths_to_be_renamed + self.paths_renamed
+        return self.listing_rename + self.paths_renamed
 
     @property
     def no_action_output(self):
-        return self.paths_to_be_renamed + self.no_action
+        return self.listing_rename + self.no_action
 
     @property
     def no_confirm_output(self):
-        return self.paths_to_be_renamed + self.confirm + self.no_action
+        return self.listing_rename + self.confirm + self.no_action
 
     @property
-    def paths_to_be_renamed(self):
+    def listing_rename(self):
         args = [f'Paths to be renamed {self.totlist}.\n']
         args.extend(
             f'{o}\n{n}\n'

@@ -13,79 +13,81 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Problems refactor:
+Implement --list-all printing behavior:
 
-    - Include ability to list skipped rps in cli.py.
+    - Consider including the skip-reason in listing:
 
-        x Store skipped RenamePair instances.
+        # Problem: equal.
+        foo
+        bar
 
-        . Modify messages:
-            x Rename paths [yes]?
-            x Paths to be renamed (active 30, listed 10).
-            - Paths to be renamed (skipped 2, active 30, listed 10).
+        # Problem: missing.
+        x
+        y
 
-        - Add --list-all, which lists active renamings (as usual) and
-          controlled renamings for skip, create, clobber (up to --limit within
-          each category).
+    - Assess the new approach.
 
-    - Support skip and clobber where possible:
+    - Fix failing test.
+        - Also: why is only one test failing?
 
-        - Make problem names simpler and more compact.
+Support skip and clobber where possible:
 
-            Problem                | New name      | Note
-            -------------------------------------------------------------------
-            equal                  | .             | .
-            same                   | .             | .
-            recase                 | .             | .
-            missing                | .             | .
-            type                   | .             | .
-            parent                 | .             | .
-            existing               | exists        | .
-            colliding              | collides      | .
-            existing_diff          | exists_diff   | has SKIP, HALT; add CLOBBER
-            colliding_diff         | collides_diff | "
-            existing_non_empty     | exists_full   | "
-            filter_code_invalid    | filter        | has HALT; add SKIP
-            rename_code_invalid    | rename        | "
-            rename_code_bad_return | .             | Drop problem
+    - Make problem names simpler and more compact.
 
-        - Adding SKIP to the code-related problems is easy. Just add/fix tests.
+        Problem                | New name      | Note
+        -------------------------------------------------------------------
+        equal                  | .             | .
+        same                   | .             | .
+        recase                 | .             | .
+        missing                | .             | .
+        type                   | .             | .
+        parent                 | .             | .
+        existing               | exists        | .
+        colliding              | collides      | .
+        existing_diff          | exists_diff   | has SKIP, HALT; add CLOBBER
+        colliding_diff         | collides_diff | "
+        existing_non_empty     | exists_full   | "
+        filter_code_invalid    | filter        | has HALT; add SKIP
+        rename_code_invalid    | rename        | "
+        rename_code_bad_return | .             | Drop problem
 
-        - Adjust set_exists_and_types() to set.dir_full.
+    - Adding SKIP to the code-related problems is easy. Just add/fix tests.
 
-        - Adjust do_rename() logic for clobbering:
+    - Adjust set_exists_and_types() to set.dir_full.
 
-            - Select the delete-operation based on rp.new type. This breaks a
-              test: figure out why and fix the test.
+    - Adjust do_rename() logic for clobbering:
 
-            - Implement the delete so that we first try the delete operation
-              based on rp.new. Failing that, we try the other ways.
+        - Select the delete-operation based on rp.new type. This breaks a
+          test: figure out why and fix the test.
 
-            - Emphasize issue in README:
+        - Implement the delete so that we first try the delete operation
+          based on rp.new. Failing that, we try the other ways.
 
-                Complex interactions among renamings are not guarded against
-                with any rigor. One example: multiple new-collisions on the
-                same new-path.
+        - Emphasize issue in README:
 
-            - Document in dev notes:
+            Complex interactions among renamings are not guarded against
+            with any rigor. One example: multiple new-collisions on the
+            same new-path.
 
-                Determining the delete operation based on the type of rp.orig
-                or rp.new is flawed in the face of multiple renamings (of
-                different types) colliding on the same new path.
+        - Document in dev notes:
 
-                    Initial paths: a/ b c /x
+            Determining the delete operation based on the type of rp.orig
+            or rp.new is flawed in the face of multiple renamings (of
+            different types) colliding on the same new path.
 
-                    orig | new | rp.orig | rp.new |
-                    ---------------------------------------------------
-                    a/   | x/  | ok      | ok     | .
-                    b    | x   | fails   | ok     | .
-                    c    | x   | ok      | fails  | .
+                Initial paths: a/ b c /x
 
-    - Test coverage: fill gaps.
-        - strict behavior
-        - listing behavior for skips
-        - more problems are skippable
-        - new clobber behaviors
+                orig | new | rp.orig | rp.new |
+                ---------------------------------------------------
+                a/   | x/  | ok      | ok     | .
+                b    | x   | fails   | ok     | .
+                c    | x   | ok      | fails  | .
+
+Test coverage: fill gaps.
+    - strict behavior
+    - new listing behavior
+    - more problems are skippable
+    - new clobber behaviors
 
 New documentation [see NEW_DOCS].
 

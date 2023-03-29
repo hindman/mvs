@@ -121,7 +121,6 @@ def run_checks(
                outs_origs = None,
                outs_news = None,
                total = None,
-               listed = None,
                # Functions allowing user to do things midway through.
                other_prep = None,
                early_checks = None,
@@ -170,7 +169,6 @@ def run_checks(
         outs_origs or wa.origs,
         outs_news or wa.news,
         total = total,
-        listed = listed,
     )
 
     # Set up CliRenamer
@@ -914,7 +912,7 @@ def test_rename_paths_raises(tr, creators):
         log = LOGS_OK,
     )
     assert cli.plan.tracking_index == NSTART
-    assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
+    assert cli.out.rstrip() == outs.listing_rename.rstrip()
 
     # Same scenario, but this time we will trigger the exception via
     # the call_at attribute, so we can check the tracking_index in
@@ -934,7 +932,7 @@ def test_rename_paths_raises(tr, creators):
     assert cli.plan.tracking_rp.orig == wa.origs[N]
     assert cli.plan.tracking_index == N
     assert cli.log_tracking_dict == dict(tracking_index = N)
-    assert cli.out.rstrip() == outs.paths_to_be_renamed.rstrip()
+    assert cli.out.rstrip() == outs.listing_rename.rstrip()
 
 def test_filter_all(tr, creators):
     # Paths and args.
