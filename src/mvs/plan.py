@@ -66,10 +66,17 @@ class RenamingPlan:
                  strict = False,
                  ):
 
-        # Input paths, input structure, and RenamePair instances.
+        # Input paths and structure.
         self.inputs = tuple(inputs)
         self.structure = structure or STRUCTURES.flat
-        self.rps = tuple()
+
+        # RenamePair instances:
+        # - active
+        # - filtered by user code
+        # - skipped via problem-control
+        self.rps = []
+        self.filtered = []
+        self.skipped = []
 
         # User-supplied code.
         self.rename_code = rename_code
@@ -176,10 +183,20 @@ class RenamingPlan:
             (self.check_new_collisions, self.prepare_new_groups),
         )
         for step, prep_step in rp_steps:
-            # Run any needed preparations and then the step.
+            # Run any needed preparations.
             if prep_step:
                 prep_step()
-            self.rps = tuple(self.processed_rps(step))
+
+            # Execute the step, adding the yielded rps to the appropriate list.
+            active = []
+            for rp in self.processed_rps(step):
+                xs = (
+                    self.filtered if rp.exclude else
+                    self.skipped if rp.skip else
+                    active
+                )
+                xs.append(rp)
+            self.rps = active
 
             # Register problem if the step filtered out everything.
             if not self.rps:
@@ -330,27 +347,11 @@ class RenamingPlan:
 
         for rp in self.rps:
             # Execute the step. If we get a Problem, handle it and
-            # determine which control is active for it.
+            # set the corresponding attribute on rp.
             prob = step(rp, next(seq))
-            if prob is None:
-                control = None
-            else:
+            if prob:
                 control = self.handle_problem(prob, rp = rp)
-
-            # Respond to the problem control, if any.
-            #
-            # - skip or halt: bypass this RenamePair, but proceeed
-            #   with others in this step. If halt, that will prevent
-            #   the next step from being called.
-            #
-            # - clobber or create: set the needed RenamePair attribute
-            #   to guide renaming behavior when it occurs.
-            if control in (CONTROLS.skip, CONTROLS.halt):
-                continue
-            elif control == CONTROLS.clobber:
-                rp.clobber = True
-            elif control == CONTROLS.create:
-                rp.create_parent = True
+                setattr(rp, control, True)
 
             # Yield unless RenamePair was filtered out by user code.
             if not rp.exclude:
@@ -613,7 +614,7 @@ class RenamingPlan:
         pn = Path(rp.new)
 
         # Create new parent if requested.
-        if rp.create_parent:
+        if rp.create:
             pn.parent.mkdir(parents = True, exist_ok = True)
 
         # If new path exists already, deal with it before

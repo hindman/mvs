@@ -97,7 +97,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
     # Other messages in CliRenamer.
     paths_to_be_renamed    = 'Paths to be renamed{}.\n',
-    confirm_prompt         = '\nRename paths{}',
+    confirm_prompt         = '\nRename paths',
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
     cli_version_msg        = f'{CON.app_name} v{__version__}',
@@ -137,11 +137,15 @@ class RenamePair:
 
     # Flags set when checking the RenamePair instance for problems:
     # - Whether user code filtered out the RenamePair.
+    # - Whether it cause a Problem that will halt the RenamingPlan.
+    # - Whether it should be skipped due to a Problem.
     # - Whether to create new-parent before renaming.
     # - Whether renaming will clobber something.
     # - Whether renaming will involve case-change-only renaming (ie self-clobber).
     exclude: bool = False
-    create_parent: bool = False
+    halt: bool = False
+    skip: bool = False
+    create: bool = False
     clobber: bool = False
     clobber_self: bool = False
 

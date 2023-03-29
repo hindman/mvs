@@ -154,8 +154,7 @@ class CliRenamer:
 
         # User confirmation.
         if not opts.yes:
-            msg = self.msg_with_counts(MF.confirm_prompt, plan.rps)
-            if not self.get_confirmation(msg, expected = CON.yes):
+            if not self.get_confirmation(MF.confirm_prompt, expected = CON.yes):
                 self.wrapup(CON.exit_ok, MF.no_action_msg)
                 return
 
@@ -500,21 +499,16 @@ class CliRenamer:
     # Listings and pagination.
     ####
 
-    def msg_with_counts(self, fmt, xs):
-        # Takes a message format and a sequence of items.
-        # Returns a message followed by two counts in parentheses:
-        # - N items
-        # - N items listed, based on opts.limit
+    def listing_msg(self, fmt, xs):
+        # Takes a message format and a sequence of items
+        # (either RenamePair or Problem instances).
+        # Attaches a tally of the items to the message format.
+        # Returns that message followed by a
+        # potentially-limited listing of those items.
         n = len(xs)
         lim = n if self.opts.limit is None else self.opts.limit
-        counts = f' (total {n}, listed {lim})'
-        return fmt.format(counts)
-
-    def listing_msg(self, fmt, xs):
-        # Takes a message format and a sequence of items.
-        # Returns a message-with-counts followed by a potentially-limited
-        # listing of those items.
-        msg = self.msg_with_counts(fmt, xs)
+        counts = f' (active {n}, listed {lim})'
+        msg = fmt.format(counts)
         items = CON.newline.join(x.formatted for x in xs[0:self.opts.limit])
         return f'{msg}\n{items}'
 

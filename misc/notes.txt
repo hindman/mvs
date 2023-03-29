@@ -17,16 +17,12 @@ Problems refactor:
 
     - Include ability to list skipped rps in cli.py.
 
-        - Modify messages:
+        x Store skipped RenamePair instances.
 
-            Paths to be renamed (active 30, listed 10).
-            Paths to be renamed (skipped 2, active 30, listed 10).
-
-            Rename paths [yes]?
-
-        - Store skipped RenamePair instances. Add a skip attribute. Set it
-          during processing. After getting the tuple from processed_rps(),
-          split contents into active and skipped.
+        . Modify messages:
+            x Rename paths [yes]?
+            x Paths to be renamed (active 30, listed 10).
+            - Paths to be renamed (skipped 2, active 30, listed 10).
 
         - Add --list-all, which lists active renamings (as usual) and
           controlled renamings for skip, create, clobber (up to --limit within

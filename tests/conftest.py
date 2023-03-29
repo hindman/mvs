@@ -372,7 +372,7 @@ class Outputs:
 
     @property
     def totlist(self):
-        return f'(total {self.total}, listed {self.listed})'
+        return f'(active {self.total}, listed {self.listed})'
 
     @property
     def regular_output(self):
@@ -397,7 +397,7 @@ class Outputs:
 
     @property
     def confirm(self):
-        return f'Rename paths {self.totlist} [yes]? \n'
+        return f'Rename paths [yes]? \n'
 
     @property
     def paths_renamed(self):
