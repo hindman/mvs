@@ -13,6 +13,54 @@ toc: Table of contents
 todos: TODOs
 --------
 
+After refactor, cli cannot report problems in a useful way:
+
+    - For any non-halt problems, the rps end up in plan.skipped and the plan
+      ends up having no uncontrolled-problems.
+
+    - If any rps survive, you can rename them, but you can't get any
+      information on the specific problems, even with --list-all.
+
+    - If no rps survive, you get the only the all-filtered problem. Again, no
+      useful information for the user.
+
+    - Some possible remedies:
+
+        - The all-filtered problem should be restricted to user-code filtering.
+
+        - And an all-skipped problem should not be reported. Instead, report
+          the underlying problems.
+
+        - RenamingPlan: use plan.halted rather than plan.problems.
+
+            - Start within intial rps.
+
+            - After processing those rps end up in four buckets:
+
+                plan.rps      | Still active. Might have rp.create or rp.clobber.
+                plan.filtered | Filtered out by user code
+                plan.skipped  | Had a non-fatal problem.
+                plan.halted   | Had a fatal problem.
+
+            - The failed @property would be based on plan.halted and
+              plan.failures (see below).
+
+            - Each rp would store the Problem that got it placed in the
+              filtered/skipped/halted buckets or that caused its create/clobber
+              attributes to be set.
+
+            - The Problem would no longer need to store the rp, ending that
+              circular relationship.
+
+        - Stop comingling problems (rp-specific, controllable) and the other
+          plan failures (not specific to an rp):
+
+            - input parsing failures
+            - user code compilation failures
+            - all renamings filtered out by user code
+
+            - Store these in plan.failures.
+
 Implement --list-all printing behavior:
 
     - Consider including the skip-reason in listing:
