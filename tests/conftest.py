@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from mvs.utils import CON
+from mvs.utils import CON, MSG_FORMATS as MF
 
 ####
 # Set the mvs environment variable so that (1) the user's personal
@@ -364,10 +364,23 @@ class WorkArea:
 
 class Outputs:
 
-    def __init__(self, origs, news, total = None):
+    SUMMARY_KEYS = (
+        'n_initial',
+        'n_active',
+        'n_filtered',
+        'n_skipped',
+        'n_create',
+        'n_clobber',
+    )
+
+    def __init__(self, origs, news, total = None, summary = None):
         self.origs = origs
         self.news = news
         self.total = len(origs) if total is None else total
+        self.summary = None
+        if summary:
+            kws = dict(zip(self.SUMMARY_KEYS, summary))
+            self.summary = MF.summary_table.format(**kws) + CON.newline
 
     @property
     def totlist(self):
@@ -375,7 +388,11 @@ class Outputs:
 
     @property
     def regular_output(self):
-        return self.listing_rename + self.paths_renamed
+        return ''.join((
+            self.summary or '',
+            self.listing_rename,
+            self.paths_renamed,
+        ))
 
     @property
     def no_action_output(self):

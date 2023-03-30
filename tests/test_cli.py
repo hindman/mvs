@@ -121,6 +121,7 @@ def run_checks(
                outs_origs = None,
                outs_news = None,
                total = None,
+               summary = None,
                # Functions allowing user to do things midway through.
                other_prep = None,
                early_checks = None,
@@ -169,6 +170,7 @@ def run_checks(
         outs_origs or wa.origs,
         outs_news or wa.news,
         total = total,
+        summary = summary,
     )
 
     # Set up CliRenamer
@@ -1074,6 +1076,7 @@ def test_some_failed_rps(tr, creators):
         expecteds = expecteds,
         outs_origs = WA.origs[2:],
         outs_news = WA.news[2:],
+        summary = (4, 2, 0, 2, 0, 0),
     )
 
     # Scenario: pass conflicting failure-control options.

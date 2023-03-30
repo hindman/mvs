@@ -61,23 +61,6 @@ After refactor, cli cannot report problems in a useful way:
 
             - Store these in plan.failures.
 
-Implement --list-all printing behavior:
-
-    - Consider including the skip-reason in listing:
-
-        # Problem: equal.
-        foo
-        bar
-
-        # Problem: missing.
-        x
-        y
-
-    - Assess the new approach.
-
-    - Fix failing test.
-        - Also: why is only one test failing?
-
 Support skip and clobber where possible:
 
     - Make problem names simpler and more compact.
