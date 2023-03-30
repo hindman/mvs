@@ -12,7 +12,7 @@ from textwrap import dedent
 from short_con import constants
 
 from .plan import RenamingPlan
-from .problems import Problem, CONTROLS, ProblemControl
+from .problems import ProblemControl
 from .version import __version__
 
 from .utils import (

@@ -3,7 +3,7 @@ import pytest
 # Import these from the package.
 from mvs import RenamingPlan, MvsError, __version__
 
-from mvs.utils import RenamePair
+from mvs.plan import RenamePair
 
 ####
 # Exercise package's top-level importables.

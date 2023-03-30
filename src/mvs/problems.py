@@ -2,22 +2,25 @@ from dataclasses import dataclass, field
 from short_con import constants, cons
 
 from .utils import (
-    CON,
     MSG_FORMATS as MF,
     MvsError,
-    RenamePair,
     seq_or_str,
     underscores_to_hyphens,
 )
 
 ####
-# Problem names and associated messages/formats.
+# Problems and Failures.
+#
+# Problems are specific to one RenamePair and they are handled
+# via problem controls: halt, skip, create, clobber.
+#
+# Failures are not specific to a single RenamePair and/or have
+# no meaningful control mechanism. Most relate to bad inputs.
 #
 # See command-line help text for more details on problems and their control.
 ####
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (
-    # Controllable.
     'equal',
     'same',
     'recase',
@@ -29,7 +32,23 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'existing_diff',
     'colliding_diff',
     'existing_non_empty',
-    # Not controllable.
+))
+
+PROBLEM_FORMATS = constants('ProblemFormats', {
+    PN.equal:              'Original path and new path are the exactly equal',
+    PN.same:               'Original path and new path are the functionally the same',
+    PN.recase:             'User inputs requested path name case change, but file system already agrees with new',
+    PN.missing:            'Original path does not exist',
+    PN.type:               'Original path must be regular file or directory',
+    PN.parent:             'Parent directory of new path does not exist',
+    PN.existing:           'New path exists',
+    PN.colliding:          'New path collides with another new path',
+    PN.existing_diff:      'New path exists and differs with original in type',
+    PN.colliding_diff:     'New path collides with another new path, and they differ in type',
+    PN.existing_non_empty: 'New path collides with a non-empty directory',
+})
+
+FAILURE_NAMES = FN = constants('FailureNames', (
     'all_filtered',
     'parsing_no_paths',
     'parsing_paragraphs',
@@ -41,60 +60,46 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'rename_code_bad_return',
 ))
 
-PROBLEM_FORMATS = constants('ProblemFormats', {
-    # Controllable.
-    PN.equal:                  'Original path and new path are the exactly equal',
-    PN.same:                   'Original path and new path are the functionally the same',
-    PN.recase:                 'User inputs requested path name case change, but file system already agrees with new',
-    PN.missing:                'Original path does not exist',
-    PN.type:                   'Original path must be regular file or directory',
-    PN.parent:                 'Parent directory of new path does not exist',
-    PN.existing:               'New path exists',
-    PN.colliding:              'New path collides with another new path',
-    PN.existing_diff:          'New path exists and differs with original in type',
-    PN.colliding_diff:         'New path collides with another new path, and they differ in type',
-    PN.existing_non_empty:     'New path collides with a non-empty directory',
-    # Not controllable.
-    PN.all_filtered:           'All paths were filtered out during processing',
-    PN.parsing_no_paths:       'No input paths',
-    PN.parsing_paragraphs:     'The --paragraphs option expects exactly two paragraphs',
-    PN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',
-    PN.parsing_imbalance:      'Got an unequal number of original paths and new paths',
-    PN.user_code_exec:         '{}',
-    PN.filter_code_invalid:    'Error in user-supplied filtering code: {} [original path: {}]',
-    PN.rename_code_invalid:    'Error in user-supplied renaming code: {} [original path: {}]',
-    PN.rename_code_bad_return: 'Invalid type from user-supplied renaming code: {} [original path: {}]',
+FAILURE_FORMATS = constants('FailureFormats', {
+    FN.all_filtered:           'All paths were filtered out during processing',
+    FN.parsing_no_paths:       'No input paths',
+    FN.parsing_paragraphs:     'The --paragraphs option expects exactly two paragraphs',
+    FN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',
+    FN.parsing_imbalance:      'Got an unequal number of original paths and new paths',
+    FN.user_code_exec:         '{}',
+    FN.filter_code_invalid:    'Error in user-supplied filtering code: {} [original path: {}]',
+    FN.rename_code_invalid:    'Error in user-supplied renaming code: {} [original path: {}]',
+    FN.rename_code_bad_return: 'Invalid type from user-supplied renaming code: {} [original path: {}]',
 })
 
-####
-# Data object to represent a problem.
-####
-
 @dataclass(init = False, frozen = True)
-class Problem:
+class Issue:
     name: str
     msg: str
-    rp : RenamePair = None
 
-    def __init__(self, name, *xs, msg = None, rp = None):
+    FORMATS = None
+
+    def __init__(self, name, *xs):
         # Custom initializer, because we need a convenience lookup to build
-        # the ultimate message, given a problem name and arguments.
-        # To keep Problem instances frozen, we modify __dict__ directly.
+        # the ultimate message, given a problem/failure name and arguments.
+        # To keep instances frozen, we modify __dict__ directly.
         d = self.__dict__
         d['name'] = name
-        d['msg'] = msg or self.format_for(name).format(*xs)
-        d['rp'] = rp
+        d['msg'] = self.FORMATS[name].format(*xs)
 
     @property
     def formatted(self):
-        if self.rp is None:
-            return self.msg
-        else:
-            return f'{self.msg}:\n{self.rp.formatted}'
+        return self.msg
 
-    @staticmethod
-    def format_for(name):
-        return PROBLEM_FORMATS[name]
+@dataclass(init = False, frozen = True)
+class Problem(Issue):
+
+    FORMATS = PROBLEM_FORMATS
+
+@dataclass(init = False, frozen = True)
+class Failure(Issue):
+
+    FORMATS = FAILURE_FORMATS
 
 ####
 # Problem controls.
@@ -127,15 +132,15 @@ class ProblemControl:
         PN.existing_diff:          (C.skip, C.halt),  # C.clobber
         PN.colliding_diff:         (C.skip, C.halt),  # C.clobber
         PN.existing_non_empty:     (C.skip, C.halt),  # C.clobber
-        PN.filter_code_invalid:    (C.halt,),         # C.skip
-        PN.rename_code_invalid:    (C.halt,),         # C.skip
-        PN.rename_code_bad_return: (C.halt,),         # C.skip
-        PN.all_filtered:           (C.halt,),
-        PN.parsing_no_paths:       (C.halt,),
-        PN.parsing_paragraphs:     (C.halt,),
-        PN.parsing_row:            (C.halt,),
-        PN.parsing_imbalance:      (C.halt,),
-        PN.user_code_exec:         (C.halt,),
+        # PN.filter_code_invalid:    (C.halt,),         # C.skip
+        # PN.rename_code_invalid:    (C.halt,),         # C.skip
+        # PN.rename_code_bad_return: (C.halt,),         # C.skip
+        # PN.all_filtered:           (C.halt,),
+        # PN.parsing_no_paths:       (C.halt,),
+        # PN.parsing_paragraphs:     (C.halt,),
+        # PN.parsing_row:            (C.halt,),
+        # PN.parsing_imbalance:      (C.halt,),
+        # PN.user_code_exec:         (C.halt,),
     }
 
     # A dict mapping each ProblemControl name to its

@@ -2,7 +2,6 @@ import os
 import pyperclip
 import sys
 
-from dataclasses import dataclass
 from kwexception import Kwexception
 from pathlib import Path
 from short_con import constants
@@ -122,14 +121,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
 ))
 
 ####
-# An exception class for the project.
-####
-
-class MvsError(Kwexception):
-    pass
-
-####
-# A dataclass to hold a pair of paths: original and corresponding new.
+# Types of renaming changes affecting the name-portion of a path.
 ####
 
 NAME_CHANGE_TYPES = constants('NameChangeTypes', (
@@ -138,48 +130,12 @@ NAME_CHANGE_TYPES = constants('NameChangeTypes', (
     'case_change',
 ))
 
-@dataclass
-class RenamePair:
-    # A data object to hold an original path and the corresponding new path.
+####
+# An exception class for the project.
+####
 
-    # Paths.
-    orig: str
-    new: str
-
-    # Path EXISTENCES.
-    exist_orig: int = None
-    exist_new: int = None
-    exist_new_parent: int = None
-
-    # Path types.
-    type_orig: str = None
-    type_new: str = None
-
-    # The renaming type and whether orig and new have the same parents.
-    name_change_type: str = None
-    same_parents: bool = None
-
-    # Flags set when checking the RenamePair instance for problems:
-    # - Whether user code filtered out the RenamePair.
-    # - Whether it cause a Problem that will halt the RenamingPlan.
-    # - Whether it should be skipped due to a Problem.
-    # - Whether to create new-parent before renaming.
-    # - Whether renaming will clobber something.
-    # - Whether renaming will involve case-change-only renaming (ie self-clobber).
-    exclude: bool = False
-    halt: bool = False
-    skip: bool = False
-    create: bool = False
-    clobber: bool = False
-    clobber_self: bool = False
-
-    @property
-    def equal(self):
-        return self.orig == self.new
-
-    @property
-    def formatted(self):
-        return f'{self.orig}\n{self.new}\n'
+class MvsError(Kwexception):
+    pass
 
 ####
 # Read/write: files, clipboard.
