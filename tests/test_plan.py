@@ -16,6 +16,8 @@ from mvs.utils import (
 from mvs.problems import (
     CONTROLS,
     PROBLEM_NAMES as PN,
+    FAILURE_NAMES as FN,
+    Failure,
     Problem,
     ProblemControl,
 )
@@ -129,13 +131,17 @@ def assert_raised_because(einfo, plan, prob):
     # (2) the given RenamingPlan, and (3) an expected Problem name.
 
     # Get the part of the Problem message format before any string formatting.
-    exp_msg = Problem.format_for(prob).split('{')[0]
+    cls = Problem if prob in Problem.FORMATS else Failure
+    exp_msg = cls.FORMATS[prob].split('{')[0]
     size = len(exp_msg)
 
     # Grab the plan's uncontrolled failure messages, trimmed to the same size.
     fmsgs = tuple(
+        rp.problem.msg[0 : size]
+        for rp in plan.halts
+    ) + tuple(
         f.msg[0 : size]
-        for f in plan.uncontrolled_problems
+        for f in plan.failures
     )
 
     # Check for the expected (a) general failure message
@@ -163,7 +169,7 @@ def test_no_inputs(tr, create_wa):
             inputs = (),
             rename_code = code,
             failure = True,
-            reason = PN.parsing_no_paths,
+            reason = FN.parsing_no_paths,
             no_change = True,
         )
 
@@ -238,7 +244,7 @@ def test_structure_paragraphs(tr, create_wa):
             inputs = assemble_inputs(**kws),
             structure = STRUCTURES.paragraphs,
             failure = True,
-            reason = PN.parsing_paragraphs,
+            reason = FN.parsing_paragraphs,
             no_change = True,
         )
 
@@ -282,7 +288,7 @@ def test_structure_pairs(tr, create_wa):
         structure = STRUCTURES.pairs,
         failure = True,
         no_change = True,
-        reason = PN.parsing_imbalance,
+        reason = FN.parsing_imbalance,
     )
 
 def test_structure_rows(tr, create_wa):
@@ -327,7 +333,7 @@ def test_structure_rows(tr, create_wa):
             structure = STRUCTURES.rows,
             failure = True,
             no_change = True,
-            reason = PN.parsing_row,
+            reason = FN.parsing_row,
         )
 
 ####
@@ -383,10 +389,10 @@ def test_code_compilation_fails(tr, create_wa):
     BAD_CODE = 'FUBB BLORT'
 
     # Helper to check some details about the first uncontrolled Problem.
-    def check_problem(plan):
-        prob = plan.uncontrolled_problems[0]
-        assert BAD_CODE in prob.msg
-        assert 'invalid syntax' in prob.msg
+    def check_fail(plan):
+        f = plan.failures[0]
+        assert BAD_CODE in f.msg
+        assert 'invalid syntax' in f.msg
 
     # Scenario: invalid renaming code.
     wa, plan = run_checks(
@@ -395,9 +401,9 @@ def test_code_compilation_fails(tr, create_wa):
         rename_code = BAD_CODE,
         failure = True,
         no_change = True,
-        reason = PN.user_code_exec,
+        reason = FN.user_code_exec,
     )
-    check_problem(plan)
+    check_fail(plan)
 
     # Scenario: invalid filtering code.
     wa, plan = run_checks(
@@ -405,9 +411,9 @@ def test_code_compilation_fails(tr, create_wa):
         filter_code = BAD_CODE,
         failure = True,
         no_change = True,
-        reason = PN.user_code_exec,
+        reason = FN.user_code_exec,
     )
-    check_problem(plan)
+    check_fail(plan)
 
 def test_code_execution_fails(tr, create_wa):
     # Paths and args.
@@ -427,9 +433,9 @@ def test_code_execution_fails(tr, create_wa):
     # - Renaming code returns bad data type.
     # - Filtering code raises an exception.
     scenarios = (
-        dict(rename_code = rename_code1, reason = PN.rename_code_invalid),
-        dict(rename_code = rename_code2, reason = PN.rename_code_bad_return),
-        dict(filter_code = filter_code, reason = PN.filter_code_invalid),
+        dict(rename_code = rename_code1, reason = PN.rename),
+        dict(rename_code = rename_code2, reason = PN.rename),
+        dict(filter_code = filter_code, reason = PN.filter),
     )
     for kws in scenarios:
         wa, plan = run_checks(
@@ -440,11 +446,10 @@ def test_code_execution_fails(tr, create_wa):
             include_news = 'filter_code' in kws,
             **kws,
         )
-        probs = plan.uncontrolled_problems
-        assert len(probs) == 1
-        p = probs[0]
-        assert p.rp.orig == FAILING_ORIG
-        assert p.name == kws['reason']
+        assert len(plan.halts) == 1
+        rp = plan.halts[0]
+        assert rp.orig == FAILING_ORIG
+        assert rp.problem.name == kws['reason']
 
 def test_seq(tr, create_wa):
     # Paths and args.
@@ -499,7 +504,7 @@ def test_plan_as_dict(tr, create_wa):
             'seq_step',
             'controls',
             'strict',
-            'problems',
+            # 'problems',
             'prefix_len',
             'rename_pairs',
             'tracking_index',
@@ -848,7 +853,7 @@ def test_new_exists_recase(tr, create_wa):
     if case_sensitivity() == FS_TYPES.case_sensitive:
         reason = PN.missing
     else:
-        reason = PN.all_filtered
+        reason = FN.all_filtered
 
     # Scenarios: user reverses order of news and origs
     # when supplying inputs. Renaming will be rejected.
@@ -985,8 +990,7 @@ def test_news_collide_orig_missing(tr, create_wa):
         no_change = True,
         reason = PN.missing,
     )
-    probs = plan.uncontrolled_problems
-    assert len(probs) == 1
+    assert len(plan.halts) == 1
 
 def test_news_collide_case(tr, create_wa):
     # Paths and args.
@@ -1031,7 +1035,7 @@ def test_failures_skip_all(tr, create_wa):
         *run_args,
         failure = True,
         no_change = True,
-        reason = PN.all_filtered,
+        reason = FN.all_filtered,
     )
 
 ####

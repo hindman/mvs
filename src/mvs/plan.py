@@ -248,11 +248,12 @@ class RenamingPlan:
             # to guide subsequent filtering, skipping, clobbering, etc.
             active = []
             for rp in self.rps:
-                # If the step returns a Problem/Failure, handle it and set the
-                # corresponding problem-control attribute on rp.
-                pf = step(rp, next(seq))
-                if pf:
-                    control = self.handle_issue(pf, rp = rp)
+                # If the step returns a Problem, handle it and set the
+                # corresponding problem-related attributes on rp.
+                prob = step(rp, next(seq))
+                if prob:
+                    rp.problem = prob
+                    control = self.control_lookup[prob.name]
                     if control:
                         setattr(rp, control, True)
                 # Add each resulting rp to the appropriate list.
@@ -267,7 +268,7 @@ class RenamingPlan:
 
         # Register problem if everything was filtered out.
         if not self.rps:
-            self.handle_issue(FN.all_filtered)
+            self.handle_failure(FN.all_filtered)
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -279,7 +280,7 @@ class RenamingPlan:
 
         # Helper to handle a Failure and return empty.
         def do_fail(name, *xs):
-            self.handle_issue(name, *xs)
+            self.handle_failure(name, *xs)
             return []
 
         # If we have rename_code, inputs are just original paths.
@@ -385,7 +386,7 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             tb = traceback.format_exc(limit = 0)
-            self.handle_issue(FN.user_code_exec, tb)
+            self.handle_failure(FN.user_code_exec, tb)
             return None
 
     ####
@@ -433,7 +434,7 @@ class RenamingPlan:
                 if not keep:
                     rp.exclude = True
             except Exception as e:
-                return Failure(FN.filter_code_invalid, e, rp.orig)
+                return Problem(PN.filter, e, rp.orig)
         return None
 
     def execute_user_rename(self, rp, seq_val):
@@ -442,13 +443,13 @@ class RenamingPlan:
             try:
                 new = self.rename_func(rp.orig, Path(rp.orig), seq_val, self)
             except Exception as e:
-                return Failure(FN.rename_code_invalid, e, rp.orig)
+                return Problem(PN.rename, e, rp.orig)
             # Validate its type and either set rp.new or return Problem.
             if isinstance(new, (str, Path)):
                 rp.new = str(new)
             else:
                 typ = type(new).__name__
-                return Failure(FN.rename_code_bad_return, typ, rp.orig)
+                return Problem(PN.rename, typ, rp.orig)
         return None
 
     def check_orig_exists(self, rp, seq_val):
@@ -572,25 +573,14 @@ class RenamingPlan:
     # Methods related to problem control.
     ####
 
-    def handle_issue(self, pf, *xs, rp = None):
-        # Takes a Problem/Failure or the name/args to create one.
-        # Stores the issue and returns the applicable problem-control.
-        if isinstance(pf, Problem):
-            rp.problem = pf
-            return self.control_lookup[pf.name]
-        else:
-            pf = pf if isinstance(pf, Failure) else Failure(pf, *xs)
-            self.failures.append(pf)
-            return None
+    def handle_failure(self, name, *xs):
+        # Takes name/args to create a Failure and then stores it.
+        f = Failure(name, *xs)
+        self.failures.append(f)
 
     @property
     def failed(self):
-        # The RenamingPlan has failed if there are any uncontrolled problems.
-        return bool(self.halting_issues)
-
-    @property
-    def halting_issues(self):
-        return self.failures + self.halts
+        return bool(self.failures or self.halts)
 
     ####
     # Sequence number and common prefix.
@@ -621,7 +611,11 @@ class RenamingPlan:
         # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
-            raise MvsError(MF.prepare_failed, issues = self.halting_issues)
+            raise MvsError(
+                MF.prepare_failed,
+                failures = self.failures,
+                halts = self.halts,
+            )
 
         # Rename paths.
         for i, rp in enumerate(self.rps):

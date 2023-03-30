@@ -32,6 +32,8 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'existing_diff',
     'colliding_diff',
     'existing_non_empty',
+    'filter',
+    'rename',
 ))
 
 PROBLEM_FORMATS = constants('ProblemFormats', {
@@ -46,6 +48,8 @@ PROBLEM_FORMATS = constants('ProblemFormats', {
     PN.existing_diff:      'New path exists and differs with original in type',
     PN.colliding_diff:     'New path collides with another new path, and they differ in type',
     PN.existing_non_empty: 'New path collides with a non-empty directory',
+    PN.filter:             'Error from user-supplied filtering code: {} [original path: {}]',
+    PN.rename:             'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
 })
 
 FAILURE_NAMES = FN = constants('FailureNames', (
@@ -55,9 +59,6 @@ FAILURE_NAMES = FN = constants('FailureNames', (
     'parsing_row',
     'parsing_imbalance',
     'user_code_exec',
-    'filter_code_invalid',
-    'rename_code_invalid',
-    'rename_code_bad_return',
 ))
 
 FAILURE_FORMATS = constants('FailureFormats', {
@@ -67,9 +68,6 @@ FAILURE_FORMATS = constants('FailureFormats', {
     FN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',
     FN.parsing_imbalance:      'Got an unequal number of original paths and new paths',
     FN.user_code_exec:         '{}',
-    FN.filter_code_invalid:    'Error in user-supplied filtering code: {} [original path: {}]',
-    FN.rename_code_invalid:    'Error in user-supplied renaming code: {} [original path: {}]',
-    FN.rename_code_bad_return: 'Invalid type from user-supplied renaming code: {} [original path: {}]',
 })
 
 @dataclass(init = False, frozen = True)
@@ -121,26 +119,19 @@ class ProblemControl:
     # The first control in each tuple is the default.
     # Values in comments could be allowed in the future.
     VALID_CONTROLS = {
-        PN.equal:                  (C.skip, C.halt),
-        PN.same:                   (C.skip, C.halt),
-        PN.recase:                 (C.skip, C.halt),
-        PN.missing:                (C.skip, C.halt),
-        PN.type:                   (C.skip, C.halt),
-        PN.parent:                 (C.skip, C.halt, C.create),
-        PN.existing:               (C.skip, C.halt, C.clobber),
-        PN.colliding:              (C.skip, C.halt, C.clobber),
-        PN.existing_diff:          (C.skip, C.halt),  # C.clobber
-        PN.colliding_diff:         (C.skip, C.halt),  # C.clobber
-        PN.existing_non_empty:     (C.skip, C.halt),  # C.clobber
-        # PN.filter_code_invalid:    (C.halt,),         # C.skip
-        # PN.rename_code_invalid:    (C.halt,),         # C.skip
-        # PN.rename_code_bad_return: (C.halt,),         # C.skip
-        # PN.all_filtered:           (C.halt,),
-        # PN.parsing_no_paths:       (C.halt,),
-        # PN.parsing_paragraphs:     (C.halt,),
-        # PN.parsing_row:            (C.halt,),
-        # PN.parsing_imbalance:      (C.halt,),
-        # PN.user_code_exec:         (C.halt,),
+        PN.equal:              (C.skip, C.halt),
+        PN.same:               (C.skip, C.halt),
+        PN.recase:             (C.skip, C.halt),
+        PN.missing:            (C.skip, C.halt),
+        PN.type:               (C.skip, C.halt),
+        PN.parent:             (C.skip, C.halt, C.create),
+        PN.existing:           (C.skip, C.halt, C.clobber),
+        PN.colliding:          (C.skip, C.halt, C.clobber),
+        PN.existing_diff:      (C.skip, C.halt),  # C.clobber
+        PN.colliding_diff:     (C.skip, C.halt),  # C.clobber
+        PN.existing_non_empty: (C.skip, C.halt),  # C.clobber
+        PN.filter:             (C.halt, C.skip),
+        PN.rename:             (C.halt, C.skip),
     }
 
     # A dict mapping each ProblemControl name to its

@@ -139,7 +139,7 @@ class CliRenamer:
         if plan.failed:
             msg = self.listing_msg(
                 MF.prepare_failed_cli,
-                plan.uncontrolled_problems,
+                plan.failures + plan.halts,
             )
             self.wrapup(CON.exit_fail, msg)
             return
