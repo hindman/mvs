@@ -98,7 +98,6 @@ MSG_FORMATS = constants('MsgFormats', dict(
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
     log_writing_failed     = 'Unexpected error during writing to log file.\n\n{}',
     prefs_reading_failed   = 'Unexpected error during reading of user preferences {!r}.\n\n{{}}',
-    prepare_failed_cli     = 'Renaming preparation resulted in problems:{}.\n',
     renaming_raised        = '\nRenaming raised an error at tracking_index={}. Traceback follows:\n\n{{}}',
     opts_require_one       = 'One of these options is required',
     opts_mutex             = 'No more than one of these options should be used',
@@ -109,11 +108,13 @@ MSG_FORMATS = constants('MsgFormats', dict(
     edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
     # Other messages in CliRenamer.
     summary_table          = SUMMARY_TABLE.lstrip(),
-    listing_rename         = 'Paths to be renamed{}.\n',
-    listing_filter         = 'Renamings filtered out by user code{}.\n',
-    listing_skip           = 'Renamings skipped due to problems{}.\n',
-    listing_create         = 'Renamings that will create new parent{}.\n',
-    listing_clobber        = 'Renamings that will clobber existing paths{}.\n',
+    listing_rename         = 'Paths to be renamed{}:\n',
+    listing_filter         = 'Renamings filtered out by user code{}:\n',
+    listing_skip           = 'Renamings skipped due to problems{}:\n',
+    listing_create         = 'Renamings that will create new parent{}:\n',
+    listing_clobber        = 'Renamings that will clobber existing paths{}:\n',
+    listing_failures       = 'General failures during preparation{}:\n',
+    listing_halts          = 'Renamings that halted the renaming plan during preparation{}:\n',
     confirm_prompt         = '\nRename paths',
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
@@ -279,6 +280,12 @@ def underscores_to_hyphens(s):
 
 def hyphens_to_underscores(s):
     return s.replace(CON.hyphen, CON.underscore)
+
+def with_newline(s):
+    if s.endswith(CON.newline):
+        return s
+    else:
+        return s + CON.newline
 
 def wrap_text(text, width):
     # Takes some text and a max width.

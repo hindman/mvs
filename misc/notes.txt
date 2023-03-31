@@ -13,33 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Make CLI reporting useful:
-
-    - The current problem:
-
-        - For any non-halt problems, the rps end up in plan.skipped and the
-          plan ends up having no uncontrolled-problems.
-
-        - If any rps survive, you can rename them, but you can't get any
-          information on the specific problems, even with --list-all.
-
-        - If no rps survive, you get the only the all-filtered problem. Again,
-          no useful information for the user.
-
-    - Modify listing behavior:
-
-        - The all-filtered problem should be restricted to user-code filtering.
-
-        - And an all-skipped problem should not be reported. Instead, report the
-          underlying problems.
-
-        - When listing skipped, include the Problem.name.
-
-        - Get tests working, notable test_some_failed_rps(), which
-          is currently being skipped.
-
-    - RenamingPlan.as_dict: modify to hold filtered/skipped/halts.
-
 Support skip and clobber where possible:
 
     - Adjust Problem naming to be simpler, more compact.
@@ -51,6 +24,12 @@ Support skip and clobber where possible:
         existing_diff      | exists_diff   | has SKIP, HALT; add CLOBBER
         colliding_diff     | collides_diff | "
         existing_non_empty | exists_full   | "
+
+    - Get tests passing.
+
+    - Add CLOBBER to the last 3 problems in table above.
+
+    - Get tests passing again.
 
     - Adjust set_exists_and_types() to set.dir_full.
 
@@ -64,9 +43,10 @@ Support skip and clobber where possible:
 
 Test coverage: fill gaps.
     - strict behavior
-    - new listing behavior
+    - new listing/reporting behavior: exercise the range of behaviors
+    - plan stores all rps: rps, skipped, filtered, halts: assert against them?
     - more problems are skippable: PN.filter, PN.rename
-    - new clobber behaviors
+    - new clobber behaviors: exists_diff, collides_diff, exists_full.
 
 New documentation [see NEW_DOCS].
 

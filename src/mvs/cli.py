@@ -134,14 +134,12 @@ class CliRenamer:
             self.wrapup_with_tb(MF.plan_creation_failed)
             return
 
-        # Prepare the RenamingPlan and halt if it failed.
+        # Prepare the RenamingPlan, log plan information, and halt if it failed.
         plan.prepare()
+        self.write_log_file(self.LOG_TYPE.plan)
         if plan.failed:
-            msg = self.listing_msg(
-                MF.prepare_failed_cli,
-                plan.failures + plan.halts,
-            )
-            self.wrapup(CON.exit_fail, msg)
+            self.paginate(self.failure_listing())
+            self.wrapup(CON.exit_fail, MF.no_action_msg)
             return
 
         # Print the renaming listing.
@@ -156,10 +154,6 @@ class CliRenamer:
         if not opts.yes:
             if not self.get_confirmation(MF.confirm_prompt, expected = CON.yes):
                 self.wrapup(CON.exit_ok, MF.no_action_msg)
-                return
-
-        # Log the renamings.
-        self.write_log_file(self.LOG_TYPE.plan)
 
     def do_rename(self):
         # Don't execute more than once.
@@ -510,24 +504,18 @@ class CliRenamer:
     ####
 
     def renaming_listing(self):
-        # Assemble summary table of tallies if any renamings
-        # were filtered, skipped, or otherwise controlled.
+        # A renaming listing shown to the user before asking for
+        # confirmation to proceed with renaming. It includes.
+        #
+        # - Summary table of tallies (shown if any renamings were
+        #   filtered, skipped, or otherwise controlled).
+        #
+        # - The active renamings and the various filtered, skipped
+        #   controlled renamings.
+        #
+        # Define the data for each section in the listing.
+        # Each tuple is (MSG_FMT, ITEMS).
         p = self.plan
-        controlled = dict(
-            n_filtered = len(p.filtered),
-            n_skipped = len(p.skipped),
-            n_create = len(p.creates),
-            n_clobber = len(p.clobbers),
-        )
-        table = ''
-        if any(controlled.values()):
-            table = MF.summary_table.format(
-                n_initial = p.n_initial,
-                n_active = len(p.rps),
-                **controlled,
-            ) + CON.newline
-
-        # Assemble the renaming listing.
         sections = (
             (MF.listing_rename, p.rps),
             (MF.listing_filter, p.filtered),
@@ -535,22 +523,59 @@ class CliRenamer:
             (MF.listing_create, p.creates),
             (MF.listing_clobber, p.clobbers),
         )
-        stop = None if self.opts.list_all else 1
-        listing = CON.newline.join(
+        if not self.opts.list_all:
+            sections = sections[0:1]
+        # Return the full listing.
+        return self.summary_listing() + self.section_listing(sections)
+
+    def failure_listing(self):
+        # A renaming listing shown if the renaming plan
+        # was halted during preparation.
+        p = self.plan
+        sections = (
+            (MF.listing_failures, p.failures),
+            (MF.listing_halts, p.halts),
+            (MF.listing_skip, p.skipped),
+        )
+        return self.section_listing(sections)
+
+    def summary_listing(self):
+        # Returns a message summarizing a renaming as a table of tallies,
+        # but only if there are any filtered, skipped, controlled renamings.
+        p = self.plan
+        controlled = dict(
+            n_filtered = len(p.filtered),
+            n_skipped = len(p.skipped),
+            n_create = len(p.creates),
+            n_clobber = len(p.clobbers),
+        )
+        if any(controlled.values()):
+            return MF.summary_table.format(
+                n_initial = p.n_initial,
+                n_active = len(p.rps),
+                **controlled,
+            ) + CON.newline
+        else:
+            return ''
+
+    def section_listing(self, sections):
+        # Takes data defining the sections of a renaming or failure listing.
+        # Returns sections as a message for any non-empty sections.
+        return CON.newline.join(
             self.listing_msg(fmt, items)
-            for fmt, items in sections[0 : stop]
+            for fmt, items in sections
             if items
         )
 
-        # Return the full renaming listing.
-        return table + listing
-
     def listing_msg(self, fmt, items):
-        # Takes a message format and a sequence of items,
-        # either either RenamePair or Problem.
+        # Takes a message format and a sequence of items
+        # having a formatted @property (in practice, the items
+        # are Failure or RenamePair instances).
+        #
         # Attaches a tally of the items to the message.
-        # Returns that message followed by a
-        # potentially-limited listing of those items.
+        #
+        # Returns that message followed by a listing of those items.
+        # The listing might be limited in size.
         n = len(items)
         lim = n if self.opts.limit is None else self.opts.limit
         tally = f' (total {n})'

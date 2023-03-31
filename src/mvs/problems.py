@@ -6,6 +6,7 @@ from .utils import (
     MvsError,
     seq_or_str,
     underscores_to_hyphens,
+    with_newline,
 )
 
 ####
@@ -62,12 +63,12 @@ FAILURE_NAMES = FN = constants('FailureNames', (
 ))
 
 FAILURE_FORMATS = constants('FailureFormats', {
-    FN.all_filtered:           'All paths were filtered out during processing',
+    FN.all_filtered:           'All paths were filtered or skipped during processing',
     FN.parsing_no_paths:       'No input paths',
     FN.parsing_paragraphs:     'The --paragraphs option expects exactly two paragraphs',
     FN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',
     FN.parsing_imbalance:      'Got an unequal number of original paths and new paths',
-    FN.user_code_exec:         '{}',
+    FN.user_code_exec:         'Invalid user-supplied {} code:\n{}',
 })
 
 @dataclass(init = False, frozen = True)
@@ -87,7 +88,7 @@ class Issue:
 
     @property
     def formatted(self):
-        return self.msg
+        return with_newline(self.msg)
 
 @dataclass(init = False, frozen = True)
 class Problem(Issue):

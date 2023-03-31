@@ -404,7 +404,7 @@ class Outputs:
 
     @property
     def listing_rename(self):
-        args = [f'Paths to be renamed {self.totlist}.\n']
+        args = [f'Paths to be renamed {self.totlist}:\n']
         args.extend(
             f'{o}\n{n}\n'
             for o, n in zip(self.origs, self.news)

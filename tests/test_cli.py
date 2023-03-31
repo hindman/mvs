@@ -19,6 +19,7 @@ from mvs.problems import (
     CONTROLS,
     PROBLEM_FORMATS as PF,
     FAILURE_FORMATS as FF,
+    PROBLEM_NAMES as PN,
     ProblemControl,
 )
 
@@ -28,6 +29,7 @@ from mvs.problems import (
 
 BYPASS = object()
 LOGS_OK = 'LOGS_OK'
+PLAN_LOG_OK = 'PLAN_LOG_OK'
 
 class CliRenamerSIO(CliRenamer):
     # A thin wrapper around a CliRenamer:
@@ -137,6 +139,7 @@ def run_checks(
                done = True,
                failure = False,
                out = None,
+               out_in = None,
                err = None,
                err_starts = None,
                err_in = None,
@@ -224,7 +227,10 @@ def run_checks(
     # Check CliRenamer outputs.
     if check_outs:
         # Standard output.
-        if callable(out):
+        if out_in:
+            for exp in to_tup(out_in):
+                assert exp in cli.out
+        elif callable(out):
             assert cli.out == out(wa, outs, cli)
         elif out is None:
             exp = '' if failure else outs.regular_output
@@ -234,8 +240,7 @@ def run_checks(
 
         # Error output.
         if err_starts:
-            for exp in to_tup(err_starts):
-                assert cli.err.startswith(exp)
+            assert cli.err.startswith(err_starts)
         if err_in:
             for exp in to_tup(err_in):
                 assert exp in cli.err
@@ -245,12 +250,15 @@ def run_checks(
         # Log output.
         if log is LOGS_OK:
             assert cli.logs_valid_json is LOGS_OK
+        elif log is PLAN_LOG_OK:
+            assert isinstance(cli.log_plan_dict, dict)
         elif log is BYPASS:
             pass
-        elif log is None and failure:
-            assert cli.log == ''
         elif log is None:
-            assert cli.logs_valid_json is LOGS_OK
+            if failure:
+                assert cli.log == ''
+            else:
+                assert cli.logs_valid_json is LOGS_OK
         elif log:
             assert cli.log == log
 
@@ -447,7 +455,9 @@ def test_no_input_paths(tr, creators):
         include_news = False,
         failure = True,
         no_change = True,
-        err_in = FF.parsing_no_paths,
+        err_in = MF.no_action_msg,
+        out_in = (FF.parsing_no_paths, pre_fmt(MF.listing_failures)),
+        log = PLAN_LOG_OK,
     )
 
 def test_odd_number_inputs(tr, creators):
@@ -461,9 +471,13 @@ def test_odd_number_inputs(tr, creators):
         news,
         failure = True,
         no_change = True,
-        err_starts = pre_fmt(MF.prepare_failed_cli),
-        err_in = FF.parsing_imbalance,
+        err_in = MF.no_action_msg,
+        out_in = (FF.parsing_imbalance, pre_fmt(MF.listing_failures)),
+        log = PLAN_LOG_OK,
     )
+
+    # tr.dump([cli.err])
+    # tr.dump([cli.out])
 
 def test_sources(tr, creators):
     # Paths and args.
@@ -958,8 +972,9 @@ def test_filter_all(tr, creators):
         'return False',
         failure = True,
         no_change = True,
-        err_starts = pre_fmt(MF.prepare_failed_cli),
-        err_in = FF.all_filtered,
+        err_in = MF.no_action_msg,
+        out_in = (FF.all_filtered, pre_fmt(MF.listing_failures)),
+        log = PLAN_LOG_OK,
     )
 
 ####
@@ -1051,7 +1066,6 @@ def test_main(tr, create_wa, create_outs):
 # Problem control.
 ####
 
-@pytest.mark.skip(reason = 'CLI reporting refactor')
 def test_some_failed_rps(tr, creators):
     # Paths and args.
     origs = ('z1', 'z2', 'z3', 'z4')
@@ -1071,20 +1085,10 @@ def test_some_failed_rps(tr, creators):
         extras = extras,
         no_change = True,
         failure = True,
-        err_starts = pre_fmt(MF.prepare_failed_cli),
-        err_in = PF.existing,
-        # TODO...
-        # check_outs = False,
+        err_in = MF.no_action_msg,
+        out_in = (pre_fmt(MF.listing_halts), f'# Problem: {PN.existing}\n'),
+        log = PLAN_LOG_OK,
     )
-
-    # tr.dump(cli.out)
-    # tr.dump(cli.err)
-
-    # tr.dump(cli.plan.failures)
-    # tr.dump(cli.plan.halts)
-
-    # TODO: fix test after refactoring CLI issue reporting.
-    return
 
     # Scenario: but it works if well leave the skip default in place.
     wa, outs, cli = run_checks(

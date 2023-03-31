@@ -504,9 +504,12 @@ def test_plan_as_dict(tr, create_wa):
             'seq_step',
             'controls',
             'strict',
-            # 'problems',
-            'prefix_len',
             'rename_pairs',
+            'filtered',
+            'skipped',
+            'halts',
+            'failures',
+            'prefix_len',
             'tracking_index',
         ))
 

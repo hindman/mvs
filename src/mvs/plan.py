@@ -77,8 +77,23 @@ class RenamePair:
         return self.orig == self.new
 
     @property
+    def prob_name(self):
+        if self.problem is None:
+            return None
+        else:
+            return self.problem.name
+
+    @property
+    def halt_or_skip(self):
+        return bool(self.halt or self.skip)
+
+    @property
     def formatted(self):
-        return f'{self.orig}\n{self.new}\n'
+        prefix = (
+            f'# Problem: {self.prob_name}\n' if self.halt_or_skip
+            else ''
+        )
+        return f'{prefix}{self.orig}\n{self.new}\n'
 
 class RenamingPlan:
 
@@ -215,8 +230,8 @@ class RenamingPlan:
 
         # Create the renaming and filtering functions from
         # user-supplied code, if any was given.
-        self.rename_func = self.make_user_defined_func(CON.code_actions.rename)
         self.filter_func = self.make_user_defined_func(CON.code_actions.filter)
+        self.rename_func = self.make_user_defined_func(CON.code_actions.rename)
         if self.failed:
             return
 
@@ -386,7 +401,7 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             tb = traceback.format_exc(limit = 0)
-            self.handle_failure(FN.user_code_exec, tb)
+            self.handle_failure(FN.user_code_exec, action, tb)
             return None
 
     ####
@@ -705,17 +720,14 @@ class RenamingPlan:
             seq_step = self.seq_step,
             controls = self.controls,
             strict = self.strict,
+            # RenamePair instances.
+            rename_pairs = [asdict(rp) for rp in self.rps],
+            filtered = [asdict(rp) for rp in self.filtered],
+            skipped = [asdict(rp) for rp in self.skipped],
+            halts = [asdict(rp) for rp in self.halts],
             # Other.
+            failures = [asdict(f) for f in self.failures],
             prefix_len = self.prefix_len,
-            rename_pairs = [
-                asdict(rp)
-                for rp in self.rps
-            ],
             tracking_index = self.tracking_index,
-            # TODO:
-            # problems = {
-            #     control : [asdict(p) for p in ps]
-            #     for control, ps in self.problems.items()
-            # },
         )
 
