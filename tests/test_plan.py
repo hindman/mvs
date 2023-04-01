@@ -649,18 +649,27 @@ def test_same(tr, create_wa):
     # Scenarios: for the first two RenamePair instances,
     # orig and new differ only in the casing of their parent.
     if case_sensitivity() == FS_TYPES.case_sensitive:
-        # Scenario: case-sensitive system: renaming will be rejected
-        # due to the missing parents.
+        # Scenario: case-sensitive system: by default, renamings
+        # without new-parents will be skipped.
         wa, plan = run_checks(
             *run_args,
-            failure = True,
+            expecteds = expecteds_skip,
+            # TODO: remove.
+            diagnostics = True,
+        )
+
+        # Scenario: it will be rejected if we set the control to halt.
+        wa, plan = run_checks(
+            *run_args,
             expecteds = expecteds_no_create,
+            controls = 'halt-parent',
+            failure = True,
             reason = PN.parent,
             # TODO: remove.
             diagnostics = True,
         )
 
-        # Scenario: but it will succeed if we request create-parent.
+        # Scenario: it will succeed if we set the control to create.
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_create,
@@ -668,6 +677,7 @@ def test_same(tr, create_wa):
             # TODO: remove.
             diagnostics = True,
         )
+
     else:
         # Scenario: case-insensitive system: renaming will succeed
         # because skip-same is the default.
@@ -870,25 +880,26 @@ def test_new_exists_recase(tr, create_wa):
     else:
         reason = FN.all_filtered
 
-    # Scenarios: user reverses order of news and origs
-    # when supplying inputs. Renaming will be rejected.
-    #
-    # - Case-sensitive system: because orig path won't exist.
-    #
-    # - Case-insensitive system: because new path already agrees
-    #   with the casing found on the file system, resuling in a
-    #   Problem(recase), which is skipped by default, leaving
-    #   nothing to be renamed.
+    # Scenario: user reverses order of news and origs when supplying inputs.
+    # Renaming will be rejected because all renamings will be skipped, either
+    # due to PN.missing (case-sensitive) or PN.recase (case-insensitive).
     wa, plan = run_checks(
         *run_args,
         inputs = news + origs,
         rootless = True,
         failure = True,
         no_change = True,
-        reason = reason,
+        reason = FN.all_filtered,
         # TODO: remove.
         diagnostics = True,
     )
+
+    # The precise problem will vary by file system type.
+    if case_sensitivity() == FS_TYPES.case_sensitive:
+        pn = PN.missing
+    else:
+        pn = PN.recase
+    assert plan.skipped[0].prob_name == pn
 
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.

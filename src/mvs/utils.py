@@ -353,7 +353,7 @@ def path_existence_and_type(path):
     # Determine path existence.
     e = ES.missing
     if p.parent.exists():
-        if p in p.parent.iterdir():
+        if any(x.name == p.name for x in p.parent.iterdir()):
             # Means p exists and p.name exactly matches the name
             # as reported by file system (including case).
             e = ES.exists_strict
