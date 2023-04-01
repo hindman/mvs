@@ -654,8 +654,6 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
-            # TODO: remove.
-            diagnostics = True,
         )
 
         # Scenario: it will be rejected if we set the control to halt.
@@ -665,8 +663,6 @@ def test_same(tr, create_wa):
             controls = 'halt-parent',
             failure = True,
             reason = PN.parent,
-            # TODO: remove.
-            diagnostics = True,
         )
 
         # Scenario: it will succeed if we set the control to create.
@@ -674,8 +670,6 @@ def test_same(tr, create_wa):
             *run_args,
             expecteds = expecteds_create,
             controls = 'create-parent',
-            # TODO: remove.
-            diagnostics = True,
         )
 
     else:
@@ -864,8 +858,6 @@ def test_new_exists_case_change_renaming(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds,
-        # TODO: remove.
-        diagnostics = True,
     )
 
 def test_new_exists_recase(tr, create_wa):
@@ -890,8 +882,6 @@ def test_new_exists_recase(tr, create_wa):
         failure = True,
         no_change = True,
         reason = FN.all_filtered,
-        # TODO: remove.
-        diagnostics = True,
     )
 
     # The precise problem will vary by file system type.

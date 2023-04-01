@@ -15,6 +15,8 @@ todos: TODOs
 
 Tests:
 
+    - Add run_checks(diagnostics) to test_cli.py if feasible.
+
     - strict behavior
 
     - new listing/reporting behavior: exercise the range of behaviors
@@ -30,17 +32,6 @@ Tests:
         - check_new_collisions(): PN.collides_diff
         - do_rename(): MF.unsupported_clobber
         - do_rename(): shutil.rmtree()
-
-    - Builds:
-
-        - Linux
-
-            FAILED tests/test_plan.py::test_same - Failed: DID NOT RAISE <class 'mvs.utils.MvsError'>
-            FAILED tests/test_plan.py::test_new_exists_recase - AssertionError: assert 'Original path does not exist' in ('All paths were filtered or s',)
-
-        - Windows:
-
-            FAILED tests/test_plan.py::test_new_exists_case_change_renaming - mvs.utils.MvsError: {'msg': 'RenamingPlan cannot rename paths because failures occurred during preparation', 'failures': [Failure(name='all_filtered', msg='All paths were filtered or skipped during processing')], 'halts': []}
 
 New documentation [see NEW_DOCS].
 
