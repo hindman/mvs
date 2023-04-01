@@ -1,5 +1,6 @@
 import os
 import pyperclip
+import stat
 import sys
 
 from kwexception import Kwexception
@@ -93,6 +94,7 @@ MSG_FORMATS = constants('MsgFormats', dict(
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
     unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
+    unsupported_clobber    = 'Renaming would cause unsupported path type to be clobbered',
     # Error messages in CliRenamer.
     path_collection_failed = 'Collection of input paths failed.\n\n{}',
     plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
@@ -346,7 +348,6 @@ ANY_EXISTENCE = (EXISTENCES.exists, EXISTENCES.exists_strict)
 def path_existence_and_type(path):
     # Setup.
     ES = EXISTENCES
-    PTS = PATH_TYPES
     p = Path(path)
 
     # Determine path existence.
@@ -360,18 +361,20 @@ def path_existence_and_type(path):
             # Means only that p exists.
             e = ES.exists
 
-    # Determine path type.
-    pt = None
-    if e is not ES.missing:
-        pt = (
-            PTS.other if p.is_symlink() else
-            PTS.file if p.is_file() else
-            PTS.directory if p.is_dir() else
-            PTS.other
-        )
-
-    # Zap!
+    # Determine path type and then return.
+    pt = None if e is ES.missing else determine_path_type(path)
     return (e, pt)
+
+def determine_path_type(path):
+    # Takes a path known to exist.
+    # Returns its PATH_TYPES value.
+    PTS = PATH_TYPES
+    m = os.stat(path, follow_symlinks = False).st_mode
+    return (
+        PTS.file if stat.S_ISREG(m) else
+        PTS.directory if stat.S_ISDIR(m) else
+        PTS.other
+    )
 
 def is_non_empty_dir(path):
     # Returns true if the given directory path has stuff in it.

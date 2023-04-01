@@ -13,40 +13,23 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Support skip and clobber where possible:
+Tests:
 
-    - Adjust Problem naming to be simpler, more compact.
-
-        Problem            | New name      | Note
-        -------------------------------------------------------------------
-        existing           | exists        | .
-        colliding          | collides      | .
-        existing_diff      | exists_diff   | has SKIP, HALT; add CLOBBER
-        colliding_diff     | collides_diff | "
-        existing_non_empty | exists_full   | "
-
-    - Get tests passing.
-
-    - Add CLOBBER to the last 3 problems in table above.
-
-    - Get tests passing again.
-
-    - Adjust set_exists_and_types() to set.dir_full.
-
-    - Adjust do_rename() logic for clobbering:
-
-        - Select the delete-operation based on rp.new type. This breaks a
-          test: figure out why and fix the test.
-
-        - Implement the delete so that we first try the delete operation
-          based on rp.new. Failing that, we try the other ways.
-
-Test coverage: fill gaps.
     - strict behavior
+
     - new listing/reporting behavior: exercise the range of behaviors
+
     - plan stores all rps: rps, skipped, filtered, halts: assert against them?
-    - more problems are skippable: PN.filter, PN.rename
-    - new clobber behaviors: exists_diff, collides_diff, exists_full.
+
+    - SKIP applies to more problems: PN.filter, PN.rename
+
+    - CLOBBER applies to more problems: PN.exists_diff, PN.exists_full, PN.collides_diff.
+
+    - Current coverage gaps:
+        - check_new_exists(): PN.exists_diff
+        - check_new_collisions(): PN.collides_diff
+        - do_rename(): MF.unsupported_clobber
+        - do_rename(): shutil.rmtree()
 
 New documentation [see NEW_DOCS].
 
@@ -473,9 +456,9 @@ Why determine the clobber delete-operation in real-time:
 
     - One could try to reason through the clobbering chain implied by the
       renamings to select the delete-operation [too complex and fraught], or
-      check the path-type of each rp.new that needs clobbering [would work], or
-      just try each approach in a reasonable order [eg, starting with the
-      path-type of rp.new]
+      check the path-type of each rp.new that needs clobbering [probably the
+      simplest approach to implement], or just try each approach in a
+      reasonable order [eg, starting with the path-type of rp.new]
 
 --------
 other-tools: Other tools

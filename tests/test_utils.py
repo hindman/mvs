@@ -1,13 +1,9 @@
 import pytest
 
-# Import these from the package.
+# Import these directly from the package.
 from mvs import RenamingPlan, MvsError, __version__
 
-from mvs.plan import RenamePair
-
-####
-# Exercise package's top-level importables.
-####
+from mvs.utils import with_newline
 
 def test_top_level_imports(tr):
     # Exercise the package's top-level importables.
@@ -16,8 +12,8 @@ def test_top_level_imports(tr):
     assert MvsError('foo', x = 1).msg == 'foo'
     assert isinstance(__version__, str)
 
-def test_rename_pair(tr):
-    rp = RenamePair('a', 'b')
-    assert rp.orig == 'a'
-    assert rp.new == 'b'
+def test_with_newline(tr):
+    exp = 'foo\n'
+    assert with_newline('foo') == exp
+    assert with_newline(exp) == exp
 

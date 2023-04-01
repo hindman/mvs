@@ -1,4 +1,5 @@
 import re
+import shutil
 import sys
 import traceback
 
@@ -20,6 +21,7 @@ from .utils import (
     PATH_TYPES,
     STRUCTURES,
     case_sensitivity,
+    determine_path_type,
     is_non_empty_dir,
     path_existence_and_type,
 )
@@ -55,6 +57,9 @@ class RenamePair:
     # The renaming type and whether orig and new have the same parents.
     name_change_type: str = None
     same_parents: bool = None
+
+    # Whether the new path points to a non-empty directory.
+    new_full: bool = False
 
     # Attributes for problems.
     # - Problem with the RenamePair, if any.
@@ -440,6 +445,9 @@ class RenamingPlan:
                 NCT.case_change if po.name.lower() == pn.name.lower() else
                 NCT.name_change
             )
+            # Set flag if rp.new is a non-empty directory.
+            if rp.type_new == PATH_TYPES.directory:
+                rp.new_full = is_non_empty_dir(rp.new)
         return None
 
     def execute_user_filter(self, rp, seq_val):
@@ -495,12 +503,12 @@ class RenamingPlan:
             return None
 
         # Determine the type of Problem to return if clobbering would occur.
-        if rp.type_new == PATH_TYPES.directory and is_non_empty_dir(rp.new):
-            clobber_prob = Problem(PN.existing_non_empty)
+        if rp.type_new == PATH_TYPES.directory and rp.new_full:
+            clobber_prob = Problem(PN.exists_full)
         elif rp.type_orig == rp.type_new:
-            clobber_prob = Problem(PN.existing)
+            clobber_prob = Problem(PN.exists)
         else:
-            clobber_prob = Problem(PN.existing_diff)
+            clobber_prob = Problem(PN.exists_diff)
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rp.new exists, we have clobbering
@@ -580,9 +588,9 @@ class RenamingPlan:
 
         # Return appropriate collision problem.
         if all(rp.type_orig == pt for pt in ptypes):
-            return Problem(PN.colliding)
+            return Problem(PN.collides)
         else:
-            return Problem(PN.colliding_diff)
+            return Problem(PN.collides_diff)
 
     ####
     # Methods related to problem control.
@@ -657,29 +665,60 @@ class RenamingPlan:
 
         # If new path exists already, deal with it before
         # we attempt to renaming from rp.orig to rp.new.
+        # We do this for a few reasons.
         #
-        # (1) User requested case-change renaming (self clobber).
-        # No problem.
+        # (1) We want to make a best-effort to avoid unintended
+        # clobbering, whether due to race conditions (creation
+        # of rp.new since the problem-checks were performed)
+        # or due to interactions among the renamings (eg, multiple
+        # collisions among rp.new values).
         #
-        # (2) User requested clobbering. Delete the current
-        # path at rp.new. We do this so that the renaming won't
-        # inherit casing from the current path.
+        # (2) We don't want the renamed path to inherit casing from
+        # the existing rp.new, which occurs on case-preseving systems.
         #
-        # (3) User did not request clobber, but the path at rp.new
-        # exists nonetheless (presumably it was created between
-        # the check for new-existing and now). Raise an exception.
-        # This is the final line of defense against unintended clobbering.
+        # (3) Python's path renaming functions fail on some
+        # systems in the face of clobbering, and we don't want
+        # to deal with those OS-dependent complications.
         #
         if pn.exists():
             if rp.clobber_self:
+                # User requested case-change renaming. No problem.
                 pass
             elif rp.clobber:
-                if rp.type_orig == PATH_TYPES.file:
+                # User requested a clobber for this RenamePair.
+                # Make sure the clobber victim is (still) a supported path type.
+                # Select the appropriate deletion operation based on the path
+                # type and the user's control setting regarding non-empty dirs.
+                pt = determine_path_type(rp.new)
+                if pt == PATH_TYPES.other:
+                    raise MvsError(
+                        MF.unsupported_clobber,
+                        orig = rp.orig,
+                        new = rp.new,
+                    )
+                elif pt == PATH_TYPES.file:
                     pn.unlink()
+                elif self.control_lookup[PN.exists_full] == CONTROLS.clobber:
+                    shutil.rmtree(rp.new)
                 else:
                     pn.rmdir()
             else:
-                raise MvsError(MF.unrequested_clobber, orig = rp.orig, new = rp.new)
+                # An unrequested clobber.
+                raise MvsError(
+                    MF.unrequested_clobber,
+                    orig = rp.orig,
+                    new = rp.new,
+                )
+
+            # if rp.clobber_self:
+            #     pass
+            # elif rp.clobber:
+            #     if rp.type_orig == PATH_TYPES.file:
+            #         pn.unlink()
+            #     else:
+            #         pn.rmdir()
+            # else:
+            #     raise MvsError(MF.unrequested_clobber, orig = rp.orig, new = rp.new)
 
         # Rename.
         po.rename(rp.new)

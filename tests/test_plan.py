@@ -2,7 +2,7 @@ import pytest
 from itertools import chain
 from pathlib import Path
 
-from mvs.plan import RenamingPlan
+from mvs.plan import RenamingPlan, RenamePair
 
 from mvs.utils import (
     CON,
@@ -575,8 +575,8 @@ def test_controls(tr, create_wa):
     # But we cannot control the same problem in two different ways.
     checks = (
         (PN.parent, CONTROLS.skip, CONTROLS.create),
-        (PN.existing, CONTROLS.skip, CONTROLS.clobber),
-        (PN.colliding, CONTROLS.skip, CONTROLS.clobber),
+        (PN.exists, CONTROLS.skip, CONTROLS.clobber),
+        (PN.collides, CONTROLS.skip, CONTROLS.clobber),
     )
     for prob, *controls in checks:
         tup = tuple(f'{c}-{prob}' for c in controls)
@@ -746,10 +746,10 @@ def test_new_exists(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'halt-existing',
+        controls = 'halt-exists',
         failure = True,
         no_change = True,
-        reason = PN.existing,
+        reason = PN.exists,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -764,7 +764,7 @@ def test_new_exists(tr, create_wa):
         *run_args,
         extras = extras,
         expecteds = expecteds_clobber,
-        controls = 'clobber-existing',
+        controls = 'clobber-exists',
     )
 
 def test_new_exists_diff_parents(tr, create_wa):
@@ -781,10 +781,10 @@ def test_new_exists_diff_parents(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'halt-existing',
+        controls = 'halt-exists',
         failure = True,
         no_change = True,
-        reason = PN.existing,
+        reason = PN.exists,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -814,10 +814,10 @@ def test_new_exists_different_case(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             extras = extras,
-            controls = 'halt-existing',
+            controls = 'halt-exists',
             failure = True,
             no_change = True,
-            reason = PN.existing,
+            reason = PN.exists,
         )
 
         # Scenario: renaming will succeed if we request clobbering.
@@ -828,7 +828,7 @@ def test_new_exists_different_case(tr, create_wa):
             *run_args,
             extras = extras,
             expecteds = news,
-            controls = 'clobber-existing',
+            controls = 'clobber-exists',
         )
 
 def test_new_exists_case_change_renaming(tr, create_wa):
@@ -892,10 +892,10 @@ def test_new_exists_non_empty(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'halt-existing-non-empty',
+        controls = 'halt-exists-full',
         failure = True,
         no_change = True,
-        reason = PN.existing_non_empty,
+        reason = PN.exists_full,
     )
 
     # Scenario: if we exclude the last extras path, the
@@ -903,7 +903,7 @@ def test_new_exists_non_empty(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         extras = extras[:-1],
-        controls = 'clobber-existing',
+        controls = 'clobber-exists',
     )
 
 def test_new_parent_missing(tr, create_wa):
@@ -951,10 +951,10 @@ def test_news_collide(tr, create_wa):
     # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
-        controls = 'halt-colliding',
+        controls = 'halt-collides',
         failure = True,
         no_change = True,
-        reason = PN.colliding,
+        reason = PN.collides,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -967,7 +967,7 @@ def test_news_collide(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_clobber,
-        controls = 'clobber-colliding',
+        controls = 'clobber-collides',
     )
 
 def test_news_collide_orig_missing(tr, create_wa):
@@ -1019,10 +1019,10 @@ def test_news_collide_case(tr, create_wa):
         # Renaming will be rejected if we set the control to halt.
         wa, plan = run_checks(
             *run_args,
-            controls = 'halt-colliding',
+            controls = 'halt-collides',
             failure = True,
             no_change = True,
-            reason = PN.colliding,
+            reason = PN.collides,
         )
 
 def test_failures_skip_all(tr, create_wa):
@@ -1044,6 +1044,13 @@ def test_failures_skip_all(tr, create_wa):
 ####
 # Other.
 ####
+
+def test_rename_pair(tr):
+    rp = RenamePair('a', 'a.new')
+    assert rp.prob_name is None
+    nm = PN.equal
+    rp.problem = Problem(nm)
+    assert rp.prob_name == nm
 
 def test_unexpected_clobber(tr, create_wa):
     # Paths and args.

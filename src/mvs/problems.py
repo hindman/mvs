@@ -28,29 +28,29 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'missing',
     'type',
     'parent',
-    'existing',
-    'colliding',
-    'existing_diff',
-    'colliding_diff',
-    'existing_non_empty',
+    'exists',
+    'collides',
+    'exists_diff',
+    'collides_diff',
+    'exists_full',
     'filter',
     'rename',
 ))
 
 PROBLEM_FORMATS = constants('ProblemFormats', {
-    PN.equal:              'Original path and new path are the exactly equal',
-    PN.same:               'Original path and new path are the functionally the same',
-    PN.recase:             'User inputs requested path name case change, but file system already agrees with new',
-    PN.missing:            'Original path does not exist',
-    PN.type:               'Original path must be regular file or directory',
-    PN.parent:             'Parent directory of new path does not exist',
-    PN.existing:           'New path exists',
-    PN.colliding:          'New path collides with another new path',
-    PN.existing_diff:      'New path exists and differs with original in type',
-    PN.colliding_diff:     'New path collides with another new path, and they differ in type',
-    PN.existing_non_empty: 'New path collides with a non-empty directory',
-    PN.filter:             'Error from user-supplied filtering code: {} [original path: {}]',
-    PN.rename:             'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
+    PN.equal:         'Original path and new path are the exactly equal',
+    PN.same:          'Original path and new path are the functionally the same',
+    PN.recase:        'User inputs requested path name case change, but file system already agrees with new',
+    PN.missing:       'Original path does not exist',
+    PN.type:          'Original path must be regular file or directory',
+    PN.parent:        'Parent directory of new path does not exist',
+    PN.exists:        'New path exists',
+    PN.collides:      'New path collides with another new path',
+    PN.exists_diff:   'New path exists and differs with original in type',
+    PN.collides_diff: 'New path collides with another new path, and they differ in type',
+    PN.exists_full:   'New path collides with a non-empty directory',
+    PN.filter:        'Error from user-supplied filtering code: {} [original path: {}]',
+    PN.rename:        'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
 })
 
 FAILURE_NAMES = FN = constants('FailureNames', (
@@ -120,19 +120,19 @@ class ProblemControl:
     # The first control in each tuple is the default.
     # Values in comments could be allowed in the future.
     VALID_CONTROLS = {
-        PN.equal:              (C.skip, C.halt),
-        PN.same:               (C.skip, C.halt),
-        PN.recase:             (C.skip, C.halt),
-        PN.missing:            (C.skip, C.halt),
-        PN.type:               (C.skip, C.halt),
-        PN.parent:             (C.skip, C.halt, C.create),
-        PN.existing:           (C.skip, C.halt, C.clobber),
-        PN.colliding:          (C.skip, C.halt, C.clobber),
-        PN.existing_diff:      (C.skip, C.halt),  # C.clobber
-        PN.colliding_diff:     (C.skip, C.halt),  # C.clobber
-        PN.existing_non_empty: (C.skip, C.halt),  # C.clobber
-        PN.filter:             (C.halt, C.skip),
-        PN.rename:             (C.halt, C.skip),
+        PN.equal:         (C.skip, C.halt),
+        PN.same:          (C.skip, C.halt),
+        PN.recase:        (C.skip, C.halt),
+        PN.missing:       (C.skip, C.halt),
+        PN.type:          (C.skip, C.halt),
+        PN.parent:        (C.skip, C.halt, C.create),
+        PN.exists:        (C.skip, C.halt, C.clobber),
+        PN.collides:      (C.skip, C.halt, C.clobber),
+        PN.exists_diff:   (C.skip, C.halt, C.clobber),
+        PN.collides_diff: (C.skip, C.halt, C.clobber),
+        PN.exists_full:   (C.skip, C.halt, C.clobber),
+        PN.filter:        (C.halt, C.skip),
+        PN.rename:        (C.halt, C.skip),
     }
 
     # A dict mapping each ProblemControl name to its

@@ -767,7 +767,7 @@ def test_preferences_problem_control(tr, creators):
 
     # Problem controls: application defaults and some other controls.
     app_defs = list(ProblemControl.DEFAULTS)
-    others = ['skip-existing', 'create-parent', 'clobber-colliding']
+    others = ['skip-exists', 'create-parent', 'clobber-collides']
 
     # Helper to get cli.opts and confirm that CliRenamer did
     # not gripe about invalid arguments.
@@ -1081,19 +1081,19 @@ def test_some_failed_rps(tr, creators):
     # No renaming occurs if with set control to halt.
     wa, outs, cli = run_checks(
         *run_args,
-        '--controls', 'halt-existing',
+        '--controls', 'halt-exists',
         extras = extras,
         no_change = True,
         failure = True,
         err_in = MF.no_action_msg,
-        out_in = (pre_fmt(MF.listing_halts), f'# Problem: {PN.existing}\n'),
+        out_in = (pre_fmt(MF.listing_halts), f'# Problem: {PN.exists}\n'),
         log = PLAN_LOG_OK,
     )
 
     # Scenario: but it works if well leave the skip default in place.
     wa, outs, cli = run_checks(
         *run_args,
-        '--controls', 'skip-existing',
+        '--controls', 'skip-exists',
         extras = extras,
         expecteds = expecteds,
         outs_origs = WA.origs[2:],
@@ -1105,7 +1105,7 @@ def test_some_failed_rps(tr, creators):
     # No renaming occurs.
     wa, outs, cli = run_checks(
         *run_args,
-        '--controls', 'skip-existing', 'clobber-existing',
+        '--controls', 'skip-exists', 'clobber-exists',
         extras = extras,
         no_change = True,
         failure = True,
