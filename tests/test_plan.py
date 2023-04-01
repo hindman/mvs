@@ -43,6 +43,7 @@ def run_checks(
                include_extras = False,
                # Assertion making.
                early_checks = None,
+               diagnostics = False,
                check_wa = True,
                check_failure = True,
                failure = False,
@@ -79,11 +80,16 @@ def run_checks(
     # Helper to execute plan.prepare() and plan.rename_paths().
     def do_prepare_and_rename():
         # Prepare.
-        n_preps = int(prepare_before or prepare_only)
+        n_preps = int(prepare_before or prepare_only or diagnostics)
         for _ in range(n_preps):
             plan.prepare()
         if prepare_only:
             return None
+
+        # Print diagnostic info.
+        if diagnostics:
+            tr.dumpj(wa.as_dict, 'WorkArea')
+            tr.dumpj(plan.as_dict, 'RenamingPlan')
 
         # Rename.
         if failure:
@@ -121,15 +127,6 @@ def run_checks(
         return (wa, plan, einfo)
     else:
         return (wa, plan)
-
-def diagnostics(tr):
-    # A helper function intended for run_checks(early_checks = FUNC).
-    # Returns a function to print JSON of the WorkArea and RenamingPlan
-    # before any assertions in run_checks() occur.
-    def f(wa, plan):
-        tr.dumpj(wa.as_dict, 'WorkArea')
-        tr.dumpj(plan.as_dict, 'RenamingPlan')
-    return f
 
 ####
 # Helper to confirm that a RenamingPlan raised for the expected reason.
@@ -660,7 +657,7 @@ def test_same(tr, create_wa):
             expecteds = expecteds_no_create,
             reason = PN.parent,
             # TODO: remove.
-            early_checks = diagnostics(tr),
+            diagnostics = True,
         )
 
         # Scenario: but it will succeed if we request create-parent.
@@ -669,7 +666,7 @@ def test_same(tr, create_wa):
             expecteds = expecteds_create,
             controls = 'create-parent',
             # TODO: remove.
-            early_checks = diagnostics(tr),
+            diagnostics = True,
         )
     else:
         # Scenario: case-insensitive system: renaming will succeed
@@ -858,7 +855,7 @@ def test_new_exists_case_change_renaming(tr, create_wa):
         *run_args,
         expecteds = expecteds,
         # TODO: remove.
-        early_checks = diagnostics(tr),
+        diagnostics = True,
     )
 
 def test_new_exists_recase(tr, create_wa):
@@ -890,7 +887,7 @@ def test_new_exists_recase(tr, create_wa):
         no_change = True,
         reason = reason,
         # TODO: remove.
-        early_checks = diagnostics(tr),
+        diagnostics = True,
     )
 
 def test_new_exists_non_empty(tr, create_wa):
