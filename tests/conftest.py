@@ -343,19 +343,35 @@ class WorkArea:
             wps = self.news_wp + self.extras_wp
         exp = sorted(set(wp.path for wp in wps))
 
-        # Actual content of the work area (other than KEEP_FILE).
-        keep = Path(self.ROOT) / self.KEEP_FILE
+        # Get current WorkArea content.
         self.make_subdirs_accessible()
-        got = sorted(
-            str(p)
-            for p in Path(self.ROOT).glob('**/*')
-            if p != keep
-        )
+        got = self.contents
 
         # Assert and return.
         if do_assert:
             assert got == exp
         return (got, exp)
+
+    @property
+    def contents(self):
+        # Returns actual content of the work area (other than KEEP_FILE).
+        keep = Path(self.ROOT) / self.KEEP_FILE
+        return sorted(
+            str(p)
+            for p in Path(self.ROOT).glob('**/*')
+            if p != keep
+        )
+
+    @property
+    def as_dict(self):
+        return dict(
+            origs = self.origs,
+            news = self.news,
+            extras = self.extras,
+            expecteds = self.expecteds,
+            rootless = self.rootless,
+            contents = self.contents,
+        )
 
 ####
 # A class used by the create_outs() fixture to take orig and new paths

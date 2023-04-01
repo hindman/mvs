@@ -122,6 +122,15 @@ def run_checks(
     else:
         return (wa, plan)
 
+def diagnostics(tr):
+    # A helper function intended for run_checks(early_checks = FUNC).
+    # Returns a function to print JSON of the WorkArea and RenamingPlan
+    # before any assertions in run_checks() occur.
+    def f(wa, plan):
+        tr.dumpj(wa.as_dict, 'WorkArea')
+        tr.dumpj(plan.as_dict, 'RenamingPlan')
+    return f
+
 ####
 # Helper to confirm that a RenamingPlan raised for the expected reason.
 ####
@@ -650,6 +659,8 @@ def test_same(tr, create_wa):
             failure = True,
             expecteds = expecteds_no_create,
             reason = PN.parent,
+            # TODO: remove.
+            early_checks = diagnostics(tr),
         )
 
         # Scenario: but it will succeed if we request create-parent.
@@ -657,6 +668,8 @@ def test_same(tr, create_wa):
             *run_args,
             expecteds = expecteds_create,
             controls = 'create-parent',
+            # TODO: remove.
+            early_checks = diagnostics(tr),
         )
     else:
         # Scenario: case-insensitive system: renaming will succeed
@@ -844,6 +857,8 @@ def test_new_exists_case_change_renaming(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds,
+        # TODO: remove.
+        early_checks = diagnostics(tr),
     )
 
 def test_new_exists_recase(tr, create_wa):
@@ -874,6 +889,8 @@ def test_new_exists_recase(tr, create_wa):
         failure = True,
         no_change = True,
         reason = reason,
+        # TODO: remove.
+        early_checks = diagnostics(tr),
     )
 
 def test_new_exists_non_empty(tr, create_wa):
