@@ -13,25 +13,27 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Add collides_full:
+
+    - Add it in problems.py.
+
+    - Then activate the new code in check_new_collisions(): see TODO.
+
 Tests:
 
-    - Add run_checks(diagnostics) to test_cli.py if feasible.
-
-    - strict behavior
-
-    - new listing/reporting behavior: exercise the range of behaviors
+    - Current coverage gaps:
+        - check_new_collisions(): PN.collides_diff
+        - do_rename(): MF.unsupported_clobber
 
     - plan stores all rps: rps, skipped, filtered, halts: assert against them?
 
     - SKIP applies to more problems: PN.filter, PN.rename
 
-    - CLOBBER applies to more problems: PN.exists_diff, PN.exists_full, PN.collides_diff.
+    - CLOBBER applies to more problems: PN.collides_diff.
 
-    - Current coverage gaps:
-        - check_new_exists(): PN.exists_diff
-        - check_new_collisions(): PN.collides_diff
-        - do_rename(): MF.unsupported_clobber
-        - do_rename(): shutil.rmtree()
+    - new problem: collides_full.
+
+    - new listing/reporting behavior: exercise the range of behaviors
 
 New documentation [see NEW_DOCS].
 
@@ -461,6 +463,29 @@ Why determine the clobber delete-operation in real-time:
       check the path-type of each rp.new that needs clobbering [probably the
       simplest approach to implement], or just try each approach in a
       reasonable order [eg, starting with the path-type of rp.new]
+
+Thinking behind RenamePair instances having only a single problem:
+
+    - If a problem occurs either (a) the user requested a solution (via create
+      or clobber), thus making the issue non-problematic or (b) the rp ends up
+      in plan.skipped or plan.halts and no further problem-checks occur for it.
+
+    - The checks are arranged so that more funamental checks occur before
+      checks that have built-in assumptions: for example, PN.equal (user did
+      not request renaming) before PN.missing (renaming is impossible) before
+      PN.exists (renaming looks risky).
+
+    - Within each check, problems are prioritized: for example, when checking
+      whether rp.new exists, we return a PN.exists_full before less-severe
+      existence-related problems.
+
+    - Thus a RenamePair instance ends up having zero or one problems after the
+      checks -- namely, the most severe or logically-prior problem rather than
+      a full accounting of every problem that it could be diagnosed with.
+
+    - Storing all diagnosed problems would make the reporting logic more
+      complex and it might also require the user to apply more problem controls
+      to achieve an outcome.
 
 --------
 other-tools: Other tools

@@ -88,8 +88,7 @@ def run_checks(
 
         # Print diagnostic info.
         if diagnostics:
-            tr.dumpj(wa.as_dict, 'WorkArea')
-            tr.dumpj(plan.as_dict, 'RenamingPlan')
+            run_diagnostics(tr, wa, plan)
 
         # Rename.
         if failure:
@@ -111,7 +110,12 @@ def run_checks(
     if check_failure:
         if failure:
             if reason:
-                assert_raised_because(einfo, plan, reason)
+                if reason in Problem.FORMATS:
+                    got = tuple(rp.prob_name for rp in plan.halts)
+                else:
+                    got = tuple(f.name for f in plan.failures)
+                assert einfo.value.params['msg'] == MF.prepare_failed
+                assert reason in got
             assert plan.failed
         else:
             assert not plan.failed
@@ -128,32 +132,9 @@ def run_checks(
     else:
         return (wa, plan)
 
-####
-# Helper to confirm that a RenamingPlan raised for the expected reason.
-####
-
-def assert_raised_because(einfo, plan, prob):
-    # Takes (1) an einfo for an exception that was raised by,
-    # (2) the given RenamingPlan, and (3) an expected Problem name.
-
-    # Get the part of the Problem message format before any string formatting.
-    cls = Problem if prob in Problem.FORMATS else Failure
-    exp_msg = cls.FORMATS[prob].split('{')[0]
-    size = len(exp_msg)
-
-    # Grab the plan's uncontrolled failure messages, trimmed to the same size.
-    fmsgs = tuple(
-        rp.problem.msg[0 : size]
-        for rp in plan.halts
-    ) + tuple(
-        f.msg[0 : size]
-        for f in plan.failures
-    )
-
-    # Check for the expected (a) general failure message
-    # and (b) specific Problem message.
-    assert einfo.value.params['msg'] == MF.prepare_failed
-    assert exp_msg in fmsgs
+def run_diagnostics(tr, wa, plan):
+    tr.dumpj(wa.as_dict, 'WorkArea')
+    tr.dumpj(plan.as_dict, 'RenamingPlan')
 
 ####
 # Inputs and their structures.
@@ -636,6 +617,15 @@ def test_equal(tr, create_wa):
         reason = PN.equal,
     )
 
+    # Scenario: it will also be rejected in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        strict = True,
+        failure = True,
+        no_change = True,
+        reason = PN.equal,
+    )
+
 def test_same(tr, create_wa):
     # Paths and args.
     origs = ('foo/xyz', 'BAR/xyz', 'a')
@@ -700,6 +690,13 @@ def test_missing_orig(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are missing.
+    # By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = inputs,
+        rootless = True,
+    )
+
     # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
@@ -711,11 +708,15 @@ def test_missing_orig(tr, create_wa):
         reason = PN.missing,
     )
 
-    # Scenario: same. By default, offending paths are skipped.
+    # Or if we use strict mode.
     wa, plan = run_checks(
         *run_args,
         inputs = inputs,
+        strict = True,
         rootless = True,
+        failure = True,
+        no_change = True,
+        reason = PN.missing,
     )
 
 def test_orig_type(tr, create_wa):
@@ -750,7 +751,6 @@ def test_new_exists(tr, create_wa):
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new',)
-    extras_diff_type = ('a.new/',)
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
     run_args = (tr, create_wa, origs, news)
@@ -779,6 +779,68 @@ def test_new_exists(tr, create_wa):
         extras = extras,
         expecteds = expecteds_clobber,
         controls = 'clobber-exists',
+    )
+
+def test_new_exists_diff(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'c.new')
+    extras = ('a.new/',)
+    extras_full = ('a.new/', 'a.new/foo')
+    expecteds_skip = ('a',) + news
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario 1: one of new paths already exists and it
+    # differs in type form the orig path.
+    # 1A: By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = expecteds_skip,
+    )
+
+    # 1B: Renaming will be rejected if we set the control to halt.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        controls = 'halt-exists-diff',
+        failure = True,
+        no_change = True,
+        reason = PN.exists_diff,
+    )
+
+    # 1C: Renaming will also succeed if allow clobber.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        controls = 'clobber-exists-diff',
+    )
+
+    # Scenario 2: same as initial scenario, but the existing
+    # directory is also non-empty.
+    # 2A: By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras_full,
+        expecteds = expecteds_skip + extras_full,
+    )
+
+    # 2B: Renaming will be rejected if we set the control to halt.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras_full,
+        controls = 'halt-exists-full',
+        failure = True,
+        no_change = True,
+        reason = PN.exists_full,
+    )
+
+    # 2C: And it will succeed if we allow clobber.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras_full,
+        expecteds = news,
+        controls = 'clobber-exists-full',
     )
 
 def test_new_exists_diff_parents(tr, create_wa):

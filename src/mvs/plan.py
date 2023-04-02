@@ -177,7 +177,7 @@ class RenamingPlan:
         # Validate and standardize the user's problem controls.
         # Then merge the defaults problem controls with the user's into
         # a lookup dict mapping each Problem name to its control mechanism.
-        self.strict = strict
+        self.strict = bool(strict)
         try:
             self.controls = ProblemControl.merge(controls)
         except MvsError as e:
@@ -248,6 +248,7 @@ class RenamingPlan:
             (self.execute_user_filter, None),
             (self.execute_user_rename, None),
             (self.set_exists_and_types, None),
+            (self.check_equal, None),
             (self.check_orig_exists, None),
             (self.check_orig_type, None),
             (self.check_new_exists, None),
@@ -475,9 +476,14 @@ class RenamingPlan:
                 return Problem(PN.rename, typ, rp.orig)
         return None
 
+    def check_equal(self, rp, seq_val):
+        if rp.equal:
+            return Problem(PN.equal)
+        else:
+            return None
+
     def check_orig_exists(self, rp, seq_val):
         # Key question: is renaming possible?
-        # Strict existence not required.
         if rp.exist_orig in ANY_EXISTENCE:
             return None
         else:
@@ -490,11 +496,6 @@ class RenamingPlan:
             return Problem(PN.type)
 
     def check_new_exists(self, rp, seq_val):
-        # Handle path equality. In this case, renaming is
-        # impossible and user input did not request it.
-        if rp.equal:
-            return Problem(PN.equal)
-
         # Handle situation where rp.new does not exist in any sense.
         # In this case, we can rename freely, regardless of file
         # system type or other renaming details.
@@ -532,7 +533,7 @@ class RenamingPlan:
             # casing of the parent path. By policy, mvs does not rename parents.
             return Problem(PN.same)
         elif rp.name_change_type == NCT.case_change:
-            if rp.exist_new == EXISTENCES.exists_strict:
+            if rp.exist_new == EXISTENCES.exists_case:
                 # User inputs implied that a case-change renaming
                 # was desired, but the path's name-portion already
                 # agrees with the file system, so renaming is impossible.
@@ -567,10 +568,10 @@ class RenamingPlan:
         # Get the other RenamePair instances that have
         # the same new-path as the current rp.
         k = self.new_collision_key_func(rp.new)
-        others = self.new_groups[k]
+        others = [o for o in self.new_groups[k] if o is not rp]
 
         # No problem if rp.new is unique.
-        if len(others) == 1:
+        if not others:
             return None
 
         # Determine which kind of new-collision problem we have:
@@ -591,6 +592,18 @@ class RenamingPlan:
             return Problem(PN.collides)
         else:
             return Problem(PN.collides_diff)
+
+        # TODO: possible new code if we add PN.collides_full.
+        ORIG = (rp.type_orig, rp.type_orig)
+        is_full = lambda o: o.orig_full or o.new_full
+        is_diff = lambda o: (o.type_orig, o.type_new) != ORIG
+
+        if any(map(is_full, others)):
+            return Problem(PN.collides_full)
+        elif any(map(is_diff, others)):
+            return Problem(PN.collides_diff)
+        else:
+            return Problem(PN.collides)
 
     ####
     # Methods related to problem control.

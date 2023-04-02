@@ -150,6 +150,8 @@ def run_checks(
                include_origs = True,
                include_news = True,
                prepare_only = False,
+               prepare_before = 0,
+               diagnostics = False,
                setup_only = False,
                no_checks = False,
                rename_via_do = False,
@@ -199,18 +201,37 @@ def run_checks(
     if other_prep:
         other_prep(wa, outs, cli)
 
-    # Run the renaming or just the preparations.
+    # Run prparations.
     if prepare_only:
         no_change = True
+    n_preps = int(
+        prepare_before or
+        prepare_only or
+        rename_via_do or
+        diagnostics
+    )
+    for _ in range(n_preps):
         cli.do_prepare()
-    elif rename_via_do:
-        cli.do_prepare()
-        cli.do_rename()
-    elif rootless:
-        with wa.cd():
+
+    # Print diagnostic info.
+    if diagnostics:
+        tr.dumpj(wa.as_dict, 'WorkArea-before')
+        tr.dumpj(cli.plan.as_dict, 'RenamingPlan-before')
+
+    # Run the renaming.
+    if not prepare_only:
+        if rename_via_do:
+            cli.do_rename()
+        elif rootless:
+            with wa.cd():
+                cli.run()
+        elif not skip_rename:
             cli.run()
-    elif not skip_rename:
-        cli.run()
+
+    # Print diagnostic info.
+    if diagnostics:
+        tr.dumpj(wa.as_dict, 'WorkArea-after')
+        tr.dumpj(cli.plan.as_dict, 'RenamingPlan-after')
 
     # Return early if user does not want to check anything.
     if no_checks:

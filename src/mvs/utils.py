@@ -340,10 +340,10 @@ PATH_TYPES = constants('PathTypes', (
 EXISTENCES = constants('Existences', dict(
     missing = 0,
     exists = 1,
-    exists_strict = 2,
+    exists_case = 2,
 ))
 
-ANY_EXISTENCE = (EXISTENCES.exists, EXISTENCES.exists_strict)
+ANY_EXISTENCE = (EXISTENCES.exists, EXISTENCES.exists_case)
 
 def path_existence_and_type(path):
     # Setup.
@@ -356,7 +356,7 @@ def path_existence_and_type(path):
         if any(x.name == p.name for x in p.parent.iterdir()):
             # Means p exists and p.name exactly matches the name
             # as reported by file system (including case).
-            e = ES.exists_strict
+            e = ES.exists_case
         elif p.exists():
             # Means only that p exists.
             e = ES.exists

@@ -63,12 +63,12 @@ FAILURE_NAMES = FN = constants('FailureNames', (
 ))
 
 FAILURE_FORMATS = constants('FailureFormats', {
-    FN.all_filtered:           'All paths were filtered or skipped during processing',
-    FN.parsing_no_paths:       'No input paths',
-    FN.parsing_paragraphs:     'The --paragraphs option expects exactly two paragraphs',
-    FN.parsing_row:            'The --rows option expects rows with exactly two cells: {!r}',
-    FN.parsing_imbalance:      'Got an unequal number of original paths and new paths',
-    FN.user_code_exec:         'Invalid user-supplied {} code:\n{}',
+    FN.all_filtered:       'All paths were filtered or skipped during processing',
+    FN.parsing_no_paths:   'No input paths',
+    FN.parsing_paragraphs: 'The --paragraphs option expects exactly two paragraphs',
+    FN.parsing_row:        'The --rows option expects rows with exactly two cells: {!r}',
+    FN.parsing_imbalance:  'Got an unequal number of original paths and new paths',
+    FN.user_code_exec:     'Invalid user-supplied {} code:\n{}',
 })
 
 @dataclass(init = False, frozen = True)
@@ -215,7 +215,7 @@ class ProblemControl:
             return merged
         else:
             return tuple(
-                f'{control}-{prob}'
+                pcname(control, prob)
                 for prob, control in merged.items()
             )
 
