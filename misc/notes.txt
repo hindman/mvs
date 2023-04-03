@@ -15,17 +15,14 @@ todos: TODOs
 
 Tests:
 
-    - Current coverage gaps:
-        - check_new_collisions(): PN.collides_diff
-        - do_rename(): MF.unsupported_clobber
-
     - plan stores all rps: rps, skipped, filtered, halts: assert against them?
 
     - SKIP applies to more problems: PN.filter, PN.rename
 
-    - CLOBBER applies to more problems: PN.collides_diff.
-
-    - new problem: collides_full.
+    - Current coverage gaps:
+        - check_new_collisions(): PN.collides_diff
+        - check_new_collisions(): PN.collides_full
+        - do_rename(): MF.unsupported_clobber
 
     - new listing/reporting behavior: exercise the range of behaviors
 

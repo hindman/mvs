@@ -1,3 +1,25 @@
+'''
+
+Failing but set to inventory=WAIT:
+    test_filtering_code
+    test_missing_orig
+
+test_orig_type
+test_new_exists
+test_new_exists_diff
+test_new_exists_diff_parents
+test_new_exists_different_case
+test_new_exists_recase
+test_new_exists_non_empty
+test_new_parent_missing
+test_news_collide
+test_news_collide_orig_missing
+test_news_collide_case
+test_failures_skip_all
+
+
+'''
+
 import pytest
 from itertools import chain
 from pathlib import Path
@@ -44,6 +66,7 @@ def run_checks(
                # Assertion making.
                early_checks = None,
                diagnostics = False,
+               inventory = None,
                check_wa = True,
                check_failure = True,
                failure = False,
@@ -126,6 +149,24 @@ def run_checks(
             no_change = True
         wa.check(no_change = no_change)
 
+    # Check the plan's inventory of RenamePair instances.
+    if inventory is not False:
+        # Normalize the inventory string.
+        # - False: bypass the check
+        # - None: all in plan.rps
+        # - Single char: all in the same bucket.
+        n = len(wa.origs)
+        if inventory is None:
+            inventory = '.'
+        if len(inventory) == 1:
+            inventory = inventory * n
+        assert len(inventory) == n
+        # Check the plan's attributes holding RenamePair instances.
+        for k, attrib in INV_MAP.items():
+            got = sorted(rp.orig for rp in getattr(plan, attrib))
+            exp = sorted(o for i, o in zip(inventory, wa.origs) if i == k)
+            assert (attrib, got) == (attrib, exp)
+
     # Let the caller make other custom assertions.
     if return_einfo:
         return (wa, plan, einfo)
@@ -135,6 +176,16 @@ def run_checks(
 def run_diagnostics(tr, wa, plan):
     tr.dumpj(wa.as_dict, 'WorkArea')
     tr.dumpj(plan.as_dict, 'RenamingPlan')
+
+EMPTY = ' '
+WAIT = False  # TODO
+
+INV_MAP = {
+    '.': 'rps',
+    'f': 'filtered',
+    's': 'skipped',
+    'H': 'halts',
+}
 
 ####
 # Inputs and their structures.
@@ -158,6 +209,7 @@ def test_no_inputs(tr, create_wa):
             failure = True,
             reason = FN.parsing_no_paths,
             no_change = True,
+            inventory = EMPTY,
         )
 
 def test_structure_default(tr, create_wa):
@@ -233,6 +285,7 @@ def test_structure_paragraphs(tr, create_wa):
             failure = True,
             reason = FN.parsing_paragraphs,
             no_change = True,
+            inventory = EMPTY,
         )
 
 def test_structure_pairs(tr, create_wa):
@@ -276,6 +329,7 @@ def test_structure_pairs(tr, create_wa):
         failure = True,
         no_change = True,
         reason = FN.parsing_imbalance,
+        inventory = EMPTY,
     )
 
 def test_structure_rows(tr, create_wa):
@@ -321,6 +375,7 @@ def test_structure_rows(tr, create_wa):
             failure = True,
             no_change = True,
             reason = FN.parsing_row,
+            inventory = EMPTY,
         )
 
 ####
@@ -364,6 +419,7 @@ def test_filtering_code(tr, create_wa):
         rename_code = 'return o + o',
         filter_code = 'return not ("d" in o or p.is_dir())',
         rootless = True,
+        inventory = WAIT,
     )
 
 def test_code_compilation_fails(tr, create_wa):
@@ -431,6 +487,7 @@ def test_code_execution_fails(tr, create_wa):
             failure = True,
             no_change = True,
             include_news = 'filter_code' in kws,
+            inventory = '.H.',
             **kws,
         )
         assert len(plan.halts) == 1
@@ -598,15 +655,24 @@ def test_controls(tr, create_wa):
 def test_equal(tr, create_wa):
     # Paths and args.
     # One of the origs equals its new counterpart.
-    SAME = ('d',)
-    origs = ('a', 'b', 'c') + SAME
-    news = ('a.new', 'b.new', 'c.new') + SAME
+    SAME = 'd'
+    origs = ('a', 'b', 'c') + (SAME,)
+    news = ('a.new', 'b.new', 'c.new') + (SAME,)
     run_args = (tr, create_wa, origs, news)
+
+    exp_inv = lambda i: ''.join(i if o == SAME else '.' for o in origs)
 
     # Scenario: renaming will succeed, because
     # skip-equal is a default control.
-    wa, plan = run_checks(*run_args)
-    wa, plan = run_checks(*run_args, controls = 'skip-equal')
+    wa, plan = run_checks(
+        *run_args,
+        inventory = '...s',
+    )
+    wa, plan = run_checks(
+        *run_args,
+        controls = 'skip-equal',
+        inventory = '...s',
+    )
 
     # Scenario: but renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
@@ -615,6 +681,7 @@ def test_equal(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.equal,
+        inventory = '...H',
     )
 
     # Scenario: it will also be rejected in strict mode.
@@ -624,6 +691,7 @@ def test_equal(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.equal,
+        inventory = '...H',
     )
 
 def test_same(tr, create_wa):
@@ -644,6 +712,7 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
+            inventory = 'ss.',
         )
 
         # Scenario: it will be rejected if we set the control to halt.
@@ -653,6 +722,7 @@ def test_same(tr, create_wa):
             controls = 'halt-parent',
             failure = True,
             reason = PN.parent,
+            inventory = 'HH.',
         )
 
         # Scenario: it will succeed if we set the control to create.
@@ -668,6 +738,7 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
+            inventory = 'ss.',
         )
 
         # Scenario: but it will fail if we disable skip-same.
@@ -678,6 +749,7 @@ def test_same(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.same,
+            inventory = 'HH.',
         )
 
 def test_missing_orig(tr, create_wa):
@@ -695,6 +767,7 @@ def test_missing_orig(tr, create_wa):
         *run_args,
         inputs = inputs,
         rootless = True,
+        inventory = WAIT,
     )
 
     # Renaming will be rejected if we set the control to halt.
@@ -706,6 +779,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
+        inventory = WAIT,
     )
 
     # Or if we use strict mode.
@@ -717,6 +791,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
+        inventory = WAIT,
     )
 
 def test_orig_type(tr, create_wa):
