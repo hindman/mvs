@@ -22,6 +22,7 @@ from .utils import (
     STRUCTURES,
     case_sensitivity,
     determine_path_type,
+    get_source_code,
     is_non_empty_dir,
     path_existence_and_type,
 )
@@ -761,8 +762,8 @@ class RenamingPlan:
             # Primary arguments from user.
             inputs = self.inputs,
             structure = self.structure,
-            rename_code = self.rename_code,
-            filter_code = self.filter_code,
+            rename_code = get_source_code(self.rename_code),
+            filter_code = get_source_code(self.filter_code),
             indent = self.indent,
             seq_start = self.seq_start,
             seq_step = self.seq_step,

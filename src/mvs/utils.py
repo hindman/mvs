@@ -3,6 +3,7 @@ import pyperclip
 import stat
 import sys
 
+from inspect import getsource
 from kwexception import Kwexception
 from pathlib import Path
 from short_con import constants
@@ -326,6 +327,14 @@ def wrap_text(text, width):
         SP.join(line)
         for line in lines
     )
+
+def get_source_code(x):
+    # Helper used to get source code for the
+    # user-supplied renaming/filtering code.
+    if callable(x):
+        return getsource(x)
+    else:
+        return str(x)
 
 ####
 # Constants and functions for path type and existence-status.
