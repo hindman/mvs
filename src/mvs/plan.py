@@ -58,7 +58,8 @@ class RenamePair:
     name_change_type: str = None
     same_parents: bool = None
 
-    # Whether the new path points to a non-empty directory.
+    # Whether the orig and new paths points to non-empty directories.
+    orig_full: bool = False
     new_full: bool = False
 
     # Attributes for problems.
@@ -421,22 +422,30 @@ class RenamingPlan:
         # information for rp.orig and, if possible, rp.new. The second call
         # handles rp.new if we have not done so already. The attributes set
         # here are used for most of the subsequent steps.
+
+        # Handle attributes related to rp.orig.
         if rp.exist_orig is None:
-            # Set existence and type for rp.orig.
+            # Existence, type, and non-empty dir.
             e, pt = path_existence_and_type(rp.orig)
             rp.exist_orig = e
             rp.type_orig = pt
+            if pt == PATH_TYPES.directory:
+                rp.orig_full = is_non_empty_dir(rp.orig)
+
+        # Handle attributes related to rp.new.
         if rp.exist_new is None and rp.new is not None:
             po = Path(rp.orig)
             pn = Path(rp.new)
-            # Set existence and type for rp.new.
+            # Existence, type, and non-empty dir.
             e, pt = path_existence_and_type(rp.new)
             rp.exist_new = e
             rp.type_new = pt
-            # Set existence for rp.new parent.
+            if pt == PATH_TYPES.directory:
+                rp.new_full = is_non_empty_dir(rp.new)
+            # Existence of parent.
             e, _ = path_existence_and_type(pn.parent)
             rp.exist_new_parent = e
-            # Set the attribute characterizing the renaming.
+            # Attributes characterizing the renaming.
             rp.same_parents = (
                 False if rp.exist_new_parent == EXISTENCES.missing else
                 samefile(po.parent, pn.parent)
@@ -446,9 +455,7 @@ class RenamingPlan:
                 NCT.case_change if po.name.lower() == pn.name.lower() else
                 NCT.name_change
             )
-            # Set flag if rp.new is a non-empty directory.
-            if rp.type_new == PATH_TYPES.directory:
-                rp.new_full = is_non_empty_dir(rp.new)
+
         return None
 
     def execute_user_filter(self, rp, seq_val):
@@ -565,45 +572,34 @@ class RenamingPlan:
             self.new_groups.setdefault(k, []).append(rp)
 
     def check_new_collisions(self, rp, seq_val):
-        # Get the other RenamePair instances that have
-        # the same new-path as the current rp.
+        # Checks for collisions among all of the new paths in the RenamingPlan.
+        # If any, returns the most serious problem: (1) collisions with
+        # non-empty directories, (2) collisions with a path of a different
+        # type, or (3) regular collisions.
+        #
+        # Collisions occur between (A) the path-type of rp.orig, (B) the
+        # path-types of all OTHER.orig, and (C) the path-types of any OTHER.new
+        # that happen to exist.
+
+        # Get the other RenamePair instances that have the same new-path as the
+        # current rp. If rp.new is unique, there is no problem.
         k = self.new_collision_key_func(rp.new)
         others = [o for o in self.new_groups[k] if o is not rp]
-
-        # No problem if rp.new is unique.
         if not others:
             return None
 
-        # Determine which kind of new-collision problem we have:
-        # collisions among files with same types or different types.
-        #
-        # Collisions will occur between (1) the path-type of rp.orig,
-        # (2) the path-types of all OTHER.orig, and (3) the path-types
-        # of any OTHER.new that happen to exist.
-        #
-        # First collect the path types.
-        ptypes = (
-            [o.type_orig for o in others] +
-            [o.type_new for o in others if o.exist_new]
-        )
-
-        # Return appropriate collision problem.
-        if all(rp.type_orig == pt for pt in ptypes):
-            return Problem(PN.collides)
-        else:
-            return Problem(PN.collides_diff)
-
-        # TODO: possible new code if we add PN.collides_full.
-        ORIG = (rp.type_orig, rp.type_orig)
-        is_full = lambda o: o.orig_full or o.new_full
-        is_diff = lambda o: (o.type_orig, o.type_new) != ORIG
-
-        if any(map(is_full, others)):
+        # Check for collisions with non-empty directories.
+        if any(o.orig_full or o.new_full for o in others):
             return Problem(PN.collides_full)
-        elif any(map(is_diff, others)):
-            return Problem(PN.collides_diff)
-        else:
-            return Problem(PN.collides)
+
+        # Check for collisions with a different path type.
+        pt = rp.type_orig
+        for o in others:
+            if o.type_orig != pt or (o.type_new and o.type_new != pt):
+                return Problem(PN.collides_diff)
+
+        # Otherwise, it's a regular collision.
+        return Problem(PN.collides)
 
     ####
     # Methods related to problem control.

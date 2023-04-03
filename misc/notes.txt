@@ -13,12 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Add collides_full:
-
-    - Add it in problems.py.
-
-    - Then activate the new code in check_new_collisions(): see TODO.
-
 Tests:
 
     - Current coverage gaps:
