@@ -15,16 +15,14 @@ todos: TODOs
 
 Tests:
 
-    - plan stores all rps: rps, skipped, filtered, halts: assert against them?
-
-    - SKIP applies to more problems: PN.filter, PN.rename
-
     - Current coverage gaps:
         - check_new_collisions(): PN.collides_diff
         - check_new_collisions(): PN.collides_full
         - do_rename(): MF.unsupported_clobber
 
-    - new listing/reporting behavior: exercise the range of behaviors
+    - SKIP applies to more problems: PN.filter, PN.rename
+
+    - New listing/reporting behavior: exercise the range of behaviors
 
 New documentation [see NEW_DOCS].
 
@@ -40,21 +38,17 @@ Clipboard source test disabled for Linux: revive if possible.
 
 Support sym-link renames.
 
-Other operations: copy, link, chmod, times, touch [see OTHER_OPS].
+New inputs options: delimiters and stripping [see INPUT_OPTS].
+
+Logging operations: list, prune, undo prior rename.
 
 Additional failure control: backup [see CONTROL_BACKUP].
 
-Logging operations: list, prune.
+Alternative dryrun output styles [see DRYRUN_OUTPUTS].
 
 Convenience renaming operations [see CONVENIENCE_OPS].
 
-Undo renaming, based on log.
-
-New inputs options: delimiters and stripping [see INPUT_OPTS].
-
-Alternative dryrun output styles [see DRYRUN_OUTPUTS].
-
-Complex failure/validation scenarios [see COMPLEX_SCENARIOS].
+Other operations: copy, link, chmod, times, touch [see OTHER_OPS].
 
 --------
 dev-notes: Dev notes
@@ -158,8 +152,12 @@ New documentation [NEW_DOCS]:
               future file system after some renamings have occurred.
 
             - Complex interactions among renamings are not guarded against with
-              any rigor. One example: multiple new-collisions on the same
-              new-path.
+              any rigor. For example:
+
+                - For example, a prior renaming alters directory path needed by
+                  subsequent renaming.
+
+                - Multiple new-collisions on the same new-path.
 
         - The package is not tested on case-sensitive and case-preserving
           operating systems, but not on case-insensitive systems. In that
@@ -202,18 +200,9 @@ New inputs options: delimiters and stripping [INPUT_OPTS]:
     --no-strip [default: paths are stripped]
 
 Alternative dryrun output styles [DRYRUN_OUTPUTS]:
-    - same as input structures
-    - plus json
-    - could be useful if we adopt strict clobbering policy:
-        - Run mvs once to figure out which clobber-victims violate policy.
-        - List that information in a flat/useful way.
-        - User handles those issues.
-        - Then user re-runs the original mvs attempt, which should work now.
-
-Complex failure/validation scenarios [COMPLEX_SCENARIOS]:
-
-    - prior renaming would make subsequent renaming fail [eg, changing
-      directory path before attempting a file rename]
+    - Like input structures: flat, paragraphs, pairs, rows
+    - Plus JSON.
+    - Or maybe just JSON.
 
 Convenience renaming operations [CONVENIENCE_OPS]:
 

@@ -1,25 +1,3 @@
-'''
-
-Failing but set to inventory=WAIT:
-    test_filtering_code
-    test_missing_orig
-
-test_orig_type
-test_new_exists
-test_new_exists_diff
-test_new_exists_diff_parents
-test_new_exists_different_case
-test_new_exists_recase
-test_new_exists_non_empty
-test_new_parent_missing
-test_news_collide
-test_news_collide_orig_missing
-test_news_collide_case
-test_failures_skip_all
-
-
-'''
-
 import pytest
 from itertools import chain
 from pathlib import Path
@@ -151,21 +129,33 @@ def run_checks(
 
     # Check the plan's inventory of RenamePair instances.
     if inventory is not False:
-        # Normalize the inventory string.
-        # - False: bypass the check
-        # - None: all in plan.rps
-        # - Single char: all in the same bucket.
-        n = len(wa.origs)
-        if inventory is None:
-            inventory = '.'
-        if len(inventory) == 1:
-            inventory = inventory * n
-        assert len(inventory) == n
-        # Check the plan's attributes holding RenamePair instances.
-        for k, attrib in INV_MAP.items():
-            got = sorted(rp.orig for rp in getattr(plan, attrib))
-            exp = sorted(o for i, o in zip(inventory, wa.origs) if i == k)
-            assert (attrib, got) == (attrib, exp)
+        # Assemble the expected inventory. The parmeter
+        # can be dict, None, or str.
+        if isinstance(inventory, dict):
+            # Dict provides the rp.orig values directly.
+            exp = {
+                attr : sorted(inventory.get(attr, []))
+                for attr in INV_MAP.values()
+            }
+        else:
+            # A str or None uses a convenience format based on INV_MAP.
+            n = len(wa.origs)
+            if inventory is None:
+                inventory = '.'
+            if len(inventory) == 1:
+                inventory = inventory * n
+            assert len(inventory) == n
+            pairs = tuple(zip(inventory, wa.origs))
+            exp = {
+                attr : sorted(o for i, o in pairs if i == k)
+                for k, attr in INV_MAP.items()
+            }
+        # Assemble actual inventory and assert.
+        got = {
+            attr : sorted(rp.orig for rp in getattr(plan, attr))
+            for attr in INV_MAP.values()
+        }
+        assert got == exp
 
     # Let the caller make other custom assertions.
     if return_einfo:
@@ -173,13 +163,13 @@ def run_checks(
     else:
         return (wa, plan)
 
+# Helper used to print the WorkArea and RenamingPlan data as JSON.
 def run_diagnostics(tr, wa, plan):
     tr.dumpj(wa.as_dict, 'WorkArea')
     tr.dumpj(plan.as_dict, 'RenamingPlan')
 
-EMPTY = ' '
-WAIT = False  # TODO
-
+# Convenience scheme for the inventory parameter in run_checks().
+EMPTY = '_'
 INV_MAP = {
     '.': 'rps',
     'f': 'filtered',
@@ -408,6 +398,10 @@ def test_filtering_code(tr, create_wa):
     news = ('aa', 'bb', 'cc')
     extras = ('d', 'dd', 'xyz/')
     run_args = (tr, create_wa, origs, news)
+    exp_inv = dict(
+        rps = ['a', 'b', 'c'],
+        filtered = ['d', 'dd', 'xyz'],
+    )
 
     # Scenario: provide orig and extras as inputs, and
     # then use filtering code to filter out the extras.
@@ -419,7 +413,7 @@ def test_filtering_code(tr, create_wa):
         rename_code = 'return o + o',
         filter_code = 'return not ("d" in o or p.is_dir())',
         rootless = True,
-        inventory = WAIT,
+        inventory = exp_inv,
     )
 
 def test_code_compilation_fails(tr, create_wa):
@@ -464,6 +458,7 @@ def test_code_execution_fails(tr, create_wa):
     origs = ('a', FAILING_ORIG, 'c')
     news = ('aa', 'bb', 'cc')
     run_args = (tr, create_wa, origs, news)
+    exp_inv = '.H.'
 
     # Code that will cause the second RenamePair
     # to fail during execution of user code.
@@ -487,7 +482,7 @@ def test_code_execution_fails(tr, create_wa):
             failure = True,
             no_change = True,
             include_news = 'filter_code' in kws,
-            inventory = '.H.',
+            inventory = exp_inv,
             **kws,
         )
         assert len(plan.halts) == 1
@@ -535,6 +530,7 @@ def test_plan_as_dict(tr, create_wa):
     origs = ('a', 'b', 'c')
     news = ('a.10', 'b.15', 'c.20')
     run_args = (tr, create_wa, origs, news)
+    filter_code = lambda o, p, seq, plan: 'd' not in o
 
     # Helper to check keys in plan.as_dict.
     def check_plan_dict(wa, plan):
@@ -564,7 +560,7 @@ def test_plan_as_dict(tr, create_wa):
         rootless = True,
         include_news = False,
         rename_code = 'return f"{o}.{seq}"',
-        filter_code = 'return "d" not in o',
+        filter_code = filter_code,
         seq_start = 10,
         seq_step = 5,
         early_checks = check_plan_dict,
@@ -658,20 +654,20 @@ def test_equal(tr, create_wa):
     SAME = 'd'
     origs = ('a', 'b', 'c') + (SAME,)
     news = ('a.new', 'b.new', 'c.new') + (SAME,)
+    exp_inv = '...s'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
-
-    exp_inv = lambda i: ''.join(i if o == SAME else '.' for o in origs)
 
     # Scenario: renaming will succeed, because
     # skip-equal is a default control.
     wa, plan = run_checks(
         *run_args,
-        inventory = '...s',
+        inventory = exp_inv,
     )
     wa, plan = run_checks(
         *run_args,
         controls = 'skip-equal',
-        inventory = '...s',
+        inventory = exp_inv,
     )
 
     # Scenario: but renaming will be rejected if we set the control to halt.
@@ -681,7 +677,7 @@ def test_equal(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.equal,
-        inventory = '...H',
+        inventory = exp_invH,
     )
 
     # Scenario: it will also be rejected in strict mode.
@@ -691,7 +687,7 @@ def test_equal(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.equal,
-        inventory = '...H',
+        inventory = exp_invH,
     )
 
 def test_same(tr, create_wa):
@@ -702,6 +698,8 @@ def test_same(tr, create_wa):
     expecteds_create = ('foo', 'FOO', 'FOO/xyz', 'BAR', 'bar', 'bar/xyz', 'a.new')
     expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
     expecteds_no_skip = origs + ('foo', 'BAR')
+    exp_inv = 'ss.'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenarios: for the first two RenamePair instances,
@@ -712,7 +710,7 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
-            inventory = 'ss.',
+            inventory = exp_inv,
         )
 
         # Scenario: it will be rejected if we set the control to halt.
@@ -722,7 +720,7 @@ def test_same(tr, create_wa):
             controls = 'halt-parent',
             failure = True,
             reason = PN.parent,
-            inventory = 'HH.',
+            inventory = exp_invH,
         )
 
         # Scenario: it will succeed if we set the control to create.
@@ -738,7 +736,7 @@ def test_same(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
-            inventory = 'ss.',
+            inventory = exp_inv,
         )
 
         # Scenario: but it will fail if we disable skip-same.
@@ -749,7 +747,7 @@ def test_same(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.same,
-            inventory = 'HH.',
+            inventory = exp_invH,
         )
 
 def test_missing_orig(tr, create_wa):
@@ -760,6 +758,14 @@ def test_missing_orig(tr, create_wa):
     missing_news = ('c.new', 'd.new')
     inputs = origs + missing_origs + news + missing_news
     run_args = (tr, create_wa, origs, news)
+    exp_inv = dict(
+        rps = ['a', 'b'],
+        skipped = ['c', 'd'],
+    )
+    exp_invH = dict(
+        rps = exp_inv['rps'],
+        halts = exp_inv['skipped'],
+    )
 
     # Scenario: some orig paths are missing.
     # By default, offending paths are skipped.
@@ -767,7 +773,7 @@ def test_missing_orig(tr, create_wa):
         *run_args,
         inputs = inputs,
         rootless = True,
-        inventory = WAIT,
+        inventory = exp_inv,
     )
 
     # Renaming will be rejected if we set the control to halt.
@@ -779,7 +785,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
-        inventory = WAIT,
+        inventory = exp_invH,
     )
 
     # Or if we use strict mode.
@@ -791,7 +797,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
-        inventory = WAIT,
+        inventory = exp_invH,
     )
 
 def test_orig_type(tr, create_wa):
@@ -801,6 +807,8 @@ def test_orig_type(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = (TARGET,)
     expecteds = ('a.new', 'b.new', 'c', TARGET)
+    exp_inv = '..s'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are not regular files.
@@ -812,6 +820,7 @@ def test_orig_type(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.type,
+        inventory = exp_invH,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -819,6 +828,7 @@ def test_orig_type(tr, create_wa):
         *run_args,
         extras = extras,
         expecteds = expecteds,
+        inventory = exp_inv,
     )
 
 def test_new_exists(tr, create_wa):
@@ -828,6 +838,8 @@ def test_new_exists(tr, create_wa):
     extras = ('a.new',)
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
+    exp_inv = 's..'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
@@ -839,6 +851,7 @@ def test_new_exists(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists,
+        inventory = exp_invH,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -846,6 +859,7 @@ def test_new_exists(tr, create_wa):
         *run_args,
         extras = extras,
         expecteds = expecteds_skip,
+        inventory = exp_inv,
     )
 
     # Scenario: renaming will also succeed if we clobber the offending paths.
@@ -863,6 +877,8 @@ def test_new_exists_diff(tr, create_wa):
     extras = ('a.new/',)
     extras_full = ('a.new/', 'a.new/foo')
     expecteds_skip = ('a',) + news
+    exp_inv = 's..'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario 1: one of new paths already exists and it
@@ -872,6 +888,7 @@ def test_new_exists_diff(tr, create_wa):
         *run_args,
         extras = extras,
         expecteds = expecteds_skip,
+        inventory = exp_inv,
     )
 
     # 1B: Renaming will be rejected if we set the control to halt.
@@ -882,6 +899,7 @@ def test_new_exists_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_diff,
+        inventory = exp_invH,
     )
 
     # 1C: Renaming will also succeed if allow clobber.
@@ -898,6 +916,7 @@ def test_new_exists_diff(tr, create_wa):
         *run_args,
         extras = extras_full,
         expecteds = expecteds_skip + extras_full,
+        inventory = exp_inv,
     )
 
     # 2B: Renaming will be rejected if we set the control to halt.
@@ -908,6 +927,7 @@ def test_new_exists_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_full,
+        inventory = exp_invH,
     )
 
     # 2C: And it will succeed if we allow clobber.
@@ -924,6 +944,8 @@ def test_new_exists_diff_parents(tr, create_wa):
     news = ('a.new', 'xy/b.new')
     extras = ('xy/', 'xy/b.new')
     expecteds = ('a.new', 'b') + extras
+    exp_inv = '.s'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists and
@@ -936,6 +958,7 @@ def test_new_exists_diff_parents(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists,
+        inventory = exp_invH,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -943,6 +966,7 @@ def test_new_exists_diff_parents(tr, create_wa):
         *run_args,
         extras = extras,
         expecteds = expecteds,
+        inventory = exp_inv,
     )
 
 def test_new_exists_different_case(tr, create_wa):
@@ -950,6 +974,8 @@ def test_new_exists_different_case(tr, create_wa):
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('B.NEW',)
+    exp_inv = '.s.'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     if case_sensitivity() == FS_TYPES.case_sensitive:
@@ -969,6 +995,7 @@ def test_new_exists_different_case(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.exists,
+            inventory = exp_invH,
         )
 
         # Scenario: renaming will succeed if we request clobbering.
@@ -1001,6 +1028,7 @@ def test_new_exists_recase(tr, create_wa):
     # Paths and args.
     origs = ('xyz',)
     news = ('xyZ',)
+    exp_inv = 's'
     run_args = (tr, create_wa, origs, news)
 
     # Reason for failure will vary by file system type.
@@ -1019,6 +1047,7 @@ def test_new_exists_recase(tr, create_wa):
         failure = True,
         no_change = True,
         reason = FN.all_filtered,
+        inventory = False,
     )
 
     # The precise problem will vary by file system type.
@@ -1027,12 +1056,15 @@ def test_new_exists_recase(tr, create_wa):
     else:
         pn = PN.recase
     assert plan.skipped[0].prob_name == pn
+    assert len(plan.rps) == 0
 
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.
     origs = ('a/', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new/', 'a.new/foo')
+    exp_inv = 's..'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: don't include the extras. Renaming succeeds.
@@ -1048,6 +1080,7 @@ def test_new_exists_non_empty(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_full,
+        inventory = exp_invH,
     )
 
     # Scenario: if we exclude the last extras path, the
@@ -1064,6 +1097,8 @@ def test_new_parent_missing(tr, create_wa):
     news = ('a.new', 'b.new', 'xy/zzz/c.new')
     expecteds_skip = ('a.new', 'b.new', 'c')
     expecteds_create = news + ('xy/', 'xy/zzz/')
+    exp_inv = '..s'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: a new-parent is missing.
@@ -1074,12 +1109,14 @@ def test_new_parent_missing(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.parent,
+        inventory = exp_invH,
     )
 
     # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_skip,
+        inventory = exp_inv,
     )
 
     # Scenario: renaming will succeed if we create the missing parents.
@@ -1098,6 +1135,8 @@ def test_news_collide(tr, create_wa):
     run_args = (tr, create_wa, origs, news)
     origs_diff = ('a', 'b', 'c/')
     run_args_diff = (tr, create_wa, origs_diff, news)
+    exp_inv = 's.s'
+    exp_invH = exp_inv.replace('s', 'H')
 
     # Scenario: some new paths collide.
     # Renaming will be rejected if we set the control to halt.
@@ -1107,12 +1146,14 @@ def test_news_collide(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.collides,
+        inventory = exp_invH,
     )
 
     # Scenario: same. By default, offending paths are skipped.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_skip,
+        inventory = exp_inv,
     )
 
     # Scenario: renaming will succeed if we request clobbering.
@@ -1128,6 +1169,10 @@ def test_news_collide_orig_missing(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new', 'a.new')
     inputs = origs + news
     run_args = (tr, create_wa, origs[:-1], news)
+    exp_inv = dict(
+        rps = ['a', 'b', 'c'],
+        halts = ['d'],
+    )
 
     # Scenario: inputs to RenamingPlan include all origs and news,
     # but we tell the WorkArea to create only the first 3 origs.
@@ -1144,8 +1189,8 @@ def test_news_collide_orig_missing(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
+        inventory = exp_inv,
     )
-    assert len(plan.halts) == 1
 
 def test_news_collide_case(tr, create_wa):
     # Paths and args.
@@ -1153,6 +1198,8 @@ def test_news_collide_case(tr, create_wa):
     news = ('a.new', 'b.new', 'B.NEW')
     expecteds_skip = ('a.new', 'b', 'c')
     expecteds_clobber = ('a.new', 'B.NEW')
+    exp_inv = '.ss'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: new paths "collide" in a case-insensitive way.
@@ -1166,6 +1213,7 @@ def test_news_collide_case(tr, create_wa):
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
+            inventory = exp_inv,
         )
 
         # Renaming will be rejected if we set the control to halt.
@@ -1175,12 +1223,14 @@ def test_news_collide_case(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.collides,
+            inventory = exp_invH,
         )
 
 def test_failures_skip_all(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('Z', 'Z', 'Z')
+    exp_inv = 'sss'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: all new paths collide. Renaming will be rejected
@@ -1191,6 +1241,7 @@ def test_failures_skip_all(tr, create_wa):
         failure = True,
         no_change = True,
         reason = FN.all_filtered,
+        inventory = exp_inv,
     )
 
 ####
