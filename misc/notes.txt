@@ -13,14 +13,54 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Do the multiple flavors of exists and collides problems make problem-control
+overly complex for users?
+
+    - One drawback is that a user wanting strict behavior for any exists or
+      collides problem has no easy way to achieve it. They can use --strict,
+      but that elevates everything to the halt level (even things like
+      PN.equal). The user has no way to say controls='halt-exists*'.
+
+    - Are there any good alternatives?
+
+    - One could simplify and just report PN.exists or PN.collides and ignore
+      issues like path-type or non-empty dirs. Users could skip/halt/clobber in
+      the face of those problems or not.
+
 Tests:
 
-    - Current coverage gaps:
-        - check_new_collisions(): PN.collides_diff
-        - check_new_collisions(): PN.collides_full
-        - do_rename(): MF.unsupported_clobber
+    - Modify check_new_exists():
 
-    - SKIP applies to more problems: PN.filter, PN.rename
+        - If rp.new exists and the clobber victim is PATH_TYPES.other, we would
+          return Problem(PN.exists_diff).
+
+        - The user could control that problem: controls='clobber-exists-diff'.
+
+        - But then do_rename() would raise, because it refuses to clobber paths
+          of type other.
+
+        - Instead, check_new_exists() should return a new type of
+          Problem(PN.exists_other). The problem will only support the halt
+          and skip controls.
+
+        - Does that also imply a need for PN.collides_other?
+
+            - My initial reaction is no.
+
+            - If multiple new paths collide:
+
+                - If none of the affected rps have new-exists problems, the
+                  nature of the new-collisions will be determined entirely by
+                  the orig path types. And those path types are already
+                  governed by a prior check.
+
+                - If some of the affected rps do have new-exists problems, and
+                  if any of those rps have path-type other, that problem will
+                  be reported in the new-exists check. Since the problem is not
+                  controllable via clobber, that renaming won't be in the mix
+                  during the collision check.
+
+    - do_rename(): exercise code branch with MF.unsupported_clobber.
 
     - New listing/reporting behavior: exercise the range of behaviors
 

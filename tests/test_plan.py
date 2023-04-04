@@ -457,8 +457,10 @@ def test_code_execution_fails(tr, create_wa):
     FAILING_ORIG = 'b'
     origs = ('a', FAILING_ORIG, 'c')
     news = ('aa', 'bb', 'cc')
+    expecteds_skip = ('aa', FAILING_ORIG, 'cc')
+    exp_inv = '.s.'
+    exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
-    exp_inv = '.H.'
 
     # Code that will cause the second RenamePair
     # to fail during execution of user code.
@@ -466,7 +468,7 @@ def test_code_execution_fails(tr, create_wa):
     rename_code2 = 'return 9999 if seq == 2 else o + o'
     filter_code = 'return FUBB if seq == 2 else True'
 
-    # Three scenarios that will cause renaming to be rejected:
+    # Three scenarios:
     # - Renaming code raises an exception.
     # - Renaming code returns bad data type.
     # - Filtering code raises an exception.
@@ -475,6 +477,8 @@ def test_code_execution_fails(tr, create_wa):
         dict(rename_code = rename_code2, reason = PN.rename),
         dict(filter_code = filter_code, reason = PN.filter),
     )
+
+    # By default, user-code failures halt the renaming plan.
     for kws in scenarios:
         wa, plan = run_checks(
             *run_args,
@@ -482,13 +486,21 @@ def test_code_execution_fails(tr, create_wa):
             failure = True,
             no_change = True,
             include_news = 'filter_code' in kws,
+            inventory = exp_invH,
+            **kws,
+        )
+
+    # Or the user can skip renamings with such problems.
+    for kws in scenarios:
+        wa, plan = run_checks(
+            *run_args,
+            controls = 'skip-filter skip-rename',
+            rootless = True,
+            include_news = 'filter_code' in kws,
+            expecteds = expecteds_skip,
             inventory = exp_inv,
             **kws,
         )
-        assert len(plan.halts) == 1
-        rp = plan.halts[0]
-        assert rp.orig == FAILING_ORIG
-        assert rp.problem.name == kws['reason']
 
 def test_seq(tr, create_wa):
     # Paths and args.
@@ -1133,12 +1145,17 @@ def test_news_collide(tr, create_wa):
     expecteds_skip = ('a', 'b.new', 'c')
     expecteds_clobber = ('a.new', 'b.new')
     run_args = (tr, create_wa, origs, news)
-    origs_diff = ('a', 'b', 'c/')
-    run_args_diff = (tr, create_wa, origs_diff, news)
     exp_inv = 's.s'
     exp_invH = exp_inv.replace('s', 'H')
 
     # Scenario: some new paths collide.
+    # By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds_skip,
+        inventory = exp_inv,
+    )
+
     # Renaming will be rejected if we set the control to halt.
     wa, plan = run_checks(
         *run_args,
@@ -1149,14 +1166,7 @@ def test_news_collide(tr, create_wa):
         inventory = exp_invH,
     )
 
-    # Scenario: same. By default, offending paths are skipped.
-    wa, plan = run_checks(
-        *run_args,
-        expecteds = expecteds_skip,
-        inventory = exp_inv,
-    )
-
-    # Scenario: renaming will succeed if we request clobbering.
+    # Renaming will succeed if we request clobbering.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_clobber,
@@ -1225,6 +1235,98 @@ def test_news_collide_case(tr, create_wa):
             reason = PN.collides,
             inventory = exp_invH,
         )
+
+def test_news_collide_diff(tr, create_wa):
+    # Paths and args.
+    SAME = 'a.new'
+    origs = ('a/', 'b', 'c', 'd/')
+    news = (SAME, 'b.new', SAME, SAME)
+    expecteds_skip = ('a', 'b.new', 'c', 'd')
+    expecteds_clobber = ('a.new', 'b.new')
+    run_args = (tr, create_wa, origs, news)
+    exp_inv = 's.ss'
+    exp_invH = exp_inv.replace('s', 'H')
+
+    # Scenario: some new paths collide and differ in type.
+    # By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds_skip,
+        inventory = exp_inv,
+    )
+
+    # Renaming will be rejected if we set the control to halt.
+    wa, plan = run_checks(
+        *run_args,
+        controls = 'halt-collides-diff',
+        failure = True,
+        no_change = True,
+        reason = PN.collides_diff,
+        inventory = exp_invH,
+    )
+
+    # Renaming will succeed if we request clobbering.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds_clobber,
+        controls = 'clobber-collides-diff',
+    )
+
+def test_news_collide_full(tr, create_wa):
+    # Paths and args.
+    SAME = 'a.new'
+    origs = ('a/', 'b', 'c/')
+    news = (SAME, 'b.new', SAME)
+    extras = ('c/foo',)
+    expecteds_skip = ('a', 'b.new', 'c') + extras
+    expecteds_clobber = ('a.new', 'a.new/foo', 'b.new')
+    run_args = (tr, create_wa, origs, news)
+    exp_inv = 's.s'
+
+    # Scenario: some new paths collide and differ in type.
+    # By default, offending paths are skipped.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = expecteds_skip,
+        inventory = exp_inv,
+    )
+
+    # If either applicable control is set to halt, the
+    # renaming plan will be rejected.
+    scenarios = (
+        dict(
+            controls = 'halt-collides-full',
+            reason = PN.collides_full,
+            inventory = 'H.s',
+        ),
+        dict(
+            controls = 'halt-collides',
+            reason = PN.collides,
+            inventory = 's.H',
+        ),
+        dict(
+            controls = 'halt-collides halt-collides-full',
+            reason = PN.collides,
+            inventory = 'H.H',
+        ),
+    )
+    for kws in scenarios:
+        wa, plan = run_checks(
+            *run_args,
+            extras = extras,
+            failure = True,
+            no_change = True,
+            **kws,
+        )
+
+    # If we request clobbering, renaming succeeds.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        controls = 'clobber-collides-full clobber-collides',
+        expecteds = expecteds_clobber,
+    )
 
 def test_failures_skip_all(tr, create_wa):
     # Paths and args.
