@@ -13,6 +13,10 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Fine tune the latest plan.
+
+Convert RenamePair to Renaming.
+
 Do the multiple flavors of exists and collides problems make problem-control
 overly complex for users?
 
@@ -141,6 +145,171 @@ Tag file creation:
 --------
 misc-notes: Misc notes
 --------
+
+Dropping problem control as a concept:
+
+    - Current approach:
+
+        - The project started with an opinionated set of defaults regarding how
+          to handle each type of problem: some were fatal (halt) and others
+          simply excluded the affected renaming (skip).
+
+        - To achieve a renaming that might involve more active measures (create
+          a new parent, clobber an existing file, or collide with another new
+          path), the user must understand the problem control system and
+          vocabulary.
+
+        - As more flavors of problems have been discovered (same, recase, and
+          the different variants of clobber and collide), that system has grown
+          too complex.
+
+    - A different approach: use --skip rather than --controls:
+
+        - Drop the opinionated defaults. Instead, embrace the philosophy of
+          informed consent.
+
+        - In other words, have a bias toward implemented the user's requested
+          renaming, but take effective action to warn the user before
+          problematic operations occur (create, clobber, collide).
+
+        - The first step is to re-assess the problem controls. They are
+          quite different in nature, coming in three varieties:
+
+            1. Side effects that makes a renaming possible: create and clobber.
+
+            2. Excluding problematic renamings while others proceed: skip.
+
+            3. Stopping the renaming plan before it starts: halt.
+
+        - If mvs shifts to the informed consent model, the need for two of
+          those varieties of control disappears:
+
+            - The user never needs to ask for create or clobber, because the
+              library will simply do them when necessary.
+
+            - The user never needs to ask for the halt control, because they
+              can achieve the same them during user confirmation.
+
+        - If the default is to perform the renamings that the user requests and
+          confirms, the only control need to the ability skip/exclude renamings
+          with problems of different kinds.
+
+            --skip PROB [PROB...]
+
+    - A different approach: grouping problems into larger categories:
+
+        - As the library has discovered new problem varieties, the number of
+          problems has become too large and subtle for most user needs.
+
+        - The problems will be organized into large groupings, and some of
+          those grouping will having optional sub-categories.
+
+        - Renamings not requested, possible, or supported.
+
+            noop    | equal, same, recase
+            missing | .
+            type    | .
+            code    | rename, filter
+
+        - Renamings with resolvable problems:
+
+            parent   | .
+            exists   | diff, full
+            collides | diff, full
+
+        - To skip renamings having those problems, the usage would look
+          like these examples:
+
+            --skip parent
+            --skip exists
+            --skip exists collides
+            --skip exists-full
+            --skip all
+
+        - Notes on the user-code problems. Move these notes to misc-notes.
+
+            - In theory, one could forge ahead with a renaming even in the
+              face of an runtime failure of the user's filtering and
+              renaming code.
+
+            - Filter failure could assume that the renaming should be
+              either retained or filtered out. The problem is that picking
+              the right default is not clear cut. Better to simply say that
+              renamings having filter failures won't be supported.
+
+            - Currently, the presence of renaming code causes the plan to
+              treat all inputs and original paths. That could be changed.
+              If that were done, the user could supply both new paths and
+              renaming code. The user's code could either return the
+              current new path or a different new path. That usage scenario
+              is counter-intuitive. Also, the user interface would require
+              an additional parameter allowing the user to distinguish
+              between normal usage (--rename with only original paths) and
+              special usage (--rename with both original and new paths).
+              That complexity is not worth it.
+
+        - How the renaming plan will store renamings:
+
+            self.active   | Active renamings.
+            self.filtered | Filtered out by user code.
+            self.excluded | Has an unresolvable problem.
+            self.skipped  | Has a problem; user wants to skip the renaming.
+
+        - Listing behavior:
+
+            - Listing formats:
+
+                - Summary table:
+
+                    Summary:
+                        Inputs: __
+                        ----
+                        Active: __
+                        Filtered: __
+                        Excluded: __
+                        Skipped: __
+                        ----
+                        Parent: __
+                        Exists: __
+                        Collides: __
+
+                - Renamings, with and without problems:
+
+                    foo/x
+                    foo/x.new
+
+                    # Problem: exists-full
+                    foo/bar
+                    foo/bar.new
+
+            - Listing configuration:
+
+                - Usage:
+
+                    --list SECTION...
+
+                - The section names are the same as shown in the table, but
+                  lowercase.
+
+                - Options and preferences: the option simply replaces the
+                  upstream setting (no merging logic required).
+
+            - Default behavior:
+
+                - All non-empty sections are listed.
+
+                - The summary table is shown if any active renamings have
+                  problems (create, exists, collides).
+
+        - Confirmation behavior:
+
+            - By default, the user must confirm in the normal way, either via a
+              "yes" reply or the --yes option.
+
+            - User can add an extra layer of safety with --strict, which halts
+              the renaming plan if any active renamings have problems (create,
+              exists, collides) or if there were any unresolvable problems
+              (excluded).
 
 New documentation [NEW_DOCS]:
 
