@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from short_con import constants, cons
+from dataclasses import dataclass
+from short_con import constants
 
 from .utils import (
     MSG_FORMATS as MF,

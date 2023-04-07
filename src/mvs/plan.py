@@ -720,16 +720,6 @@ class RenamingPlan:
                     new = rp.new,
                 )
 
-            # if rp.clobber_self:
-            #     pass
-            # elif rp.clobber:
-            #     if rp.type_orig == PATH_TYPES.file:
-            #         pn.unlink()
-            #     else:
-            #         pn.rmdir()
-            # else:
-            #     raise MvsError(MF.unrequested_clobber, orig = rp.orig, new = rp.new)
-
         # Rename.
         po.rename(rp.new)
 

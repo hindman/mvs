@@ -17,6 +17,8 @@ Figure out implementation strategy for the following:
 
     - Convert RenamePair to Renaming.
 
+        - Change orig_full and new_full to full_orig and full_new.
+
     - The new approach [see misc-notes].
 
 Do the multiple flavors of exists and collides problems make problem-control
@@ -154,9 +156,10 @@ Dropping problem control as a concept:
 
     - Current approach:
 
-        - The project started with an opinionated set of defaults regarding how
-          to handle each type of problem: some were fatal (halt) and others
-          simply excluded the affected renaming (skip).
+        - The most recent problem-control system started with an opinionated
+          set of defaults regarding how to handle each type of problem: some
+          were fatal (eventually getting the explicit halt control) and others
+          simply excluded the affected renamings (skip).
 
         - To achieve a renaming that might involve more active measures (create
           a new parent, clobber an existing file, or collide with another new
@@ -167,17 +170,21 @@ Dropping problem control as a concept:
           the different variants of clobber and collide), that system has grown
           too complex.
 
-    - A different approach: use --skip rather than --controls:
+        - The rest of these notes describe a better alternative.
+
+    - Use --skip rather than --controls:
 
         - Drop the opinionated defaults. Instead, embrace the philosophy of
           informed consent.
 
-        - In other words, have a bias toward implemented the user's requested
-          renaming, but take effective action to warn the user before
-          problematic operations occur (create, clobber, collide).
+            - In other words, have a bias toward implemented the user's requested
+              renaming.
 
-        - The first step is to re-assess the problem controls. They are
-          quite different in nature, coming in three varieties:
+            - And take effective action to warn the user before problematic
+              operations occur (create, clobber, collide).
+
+        - The first step is to re-assess the problem controls. They come in
+          three varieties:
 
             1. Side effects that makes a renaming possible: create and clobber.
 
@@ -186,147 +193,203 @@ Dropping problem control as a concept:
             3. Stopping the renaming plan before it starts: halt.
 
         - If mvs shifts to the informed consent model, the need for two of
-          those varieties of control disappears:
+          those control varieties disappears:
 
             - The user never needs to ask for create or clobber, because the
               library will simply do them when necessary.
 
             - The user never needs to ask for the halt control, because they
-              can achieve the same them during user confirmation.
+              can achieve the same outcome during user confirmation: say no.
 
         - If the default is to perform the renamings that the user requests and
-          confirms, the only control need to the ability skip/exclude renamings
-          with problems of different kinds.
+          confirms, the one control is needed: the ability skip renamings
+          having problems.
 
             --skip PROB [PROB...]
 
-    - A different approach: grouping problems into larger categories:
+    - Group related problems:
 
         - As the library has discovered new problem varieties, the number of
           problems has become too large and subtle for most user needs.
 
-        - The problems will be organized into large groupings, and some of
-          those grouping will having optional sub-categories.
+        - To eliminate that proliferation and complexity, organize the problems
+          into two broad categories (unresolvable and resolvable). Each problem
+          will have a general name as well as an optional subtype.
 
-        - Renamings not requested, possible, or supported.
+            - Unresolvable:
 
-            noop    | equal, same, recase
-            missing | .
-            type    | .
-            code    | rename, filter
+                noop     | equal, same, recase
+                missing  | .
+                type     | .
+                code     | rename, filter
 
-        - Renamings with resolvable problems:
+            - Resolvable:
 
-            parent   | .
-            exists   | diff, full
-            collides | diff, full
+                parent   | .
+                exists   | diff, full
+                collides | diff, full
 
-        - To skip renamings having any of the resolvable problems, the usage
-          would look like these examples:
+    - Adjust the Failure class in a similar way: Failure(parsing, row).
 
-            --skip parent
-            --skip exists
-            --skip exists collides
-            --skip exists-full
-            --skip all
-            --skip                    # Shortcut for all.
+    - To skip renamings having any of the resolvable problems:
 
-        - Notes on the user-code problems. Move these notes to misc-notes.
+        --skip PROB...  # parent|exists[-diff|-full]|collides[-diff|-full]
+        --skip all
 
-            - In theory, one could forge ahead with a renaming even in the
-              face of an runtime failure of the user's filtering and
-              renaming code.
+    - How the renaming plan will store renamings:
 
-            - Filter failure could assume that the renaming should be
-              either retained or filtered out. The problem is that picking
-              the right default is not clear cut. Better to simply say that
-              renamings having filter failures won't be supported.
+        self.filtered | Filtered out by user code.
+        self.skipped  | Resolvable problem, but user wants to skip the renaming.
+        self.excluded | Unresolvable problem.
+        self.active   | Active renamings.
 
-            - Currently, the presence of renaming code causes the plan to
-              treat all inputs and original paths. That could be changed.
-              If that were done, the user could supply both new paths and
-              renaming code. The user's code could either return the
-              current new path or a different new path. That usage scenario
-              is counter-intuitive. Also, the user interface would require
-              an additional parameter allowing the user to distinguish
-              between normal usage (--rename with only original paths) and
-              special usage (--rename with both original and new paths).
-              That complexity is not worth it.
+    - Listing formats:
 
-        - How the renaming plan will store renamings:
+        - Summary table:
 
-            self.active   | Active renamings.
-            self.filtered | Filtered out by user code.
-            self.excluded | Has an unresolvable problem.
-            self.skipped  | Has a problem; user wants to skip the renaming.
+            Total: _
+                Filtered: _
+                Skipped: _
+                Excluded: _
+                Active: _
+                    Parent: _
+                    Exists: _
+                    Collides: _
+                    OK: _
 
-        - Listing behavior:
+        - Renamings, with and without problems:
 
-            - Listing formats:
+            foo/x
+            foo/x.new
 
-                - Summary table:
+            # Problem: exists-full
+            foo/bar
+            foo/bar.new
 
-                    Total: __
-                        Filtered: __
-                        Skipped: __
-                        Excluded: __
-                        Active: __
-                            Parent: __
-                            Exists: __
-                            Collides: __
-                            OK: __
+    - Listing configuration:
 
-                - Renamings, with and without problems:
+        - Usage:
 
-                    foo/x
-                    foo/x.new
+            --list CATEGORY...  # filtered|skipped|excluded|parent|exists|collides|ok
+            --list all          # The default.
+            --list              # Same as all.
 
-                    # Problem: exists-full
-                    foo/bar
-                    foo/bar.new
+        - Options and preferences: the option simply replaces the upstream
+          setting (no merging logic required).
 
-            - Listing configuration:
+    - Listing behavior:
 
-                - Usage:
+        - The summary table is shown if the renaming plan would halt under
+          --strict=all [see below].
 
-                    --list CATEGORY...     # filtered|skipped|excluded|parent|exists|collides|ok
-                    --list all             # The default.
-                    --list                 # Same as all.
+        - Among the categories configured to appear, the non-empty ones are
+          listed.
 
-                - Options and preferences: the option simply replaces the
-                  upstream setting (no merging logic required).
+    - Confirmation behavior:
 
-            - Listing behavior:
+        - By default, the user must confirm in the normal way, either via a
+          "yes" reply or the --yes option.
 
-                - The summary table is shown if the renaming plan would halt
-                  under --strict=all [see below].
+        - User can add an extra layer of safety with --strict.
 
-                - Among the categories configured to appear, the non-empty ones
-                  are listed.
+            --strict CATEGORY...  # excluded|parent|exists|collides
+            --strict all
 
-        - Confirmation behavior:
+        - It halts the renaming plan if any renamings have problems in the
+          named categories.
 
-            - By default, the user must confirm in the normal way, either via a
-              "yes" reply or the --yes option.
+        - A --strict=all setting asserts that the renamings will have no
+          more problems that those declared in advance. The plan can
+          proceed only if:
 
-            - User can add an extra layer of safety with --strict.
+            - There were no unresolvable problems.
 
-                --strict CATEGORY...  # excluded|parent|exists|collides
-                --strict all
-                --strict              # Same as all.
+            - The active renamings have no problems (either because there
+              were none to begin with or becuase the user explicitly
+              skipped them).
 
-            - It halts the renaming plan if it ends up having renamings in any
-              of the given categories.
+        - Implement the strict check at the end of prepare().
 
-            - A --strict=all setting asserts that the renamings will have no
-              more problems that those declared in advance. The plan can
-              proceed only if:
+    - Renaming attributes:
 
-                - There were no unresolvable problems.
+        - A check-method runs and returns None or Problem.
 
-                - The active renamings have no problems (either because there
-                  were none to begin with or becuase the user explicitly
-                  skipped them).
+        - If Problem, attach it to the Renaming.
+
+        - Based on the problem name, put the Renaming in the right bucket:
+
+            - filtered: rn.filtered
+            - excluded: unresolvable Problem.
+            - skipped: resolvable specified by user's skip parameter.
+            - active: everything else.
+
+        - Attribute changes:
+
+            exclude   # Change to filtered
+            halt      # Drop.
+            skip      # Drop.
+
+    - PROBLEM_FORMATS and FAILURE_NAMES: convert to dicts:
+
+        (NAME, SUBTYPE) => FMT
+
+    - Change Failure(all_filtered) message to include the new vocabulary:
+      filtered, skipped, or excluded.
+
+    - Problem control:
+
+        - Drop ProblemControl and CONTROLS.
+
+        - Implement Problem.is_resolvable(cls, prob), which returns true if
+          prob.name in (parent, exists, collides).
+
+        - The RenamingPlan receives a sequence of problem identifiers. Use them
+          to build a set of Problem instances: SKIP_PROBLEMS.
+
+        - Implement RenamingPlan.should_skip(self, rn), which returns true if
+          rn.problem in SKIP_PROBLEMS.
+
+        - Define constants to configure argparse for --skip, --list, and
+          --strict.
+
+        - Probably code in problems.py to utils.py.
+
+Why runtime user-code problems are treated as unresolvable:
+
+    - In theory, one could forge ahead with a renaming even in the face of an
+      runtime failure of the user's filtering and renaming code.
+
+        - Verdict: doable, but not worth the trouble right now. Easy enough to
+          add later.
+
+        - Seem notes below for some of the issues and possible solutions.
+
+    - Filter problem:
+
+        - We could assume that the renaming should be either retained or
+          filtered out.
+
+        - Picking the right default is not clear cut. I would lean in the
+          direction retaining renamings with a runtime filter problem.
+
+    - Renaming problem:
+
+        - Currently, the presence of renaming code causes the plan to treat all
+          inputs and original paths. That could be changed.
+
+        - If that were done, the user could supply both new paths and renaming
+          code. The user's code could either return the current new path or a
+          different new path.
+
+        - Although not crazy, that usage scenario is a bit counter-intuitive.
+
+        - It would require an additional usage parameter.
+
+            --rename CODE          # Inputs just original paths.
+            --rename CODE --news   # Inputs both original and new paths.
+
+        - It would also require an additional problem sub-category, such as
+          Problem(noop, undef).
 
 New documentation [NEW_DOCS]:
 
