@@ -13,12 +13,16 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Fine tune the latest plan.
+Figure out implementation strategy for the following:
 
-Convert RenamePair to Renaming.
+    - Convert RenamePair to Renaming.
+
+    - The new approach [see misc-notes].
 
 Do the multiple flavors of exists and collides problems make problem-control
 overly complex for users?
+
+    - Yes ... but see the new approach.
 
     - One drawback is that a user wanting strict behavior for any exists or
       collides problem has no easy way to achieve it. They can use --strict,
@@ -217,14 +221,15 @@ Dropping problem control as a concept:
             exists   | diff, full
             collides | diff, full
 
-        - To skip renamings having those problems, the usage would look
-          like these examples:
+        - To skip renamings having any of the resolvable problems, the usage
+          would look like these examples:
 
             --skip parent
             --skip exists
             --skip exists collides
             --skip exists-full
             --skip all
+            --skip                    # Shortcut for all.
 
         - Notes on the user-code problems. Move these notes to misc-notes.
 
@@ -261,17 +266,15 @@ Dropping problem control as a concept:
 
                 - Summary table:
 
-                    Summary:
-                        Inputs: __
-                        ----
-                        Active: __
+                    Total: __
                         Filtered: __
-                        Excluded: __
                         Skipped: __
-                        ----
-                        Parent: __
-                        Exists: __
-                        Collides: __
+                        Excluded: __
+                        Active: __
+                            Parent: __
+                            Exists: __
+                            Collides: __
+                            OK: __
 
                 - Renamings, with and without problems:
 
@@ -286,30 +289,44 @@ Dropping problem control as a concept:
 
                 - Usage:
 
-                    --list SECTION...
-
-                - The section names are the same as shown in the table, but
-                  lowercase.
+                    --list CATEGORY...     # filtered|skipped|excluded|parent|exists|collides|ok
+                    --list all             # The default.
+                    --list                 # Same as all.
 
                 - Options and preferences: the option simply replaces the
                   upstream setting (no merging logic required).
 
-            - Default behavior:
+            - Listing behavior:
 
-                - All non-empty sections are listed.
+                - The summary table is shown if the renaming plan would halt
+                  under --strict=all [see below].
 
-                - The summary table is shown if any active renamings have
-                  problems (create, exists, collides).
+                - Among the categories configured to appear, the non-empty ones
+                  are listed.
 
         - Confirmation behavior:
 
             - By default, the user must confirm in the normal way, either via a
               "yes" reply or the --yes option.
 
-            - User can add an extra layer of safety with --strict, which halts
-              the renaming plan if any active renamings have problems (create,
-              exists, collides) or if there were any unresolvable problems
-              (excluded).
+            - User can add an extra layer of safety with --strict.
+
+                --strict CATEGORY...  # excluded|parent|exists|collides
+                --strict all
+                --strict              # Same as all.
+
+            - It halts the renaming plan if it ends up having renamings in any
+              of the given categories.
+
+            - A --strict=all setting asserts that the renamings will have no
+              more problems that those declared in advance. The plan can
+              proceed only if:
+
+                - There were no unresolvable problems.
+
+                - The active renamings have no problems (either because there
+                  were none to begin with or becuase the user explicitly
+                  skipped them).
 
 New documentation [NEW_DOCS]:
 
