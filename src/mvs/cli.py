@@ -517,7 +517,7 @@ class CliRenamer:
         # Each tuple is (MSG_FMT, ITEMS).
         p = self.plan
         sections = (
-            (MF.listing_rename, p.rps),
+            (MF.listing_rename, p.rns),
             (MF.listing_filter, p.filtered),
             (MF.listing_skip, p.skipped),
             (MF.listing_create, p.creates),
@@ -552,7 +552,7 @@ class CliRenamer:
         if any(controlled.values()):
             return MF.summary_table.format(
                 n_initial = p.n_initial,
-                n_active = len(p.rps),
+                n_active = len(p.rns),
                 **controlled,
             ) + CON.newline
         else:
@@ -570,7 +570,7 @@ class CliRenamer:
     def listing_msg(self, fmt, items):
         # Takes a message format and a sequence of items
         # having a formatted @property (in practice, the items
-        # are Failure or RenamePair instances).
+        # are Failure or Renaming instances).
         #
         # Attaches a tally of the items to the message.
         #
@@ -687,10 +687,9 @@ class CLI:
         Problem control
         ---------------
 
-        Before any renaming occurs, each pair of original and new paths is
-        checked for common types of problems. By default, if any occur, the
-        renaming plan is halted and no paths are renamed. The problems and
-        their short names are as follows:
+        Before any renamings occur, each is checked for common types of
+        problems. By default, if any occur, the renaming plan is halted and no
+        paths are renamed. The problems and their short names are as follows:
 
           equal      Original path and new path are the same.
           missing    Original path does not exist.

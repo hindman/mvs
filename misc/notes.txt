@@ -15,10 +15,6 @@ todos: TODOs
 
 Figure out implementation strategy for the following:
 
-    - Convert RenamePair to Renaming.
-
-        - Change orig_full and new_full to full_orig and full_new.
-
     - The new approach [see misc-notes].
 
 Do the multiple flavors of exists and collides problems make problem-control
@@ -41,7 +37,7 @@ Tests:
 
     - Modify check_new_exists():
 
-        - If rp.new exists and the clobber victim is PATH_TYPES.other, we would
+        - If rn.new exists and the clobber victim is PATH_TYPES.other, we would
           return Problem(PN.exists_diff).
 
         - The user could control that problem: controls='clobber-exists-diff'.
@@ -59,13 +55,13 @@ Tests:
 
             - If multiple new paths collide:
 
-                - If none of the affected rps have new-exists problems, the
+                - If none of the affected rns have new-exists problems, the
                   nature of the new-collisions will be determined entirely by
                   the orig path types. And those path types are already
                   governed by a prior check.
 
-                - If some of the affected rps do have new-exists problems, and
-                  if any of those rps have path-type other, that problem will
+                - If some of the affected rns do have new-exists problems, and
+                  if any of those rns have path-type other, that problem will
                   be reported in the new-exists check. Since the problem is not
                   controllable via clobber, that renaming won't be in the mix
                   during the collision check.
@@ -413,7 +409,7 @@ New documentation [NEW_DOCS]:
         - The --create control will create parents, not move-create.
         - New Problem('same')
             - This less strong variant of Problem('equal').
-            - equal speaks to user input: did user ask for renaming of this rp?
+            - equal speaks to user input: did user ask for renaming of this rn?
             - same speaks to whether renaming is supported by the policies of mvs.
         - New Problem('recase')
             - skipped by default
@@ -452,7 +448,7 @@ New documentation [NEW_DOCS]:
           operating systems, but not on case-insensitive systems. In that
           context, regular renamings will probably work fine. Some
           case-change-only renamings won't be treated as problems by the checks
-          (if rp.new fails to exists-strict), so the renaming would be tried,
+          (if rn.new fails to exists-strict), so the renaming would be tried,
           and it will fail.
 
         - Renaming renames the leaf, not the leaf plus its parent. When
@@ -640,16 +636,16 @@ Why I dropped the fake file system:
         - Stricter policy about clobbering.
         - Commit to writing real tests with actual renaming.
 
-Checking for the existence of RenamePair.new:
+Checking for the existence of Renaming.new:
 
     - Start with some simplifying assumptions:
 
-        - rp.orig exists: this problem is handled in a separate problem check.
+        - rn.orig exists: this problem is handled in a separate problem check.
 
-        - rp.orig and rp.new are equal: we can handle this at the outset of the
+        - rn.orig and rn.new are equal: we can handle this at the outset of the
           check_new_exists().
 
-        - rp.new exists in some sense: if it does not, the situation is simple
+        - rn.new exists in some sense: if it does not, the situation is simple
           and we can rename freely. Handle this check at the outset.
 
         - The file system is case-preserving. This type of system involves the
@@ -660,8 +656,8 @@ Checking for the existence of RenamePair.new:
     - Classification table for case-preserving systems, given the assumptions:
 
         - Columns:
-            - Do rp.orig and rp.new have the same parents: will renaming require re-locate?
-            - Does file-name casing of rp.new already agree with a file that exists on file system?
+            - Do rn.orig and rn.new have the same parents: will renaming require re-locate?
+            - Does file-name casing of rn.new already agree with a file that exists on file system?
             - What type of change did the user request for the file-name portion?
 
         - Table:
@@ -704,7 +700,7 @@ Checking for the existence of RenamePair.new:
 Why determine the clobber delete-operation in real-time:
 
     - Before a clobber-renaming we must first delete the existing path at
-      rp.new.
+      rn.new.
 
     - The deletion is needed to avoid inheriting casing on case-preserving
       systems and because the Python renaming functions won't handle the
@@ -715,13 +711,13 @@ Why determine the clobber delete-operation in real-time:
     - To delete, you need to determine the correct delete-operation:
       file, empty-directory, or full-directory.
 
-    - Determining that operation based on the type of rp.orig or rp.new is
+    - Determining that operation based on the type of rn.orig or rn.new is
       flawed in the face of multiple renamings (of different types) colliding
       on the same new path. For example:
 
         Initial paths: a/ b c x/
 
-        orig | new | rp.orig | rp.new
+        orig | new | rn.orig | rn.new
         -----------------------------
         a/   | x/  | ok      | ok
         b    | x   | fails   | ok
@@ -729,14 +725,14 @@ Why determine the clobber delete-operation in real-time:
 
     - One could try to reason through the clobbering chain implied by the
       renamings to select the delete-operation [too complex and fraught], or
-      check the path-type of each rp.new that needs clobbering [probably the
+      check the path-type of each rn.new that needs clobbering [probably the
       simplest approach to implement], or just try each approach in a
-      reasonable order [eg, starting with the path-type of rp.new]
+      reasonable order [eg, starting with the path-type of rn.new]
 
-Thinking behind RenamePair instances having only a single problem:
+Thinking behind Renaming instances having only a single problem:
 
     - If a problem occurs either (a) the user requested a solution (via create
-      or clobber), thus making the issue non-problematic or (b) the rp ends up
+      or clobber), thus making the issue non-problematic or (b) the rn ends up
       in plan.skipped or plan.halts and no further problem-checks occur for it.
 
     - The checks are arranged so that more funamental checks occur before
@@ -745,10 +741,10 @@ Thinking behind RenamePair instances having only a single problem:
       PN.exists (renaming looks risky).
 
     - Within each check, problems are prioritized: for example, when checking
-      whether rp.new exists, we return a PN.exists_full before less-severe
+      whether rn.new exists, we return a PN.exists_full before less-severe
       existence-related problems.
 
-    - Thus a RenamePair instance ends up having zero or one problems after the
+    - Thus a Renaming instance ends up having zero or one problems after the
       checks -- namely, the most severe or logically-prior problem rather than
       a full accounting of every problem that it could be diagnosed with.
 

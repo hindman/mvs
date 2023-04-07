@@ -201,7 +201,7 @@ def run_checks(
     if other_prep:
         other_prep(wa, outs, cli)
 
-    # Run prparations.
+    # Run preparations.
     if prepare_only:
         no_change = True
     n_preps = int(
@@ -904,11 +904,11 @@ def test_rename_paths_raises(tr, creators):
     def other_prep1(wa, outs, cli):
         cli.do_prepare()
         cli.do_prepare()
-        assert cli.plan.tracking_rp is None
+        assert cli.plan.tracking_rn is None
         cli.do_rename()
-        assert cli.plan.tracking_rp is None
+        assert cli.plan.tracking_rn is None
         cli.do_rename()
-        assert cli.plan.tracking_rp is None
+        assert cli.plan.tracking_rn is None
 
     def other_prep2(wa, outs, cli):
         cli.do_prepare()
@@ -917,7 +917,7 @@ def test_rename_paths_raises(tr, creators):
 
     def other_prep3(wa, outs, cli):
         cli.do_prepare()
-        assert cli.plan.tracking_rp is None
+        assert cli.plan.tracking_rn is None
         assert cli.plan.tracking_index == NSTART
         cli.plan.call_at = (N, raiser)
         cli.do_rename()
@@ -972,7 +972,7 @@ def test_rename_paths_raises(tr, creators):
         out = BYPASS,
         log = LOGS_OK,
     )
-    assert cli.plan.tracking_rp.orig == wa.origs[N]
+    assert cli.plan.tracking_rn.orig == wa.origs[N]
     assert cli.plan.tracking_index == N
     assert cli.log_tracking_dict == dict(tracking_index = N)
     assert cli.out.rstrip() == outs.listing_rename.rstrip()
@@ -1015,7 +1015,7 @@ def test_log(tr, creators):
     d1 = cli.log_plan_dict
     d2 = cli.log_tracking_dict
     assert d1['version'] == __version__
-    for k in ('current_directory', 'opts', 'inputs', 'rename_pairs'):
+    for k in ('current_directory', 'opts', 'inputs', 'renamings'):
         assert k in d1
     assert d2 == dict(tracking_index = cli.plan.TRACKING.done)
 
@@ -1087,7 +1087,7 @@ def test_main(tr, create_wa, create_outs):
 # Problem control.
 ####
 
-def test_some_failed_rps(tr, creators):
+def test_some_failed_rns(tr, creators):
     # Paths and args.
     origs = ('z1', 'z2', 'z3', 'z4')
     news = ('A1', 'A2', 'A3', 'A4')

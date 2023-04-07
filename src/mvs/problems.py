@@ -12,10 +12,10 @@ from .utils import (
 ####
 # Problems and Failures.
 #
-# Problems are specific to one RenamePair and they are handled
+# Problems are specific to one Renaming and they are handled
 # via problem controls: halt, skip, create, clobber.
 #
-# Failures are not specific to a single RenamePair and/or have
+# Failures are not specific to a single Renaming and/or have
 # no meaningful control mechanism. Most relate to bad inputs.
 #
 # See command-line help text for more details on problems and their control.
@@ -108,9 +108,9 @@ class Failure(Issue):
 
 CONTROLS = C = constants('Controls', (
     'halt',     # Halt RenamingPlan before any renaming occurs.
-    'skip',     # Skip affected RenamePair (rp).
-    'clobber',  # Delete rp.new before renaming old-to-new.
-    'create',   # Create missing parent of rp.new before renaming old-to-new.
+    'skip',     # Skip affected Renaming (rn).
+    'clobber',  # Delete rn.new before renaming old-to-new.
+    'create',   # Create missing parent of rn.new before renaming old-to-new.
 ))
 
 def pcname(control, problem):

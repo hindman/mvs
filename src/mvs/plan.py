@@ -39,7 +39,7 @@ from .problems import (
 )
 
 @dataclass
-class RenamePair:
+class Renaming:
     # A data object to hold an original path and the corresponding new path.
 
     # Paths.
@@ -60,14 +60,14 @@ class RenamePair:
     same_parents: bool = None
 
     # Whether the orig and new paths points to non-empty directories.
-    orig_full: bool = False
-    new_full: bool = False
+    full_orig: bool = False
+    full_new: bool = False
 
     # Attributes for problems.
-    # - Problem with the RenamePair, if any.
-    # - Whether user code filtered out the rp.
-    # - Whether rp caused a Problem that will halt the RenamingPlan.
-    # - Whether rp should be skipped due to a Problem.
+    # - Problem with the Renaming, if any.
+    # - Whether user code filtered out the rn.
+    # - Whether rn caused a Problem that will halt the RenamingPlan.
+    # - Whether rn should be skipped due to a Problem.
     # - Whether to create new-parent before renaming.
     # - Whether renaming will clobber something.
     # - Whether renaming will involve case-change-only renaming (ie self-clobber).
@@ -108,8 +108,8 @@ class RenamingPlan:
     #
     # During rename_paths(), we track progress via self.tracking_index. It has
     # two special values (shown below in TRACKING). Otherwise, a non-negative
-    # value indicates which RenamePair we are currently trying to rename. If an
-    # unexpected failure occurs, that index tells us which RenamePair failed.
+    # value indicates which Renaming we are currently trying to rename. If an
+    # unexpected failure occurs, that index tells us which Renaming failed.
     # API users of RenamingPlan who care can catch the exception and infer
     # which paths were renamed and which were not. Similarly, CliRenamer logs
     # the necessary information to figure that out.
@@ -140,15 +140,15 @@ class RenamingPlan:
         self.structure = structure or STRUCTURES.flat
 
         # Based on the inputs we begin with the full universe of
-        # RenamePair instances. During processing, those rps
+        # Renaming instances. During processing, those rns
         # get put into four buckes:
         # - active renamings
         # - filtered out by user code
         # - skipped via problem-control
         # - those having problems that will cause plan halt.
-        # - initial N of rps (before filtering, etc)
+        # - initial N of rns (before filtering, etc)
         self.n_initial = None
-        self.rps = []
+        self.rns = []
         self.filtered = []
         self.skipped = []
         self.halts = []
@@ -169,7 +169,7 @@ class RenamingPlan:
         self.tracking_index = self.TRACKING.not_started
         self.call_at = None
 
-        # Information used when checking RenamePair instance for problems.
+        # Information used when checking Renaming instance for problems.
         self.new_groups = None
         self.new_collision_key_func = (
             str if case_sensitivity() == FS_TYPES.case_sensitive else
@@ -214,7 +214,7 @@ class RenamingPlan:
     # This method performs various validations and computations needed before
     # renaming can occur.
     #
-    # The method does not return data; it sets self.rps.
+    # The method does not return data; it sets self.rns.
     #
     # The method does not raise; rather, when problems occur, they are
     # stored in self.problems based whether/how the user has configured
@@ -229,9 +229,9 @@ class RenamingPlan:
         else:
             self.has_prepared = True
 
-        # Get the input paths and parse them to get RenamePair instances.
-        self.rps = self.parse_inputs()
-        self.n_initial = len(self.rps)
+        # Get the input paths and parse them to get Renaming instances.
+        self.rns = self.parse_inputs()
+        self.n_initial = len(self.rns)
         if self.failed:
             return
 
@@ -242,10 +242,10 @@ class RenamingPlan:
         if self.failed:
             return
 
-        # Run various steps that process the RenamePair instances individually:
+        # Run various steps that process the Renaming instances individually:
         # setting their path existence statuses and path types; filtering;
         # computing new paths; and checking for problems.
-        rp_steps = (
+        rn_steps = (
             (self.set_exists_and_types, None),
             (self.execute_user_filter, None),
             (self.execute_user_rename, None),
@@ -257,7 +257,7 @@ class RenamingPlan:
             (self.check_new_parent_exists, None),
             (self.check_new_collisions, self.prepare_new_groups),
         )
-        for step, prep_step in rp_steps:
+        for step, prep_step in rn_steps:
             # Run preparatory step.
             if prep_step:
                 prep_step()
@@ -267,30 +267,30 @@ class RenamingPlan:
             self.prefix_len = self.compute_prefix_len()
             seq = self.compute_sequence_iterator()
 
-            # Execute the step for each rp. Some steps set attributes on the rp
+            # Execute the step for each rn. Some steps set attributes on the rn
             # to guide subsequent filtering, skipping, clobbering, etc.
             active = []
-            for rp in self.rps:
+            for rn in self.rns:
                 # If the step returns a Problem, handle it and set the
-                # corresponding problem-related attributes on rp.
-                prob = step(rp, next(seq))
+                # corresponding problem-related attributes on rn.
+                prob = step(rn, next(seq))
                 if prob:
-                    rp.problem = prob
+                    rn.problem = prob
                     control = self.control_lookup[prob.name]
                     if control:
-                        setattr(rp, control, True)
-                # Add each resulting rp to the appropriate list.
+                        setattr(rn, control, True)
+                # Add each resulting rn to the appropriate list.
                 xs = (
-                    self.filtered if rp.exclude else
-                    self.skipped if rp.skip else
-                    self.halts if rp.halt else
+                    self.filtered if rn.exclude else
+                    self.skipped if rn.skip else
+                    self.halts if rn.halt else
                     active
                 )
-                xs.append(rp)
-            self.rps = active
+                xs.append(rn)
+            self.rns = active
 
         # Register problem if everything was filtered out.
-        if not self.rps:
+        if not self.rns:
             self.handle_failure(FN.all_filtered)
 
     ####
@@ -298,7 +298,7 @@ class RenamingPlan:
     ####
 
     def parse_inputs(self):
-        # Parses self.inputs. If valid, returns a tuple of RenamePair
+        # Parses self.inputs. If valid, returns a tuple of Renaming
         # instances. Otherwise, registers a Failure and returns empty list.
 
         # Helper to handle a Failure and return empty.
@@ -308,13 +308,13 @@ class RenamingPlan:
 
         # If we have rename_code, inputs are just original paths.
         if self.rename_code:
-            rps = [
-                RenamePair(orig, None)
+            rns = [
+                Renaming(orig, None)
                 for orig in self.inputs
                 if orig
             ]
-            if rps:
-                return rps
+            if rns:
+                return rns
             else:
                 return do_fail(FN.parsing_no_paths)
 
@@ -368,9 +368,9 @@ class RenamingPlan:
         elif len(origs) != len(news):
             return do_fail(FN.parsing_imbalance)
 
-        # Return the RenamePair instances.
+        # Return the Renaming instances.
         return [
-            RenamePair(orig, new)
+            Renaming(orig, new)
             for orig, new in zip(origs, news)
         ]
 
@@ -413,45 +413,45 @@ class RenamingPlan:
             return None
 
     ####
-    # The steps that process RenamePair instance individually.
+    # The steps that process Renaming instance individually.
     # Each step returns a Problem or None.
     ####
 
-    def set_exists_and_types(self, rp, seq_val):
+    def set_exists_and_types(self, rn, seq_val):
         # This step is called twice, and the beginning and then after user-code
         # for filtering and renaming has been executed. The initial call sets
-        # information for rp.orig and, if possible, rp.new. The second call
-        # handles rp.new if we have not done so already. The attributes set
+        # information for rn.orig and, if possible, rn.new. The second call
+        # handles rn.new if we have not done so already. The attributes set
         # here are used for most of the subsequent steps.
 
-        # Handle attributes related to rp.orig.
-        if rp.exist_orig is None:
+        # Handle attributes related to rn.orig.
+        if rn.exist_orig is None:
             # Existence, type, and non-empty dir.
-            e, pt = path_existence_and_type(rp.orig)
-            rp.exist_orig = e
-            rp.type_orig = pt
+            e, pt = path_existence_and_type(rn.orig)
+            rn.exist_orig = e
+            rn.type_orig = pt
             if pt == PATH_TYPES.directory:
-                rp.orig_full = is_non_empty_dir(rp.orig)
+                rn.full_orig = is_non_empty_dir(rn.orig)
 
-        # Handle attributes related to rp.new.
-        if rp.exist_new is None and rp.new is not None:
-            po = Path(rp.orig)
-            pn = Path(rp.new)
+        # Handle attributes related to rn.new.
+        if rn.exist_new is None and rn.new is not None:
+            po = Path(rn.orig)
+            pn = Path(rn.new)
             # Existence, type, and non-empty dir.
-            e, pt = path_existence_and_type(rp.new)
-            rp.exist_new = e
-            rp.type_new = pt
+            e, pt = path_existence_and_type(rn.new)
+            rn.exist_new = e
+            rn.type_new = pt
             if pt == PATH_TYPES.directory:
-                rp.new_full = is_non_empty_dir(rp.new)
+                rn.full_new = is_non_empty_dir(rn.new)
             # Existence of parent.
             e, _ = path_existence_and_type(pn.parent)
-            rp.exist_new_parent = e
+            rn.exist_new_parent = e
             # Attributes characterizing the renaming.
-            rp.same_parents = (
-                False if rp.exist_new_parent == EXISTENCES.missing else
+            rn.same_parents = (
+                False if rn.exist_new_parent == EXISTENCES.missing else
                 samefile(po.parent, pn.parent)
             )
-            rp.name_change_type = (
+            rn.name_change_type = (
                 NCT.noop if po.name == pn.name else
                 NCT.case_change if po.name.lower() == pn.name.lower() else
                 NCT.name_change
@@ -459,142 +459,142 @@ class RenamingPlan:
 
         return None
 
-    def execute_user_filter(self, rp, seq_val):
+    def execute_user_filter(self, rn, seq_val):
         if self.filter_code:
             try:
-                keep = self.filter_func(rp.orig, Path(rp.orig), seq_val, self)
+                keep = self.filter_func(rn.orig, Path(rn.orig), seq_val, self)
                 if not keep:
-                    rp.exclude = True
+                    rn.exclude = True
             except Exception as e:
-                return Problem(PN.filter, e, rp.orig)
+                return Problem(PN.filter, e, rn.orig)
         return None
 
-    def execute_user_rename(self, rp, seq_val):
+    def execute_user_rename(self, rn, seq_val):
         if self.rename_code:
             # Compute the new path.
             try:
-                new = self.rename_func(rp.orig, Path(rp.orig), seq_val, self)
+                new = self.rename_func(rn.orig, Path(rn.orig), seq_val, self)
             except Exception as e:
-                return Problem(PN.rename, e, rp.orig)
-            # Validate its type and either set rp.new or return Problem.
+                return Problem(PN.rename, e, rn.orig)
+            # Validate its type and either set rn.new or return Problem.
             if isinstance(new, (str, Path)):
-                rp.new = str(new)
+                rn.new = str(new)
             else:
                 typ = type(new).__name__
-                return Problem(PN.rename, typ, rp.orig)
+                return Problem(PN.rename, typ, rn.orig)
         return None
 
-    def check_equal(self, rp, seq_val):
-        if rp.equal:
+    def check_equal(self, rn, seq_val):
+        if rn.equal:
             return Problem(PN.equal)
         else:
             return None
 
-    def check_orig_exists(self, rp, seq_val):
+    def check_orig_exists(self, rn, seq_val):
         # Key question: is renaming possible?
-        if rp.exist_orig in ANY_EXISTENCE:
+        if rn.exist_orig in ANY_EXISTENCE:
             return None
         else:
             return Problem(PN.missing)
 
-    def check_orig_type(self, rp, seq_val):
-        if rp.type_orig in (PATH_TYPES.file, PATH_TYPES.directory):
+    def check_orig_type(self, rn, seq_val):
+        if rn.type_orig in (PATH_TYPES.file, PATH_TYPES.directory):
             return None
         else:
             return Problem(PN.type)
 
-    def check_new_exists(self, rp, seq_val):
-        # Handle situation where rp.new does not exist in any sense.
+    def check_new_exists(self, rn, seq_val):
+        # Handle situation where rn.new does not exist in any sense.
         # In this case, we can rename freely, regardless of file
         # system type or other renaming details.
-        new_exists = (rp.exist_new in ANY_EXISTENCE)
+        new_exists = (rn.exist_new in ANY_EXISTENCE)
         if not new_exists:
             return None
 
         # Determine the type of Problem to return if clobbering would occur.
-        if rp.type_new == PATH_TYPES.directory and rp.new_full:
+        if rn.type_new == PATH_TYPES.directory and rn.full_new:
             clobber_prob = Problem(PN.exists_full)
-        elif rp.type_orig == rp.type_new:
+        elif rn.type_orig == rn.type_new:
             clobber_prob = Problem(PN.exists)
         else:
             clobber_prob = Problem(PN.exists_diff)
 
         # Handle the simplest file systems: case-sensistive or
-        # case-insensistive. Since rp.new exists, we have clobbering
+        # case-insensistive. Since rn.new exists, we have clobbering
         if case_sensitivity() != FS_TYPES.case_preserving: # pragma: no cover
             return clobber_prob
 
-        # Handle case-preserving file system where rp.orig and rp.new have
+        # Handle case-preserving file system where rn.orig and rn.new have
         # different parent directories. Since the parent directories differ,
         # case-change-only renaming (ie, self clobber) is not at issue,
         # so we have regular clobbering.
-        if not rp.same_parents:
+        if not rn.same_parents:
             return clobber_prob
 
-        # Handle case-preserving file system where rp.orig and rp.new have
+        # Handle case-preserving file system where rn.orig and rn.new have
         # the same parent, which means the renaming involves only changes
         # to the name-portion of the path.
-        if rp.name_change_type == NCT.noop:
-            # New exists because rp.orig and rp.new are functionally the same
-            # path. User inputs implied that a renaming was desired (rp.orig
-            # and rp.new were not equal) but the only difference lies in the
+        if rn.name_change_type == NCT.noop:
+            # New exists because rn.orig and rn.new are functionally the same
+            # path. User inputs implied that a renaming was desired (rn.orig
+            # and rn.new were not equal) but the only difference lies in the
             # casing of the parent path. By policy, mvs does not rename parents.
             return Problem(PN.same)
-        elif rp.name_change_type == NCT.case_change:
-            if rp.exist_new == EXISTENCES.exists_case:
+        elif rn.name_change_type == NCT.case_change:
+            if rn.exist_new == EXISTENCES.exists_case:
                 # User inputs implied that a case-change renaming
                 # was desired, but the path's name-portion already
                 # agrees with the file system, so renaming is impossible.
                 return Problem(PN.recase)
             else:
                 # User wants a case-change renaming (self-clobber).
-                rp.clobber_self = True
+                rn.clobber_self = True
                 return None
         else:
             # User wants a name-change, and it would clobber something else.
             return clobber_prob
 
-    def check_new_parent_exists(self, rp, seq_val):
+    def check_new_parent_exists(self, rn, seq_val):
         # Key question: does renaming also require parent creation?
         # Any type of existence is sufficient.
-        if rp.exist_new_parent in ANY_EXISTENCE:
+        if rn.exist_new_parent in ANY_EXISTENCE:
             return None
         else:
             return Problem(PN.parent)
 
     def prepare_new_groups(self):
         # A preparation-step for check_new_collisions().
-        # Organize rps into dict-of-list, keyed by the new path.
+        # Organize rns into dict-of-list, keyed by the new path.
         # Those keys are stored as-is for case-sensistive file
         # systems and in lowercase for non-sensistive systems.
         self.new_groups = {}
-        for rp in self.rps:
-            k = self.new_collision_key_func(rp.new)
-            self.new_groups.setdefault(k, []).append(rp)
+        for rn in self.rns:
+            k = self.new_collision_key_func(rn.new)
+            self.new_groups.setdefault(k, []).append(rn)
 
-    def check_new_collisions(self, rp, seq_val):
+    def check_new_collisions(self, rn, seq_val):
         # Checks for collisions among all of the new paths in the RenamingPlan.
         # If any, returns the most serious problem: (1) collisions with
         # non-empty directories, (2) collisions with a path of a different
         # type, or (3) regular collisions.
         #
-        # Collisions occur between (A) the path-type of rp.orig, (B) the
+        # Collisions occur between (A) the path-type of rn.orig, (B) the
         # path-types of all OTHER.orig, and (C) the path-types of any OTHER.new
         # that happen to exist.
 
-        # Get the other RenamePair instances that have the same new-path as the
-        # current rp. If rp.new is unique, there is no problem.
-        k = self.new_collision_key_func(rp.new)
-        others = [o for o in self.new_groups[k] if o is not rp]
+        # Get the other Renaming instances that have the same new-path as the
+        # current rn. If rn.new is unique, there is no problem.
+        k = self.new_collision_key_func(rn.new)
+        others = [o for o in self.new_groups[k] if o is not rn]
         if not others:
             return None
 
         # Check for collisions with non-empty directories.
-        if any(o.orig_full or o.new_full for o in others):
+        if any(o.full_orig or o.full_new for o in others):
             return Problem(PN.collides_full)
 
         # Check for collisions with a different path type.
-        pt = rp.type_orig
+        pt = rn.type_orig
         for o in others:
             if o.type_orig != pt or (o.type_new and o.type_new != pt):
                 return Problem(PN.collides_diff)
@@ -623,7 +623,7 @@ class RenamingPlan:
         return iter(range(self.seq_start, sys.maxsize, self.seq_step))
 
     def compute_prefix_len(self):
-        origs = tuple(rp.orig for rp in self.rps)
+        origs = tuple(rn.orig for rn in self.rns)
         return len(commonprefix(origs))
 
     def strip_prefix(self, orig):
@@ -651,13 +651,13 @@ class RenamingPlan:
             )
 
         # Rename paths.
-        for i, rp in enumerate(self.rps):
+        for i, rn in enumerate(self.rns):
             self.tracking_index = i
-            self.do_rename(rp)
+            self.do_rename(rn)
         self.tracking_index = self.TRACKING.done
 
-    def do_rename(self, rp):
-        # Takes a RenamePair and executes its renaming.
+    def do_rename(self, rn):
+        # Takes a Renaming and executes its renaming.
 
         # For testing purposes, call any needed code in
         # the middle of renaming -- eg, to raise an error
@@ -666,62 +666,62 @@ class RenamingPlan:
             self.call_at[1](self)
 
         # Set up Path instance.
-        po = Path(rp.orig)
-        pn = Path(rp.new)
+        po = Path(rn.orig)
+        pn = Path(rn.new)
 
         # Create new parent if requested.
-        if rp.create:
+        if rn.create:
             pn.parent.mkdir(parents = True, exist_ok = True)
 
         # If new path exists already, deal with it before
-        # we attempt to renaming from rp.orig to rp.new.
+        # we attempt to renaming from rn.orig to rn.new.
         # We do this for a few reasons.
         #
         # (1) We want to make a best-effort to avoid unintended
         # clobbering, whether due to race conditions (creation
-        # of rp.new since the problem-checks were performed)
+        # of rn.new since the problem-checks were performed)
         # or due to interactions among the renamings (eg, multiple
-        # collisions among rp.new values).
+        # collisions among rn.new values).
         #
         # (2) We don't want the renamed path to inherit casing from
-        # the existing rp.new, which occurs on case-preseving systems.
+        # the existing rn.new, which occurs on case-preseving systems.
         #
         # (3) Python's path renaming functions fail on some
         # systems in the face of clobbering, and we don't want
         # to deal with those OS-dependent complications.
         #
         if pn.exists():
-            if rp.clobber_self:
+            if rn.clobber_self:
                 # User requested case-change renaming. No problem.
                 pass
-            elif rp.clobber:
-                # User requested a clobber for this RenamePair.
+            elif rn.clobber:
+                # User requested a clobber for this Renaming.
                 # Make sure the clobber victim is (still) a supported path type.
                 # Select the appropriate deletion operation based on the path
                 # type and the user's control setting regarding non-empty dirs.
-                pt = determine_path_type(rp.new)
+                pt = determine_path_type(rn.new)
                 if pt == PATH_TYPES.other:
                     raise MvsError(
                         MF.unsupported_clobber,
-                        orig = rp.orig,
-                        new = rp.new,
+                        orig = rn.orig,
+                        new = rn.new,
                     )
                 elif pt == PATH_TYPES.file:
                     pn.unlink()
                 elif self.control_lookup[PN.exists_full] == CONTROLS.clobber:
-                    shutil.rmtree(rp.new)
+                    shutil.rmtree(rn.new)
                 else:
                     pn.rmdir()
             else:
                 # An unrequested clobber.
                 raise MvsError(
                     MF.unrequested_clobber,
-                    orig = rp.orig,
-                    new = rp.new,
+                    orig = rn.orig,
+                    new = rn.new,
                 )
 
         # Rename.
-        po.rename(rp.new)
+        po.rename(rn.new)
 
     ####
     # Other info.
@@ -729,21 +729,21 @@ class RenamingPlan:
 
     @property
     def creates(self):
-        return [rp for rp in self.rps if rp.create]
+        return [rn for rn in self.rns if rn.create]
 
     @property
     def clobbers(self):
-        return [rp for rp in self.rps if rp.clobber]
+        return [rn for rn in self.rns if rn.clobber]
 
     @property
-    def tracking_rp(self):
-        # The RenamePair that was being renamed when rename_paths()
+    def tracking_rn(self):
+        # The Renaming that was being renamed when rename_paths()
         # raised an exception.
         ti = self.tracking_index
         if ti in (self.TRACKING.not_started, self.TRACKING.done):
             return None
         else:
-            return self.rps[ti]
+            return self.rns[ti]
 
     @property
     def as_dict(self):
@@ -759,11 +759,11 @@ class RenamingPlan:
             seq_step = self.seq_step,
             controls = self.controls,
             strict = self.strict,
-            # RenamePair instances.
-            rename_pairs = [asdict(rp) for rp in self.rps],
-            filtered = [asdict(rp) for rp in self.filtered],
-            skipped = [asdict(rp) for rp in self.skipped],
-            halts = [asdict(rp) for rp in self.halts],
+            # Renaming instances.
+            renamings = [asdict(rn) for rn in self.rns],
+            filtered = [asdict(rn) for rn in self.filtered],
+            skipped = [asdict(rn) for rn in self.skipped],
+            halts = [asdict(rn) for rn in self.halts],
             # Other.
             failures = [asdict(f) for f in self.failures],
             prefix_len = self.prefix_len,

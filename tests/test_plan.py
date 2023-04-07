@@ -2,7 +2,7 @@ import pytest
 from itertools import chain
 from pathlib import Path
 
-from mvs.plan import RenamingPlan, RenamePair
+from mvs.plan import RenamingPlan, Renaming
 
 from mvs.utils import (
     CON,
@@ -112,7 +112,7 @@ def run_checks(
         if failure:
             if reason:
                 if reason in Problem.FORMATS:
-                    got = tuple(rp.prob_name for rp in plan.halts)
+                    got = tuple(rn.prob_name for rn in plan.halts)
                 else:
                     got = tuple(f.name for f in plan.failures)
                 assert einfo.value.params['msg'] == MF.prepare_failed
@@ -127,12 +127,12 @@ def run_checks(
             no_change = True
         wa.check(no_change = no_change)
 
-    # Check the plan's inventory of RenamePair instances.
+    # Check the plan's inventory of Renaming instances.
     if inventory is not False:
         # Assemble the expected inventory. The parmeter
         # can be dict, None, or str.
         if isinstance(inventory, dict):
-            # Dict provides the rp.orig values directly.
+            # Dict provides the rn.orig values directly.
             exp = {
                 attr : sorted(inventory.get(attr, []))
                 for attr in INV_MAP.values()
@@ -152,7 +152,7 @@ def run_checks(
             }
         # Assemble actual inventory and assert.
         got = {
-            attr : sorted(rp.orig for rp in getattr(plan, attr))
+            attr : sorted(rn.orig for rn in getattr(plan, attr))
             for attr in INV_MAP.values()
         }
         assert got == exp
@@ -171,7 +171,7 @@ def run_diagnostics(tr, wa, plan):
 # Convenience scheme for the inventory parameter in run_checks().
 EMPTY = '_'
 INV_MAP = {
-    '.': 'rps',
+    '.': 'rns',
     'f': 'filtered',
     's': 'skipped',
     'H': 'halts',
@@ -399,7 +399,7 @@ def test_filtering_code(tr, create_wa):
     extras = ('d', 'dd', 'xyz/')
     run_args = (tr, create_wa, origs, news)
     exp_inv = dict(
-        rps = ['a', 'b', 'c'],
+        rns = ['a', 'b', 'c'],
         filtered = ['d', 'dd', 'xyz'],
     )
 
@@ -462,7 +462,7 @@ def test_code_execution_fails(tr, create_wa):
     exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
-    # Code that will cause the second RenamePair
+    # Code that will cause the second Renaming
     # to fail during execution of user code.
     rename_code1 = 'return FUBB if seq == 2 else o + o'
     rename_code2 = 'return 9999 if seq == 2 else o + o'
@@ -556,7 +556,7 @@ def test_plan_as_dict(tr, create_wa):
             'seq_step',
             'controls',
             'strict',
-            'rename_pairs',
+            'renamings',
             'filtered',
             'skipped',
             'halts',
@@ -714,7 +714,7 @@ def test_same(tr, create_wa):
     exp_invH = exp_inv.replace('s', 'H')
     run_args = (tr, create_wa, origs, news)
 
-    # Scenarios: for the first two RenamePair instances,
+    # Scenarios: for the first two Renaming instances,
     # orig and new differ only in the casing of their parent.
     if case_sensitivity() == FS_TYPES.case_sensitive:
         # Scenario: case-sensitive system: by default, renamings
@@ -771,11 +771,11 @@ def test_missing_orig(tr, create_wa):
     inputs = origs + missing_origs + news + missing_news
     run_args = (tr, create_wa, origs, news)
     exp_inv = dict(
-        rps = ['a', 'b'],
+        rns = ['a', 'b'],
         skipped = ['c', 'd'],
     )
     exp_invH = dict(
-        rps = exp_inv['rps'],
+        rns = exp_inv['rns'],
         halts = exp_inv['skipped'],
     )
 
@@ -1068,7 +1068,7 @@ def test_new_exists_recase(tr, create_wa):
     else:
         pn = PN.recase
     assert plan.skipped[0].prob_name == pn
-    assert len(plan.rps) == 0
+    assert len(plan.rns) == 0
 
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.
@@ -1180,7 +1180,7 @@ def test_news_collide_orig_missing(tr, create_wa):
     inputs = origs + news
     run_args = (tr, create_wa, origs[:-1], news)
     exp_inv = dict(
-        rps = ['a', 'b', 'c'],
+        rns = ['a', 'b', 'c'],
         halts = ['d'],
     )
 
@@ -1350,12 +1350,12 @@ def test_failures_skip_all(tr, create_wa):
 # Other.
 ####
 
-def test_rename_pair(tr):
-    rp = RenamePair('a', 'a.new')
-    assert rp.prob_name is None
+def test_renaming(tr):
+    rn = Renaming('a', 'a.new')
+    assert rn.prob_name is None
     nm = PN.equal
-    rp.problem = Problem(nm)
-    assert rp.prob_name == nm
+    rn.problem = Problem(nm)
+    assert rn.prob_name == nm
 
 def test_unexpected_clobber(tr, create_wa):
     # Paths and args.

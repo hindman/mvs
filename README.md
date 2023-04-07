@@ -179,7 +179,7 @@ plan = RenamingPlan(...)
 # Prepare for renaming.
 plan.prepare()
 
-# All relevant information about the plan and its original-new path pairs.
+# All relevant information about the plan and its renamings.
 print(plan.as_dict)
 
 # Whether preparation failed due to problems and what they are.
@@ -190,13 +190,13 @@ print(plan.uncontrolled_problems)
 try:
     plan.rename_paths()
 except Exception as e:
-    # The index of the original-new pair that was being renamed
-    # when the exception occurred. Pairs before that index were
-    # renamed succesfully; pairs after it were not attempted.
+    # The index of the Renaming that was being handled
+    # when the exception occurred. Renamings before that index were
+    # renamed succesfully; renamings after it were not attempted.
     print(plan.tracking_index)
 
-    # The offending original-new pair.
-    print(plan.tracking_rp)
+    # The offending renaming.
+    print(plan.tracking_rn)
 ```
 
 --------
