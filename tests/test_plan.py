@@ -6,20 +6,15 @@ from mvs.plan import RenamingPlan, Renaming
 
 from mvs.utils import (
     CON,
+    FAILURE_NAMES as FN,
     FS_TYPES,
+    Failure,
     MSG_FORMATS as MF,
     MvsError,
+    PROBLEM_NAMES as PN,
+    Problem,
     STRUCTURES,
     case_sensitivity,
-)
-
-from mvs.problems import (
-    CONTROLS,
-    PROBLEM_NAMES as PN,
-    FAILURE_NAMES as FN,
-    Failure,
-    Problem,
-    ProblemControl,
 )
 
 ####
@@ -181,6 +176,7 @@ INV_MAP = {
 # Inputs and their structures.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_no_inputs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
@@ -202,6 +198,7 @@ def test_no_inputs(tr, create_wa):
             inventory = EMPTY,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_structure_default(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -217,6 +214,7 @@ def test_structure_default(tr, create_wa):
         )
         assert plan.structure == STRUCTURES.flat
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_structure_paragraphs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -278,6 +276,7 @@ def test_structure_paragraphs(tr, create_wa):
             inventory = EMPTY,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_structure_pairs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -322,6 +321,7 @@ def test_structure_pairs(tr, create_wa):
         inventory = EMPTY,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_structure_rows(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -372,6 +372,7 @@ def test_structure_rows(tr, create_wa):
 # User-supplied code.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_renaming_code(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -392,6 +393,7 @@ def test_renaming_code(tr, create_wa):
             rootless = True,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_filtering_code(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -416,6 +418,7 @@ def test_filtering_code(tr, create_wa):
         inventory = exp_inv,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_code_compilation_fails(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -452,6 +455,7 @@ def test_code_compilation_fails(tr, create_wa):
     )
     check_fail(plan)
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_code_execution_fails(tr, create_wa):
     # Paths and args.
     FAILING_ORIG = 'b'
@@ -502,6 +506,7 @@ def test_code_execution_fails(tr, create_wa):
             **kws,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_seq(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -519,6 +524,7 @@ def test_seq(tr, create_wa):
         seq_step = 5,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_common_prefix(tr, create_wa):
     # Paths and args.
     origs = ('blah-a', 'blah-b', 'blah-c')
@@ -537,6 +543,7 @@ def test_common_prefix(tr, create_wa):
 # RenamingPlan data.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_plan_as_dict(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -583,6 +590,7 @@ def test_plan_as_dict(tr, create_wa):
 # Check unexpected usage scenarios.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_prepare_rename_multiple_times(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -611,6 +619,7 @@ def test_prepare_rename_multiple_times(tr, create_wa):
 # Problems and problem-control.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_controls(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -660,6 +669,7 @@ def test_controls(tr, create_wa):
     assert err.msg == MF.invalid_controls
     assert err.params['controls'] == BAD_VAL
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_equal(tr, create_wa):
     # Paths and args.
     # One of the origs equals its new counterpart.
@@ -702,6 +712,7 @@ def test_equal(tr, create_wa):
         inventory = exp_invH,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_same(tr, create_wa):
     # Paths and args.
     origs = ('foo/xyz', 'BAR/xyz', 'a')
@@ -762,6 +773,7 @@ def test_same(tr, create_wa):
             inventory = exp_invH,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_missing_orig(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
@@ -812,6 +824,7 @@ def test_missing_orig(tr, create_wa):
         inventory = exp_invH,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_orig_type(tr, create_wa):
     # Paths and args.
     TARGET = 'c.target'
@@ -843,6 +856,7 @@ def test_orig_type(tr, create_wa):
         inventory = exp_inv,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -882,6 +896,7 @@ def test_new_exists(tr, create_wa):
         controls = 'clobber-exists',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_diff(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -950,6 +965,7 @@ def test_new_exists_diff(tr, create_wa):
         controls = 'clobber-exists-full',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_diff_parents(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
@@ -981,6 +997,7 @@ def test_new_exists_diff_parents(tr, create_wa):
         inventory = exp_inv,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_different_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1021,6 +1038,7 @@ def test_new_exists_different_case(tr, create_wa):
             controls = 'clobber-exists',
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_case_change_renaming(tr, create_wa):
     # Paths and args.
     origs = ('x/a',)
@@ -1036,6 +1054,7 @@ def test_new_exists_case_change_renaming(tr, create_wa):
         expecteds = expecteds,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_recase(tr, create_wa):
     # Paths and args.
     origs = ('xyz',)
@@ -1070,6 +1089,7 @@ def test_new_exists_recase(tr, create_wa):
     assert plan.skipped[0].prob_name == pn
     assert len(plan.rns) == 0
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.
     origs = ('a/', 'b', 'c')
@@ -1103,6 +1123,7 @@ def test_new_exists_non_empty(tr, create_wa):
         controls = 'clobber-exists',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_new_parent_missing(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1138,6 +1159,7 @@ def test_new_parent_missing(tr, create_wa):
         controls = 'create-parent',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1173,6 +1195,7 @@ def test_news_collide(tr, create_wa):
         controls = 'clobber-collides',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_orig_missing(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c', 'd')
@@ -1202,6 +1225,7 @@ def test_news_collide_orig_missing(tr, create_wa):
         inventory = exp_inv,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1236,6 +1260,7 @@ def test_news_collide_case(tr, create_wa):
             inventory = exp_invH,
         )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_diff(tr, create_wa):
     # Paths and args.
     SAME = 'a.new'
@@ -1272,6 +1297,7 @@ def test_news_collide_diff(tr, create_wa):
         controls = 'clobber-collides-diff',
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_full(tr, create_wa):
     # Paths and args.
     SAME = 'a.new'
@@ -1328,6 +1354,7 @@ def test_news_collide_full(tr, create_wa):
         expecteds = expecteds_clobber,
     )
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_failures_skip_all(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1350,6 +1377,7 @@ def test_failures_skip_all(tr, create_wa):
 # Other.
 ####
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_renaming(tr):
     rn = Renaming('a', 'a.new')
     assert rn.prob_name is None
@@ -1357,6 +1385,7 @@ def test_renaming(tr):
     rn.problem = Problem(nm)
     assert rn.prob_name == nm
 
+@pytest.mark.skip(reason = 'overhaul')
 def test_unexpected_clobber(tr, create_wa):
     # Paths and args.
     VICTIM = 'b.new'

@@ -12,7 +12,6 @@ from textwrap import dedent
 from short_con import constants
 
 from .plan import RenamingPlan
-from .problems import ProblemControl
 from .version import __version__
 
 from .utils import (
@@ -912,15 +911,6 @@ class CLI:
         #
         # Problem control and other configuration.
         #
-        OptConfig(
-            group = 'Problem control and other configuration',
-            names = '--controls',
-            validator = OptConfig.list_of_str,
-            choices = ProblemControl.ALL_NAMES,
-            nargs = '+',
-            metavar = 'PC',
-            help = 'Configure how to respond to problems (see --details)',
-        ),
         OptConfig(
             names = '--strict',
             validator = bool,

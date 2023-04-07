@@ -15,6 +15,21 @@ todos: TODOs
 
 Overhaul [PC_OVERHAUL].
 
+    - Initial conversion and editing pass:
+        x utils.py
+        - plan.py
+        - cli.py
+
+    - Minimal functionality:
+        x Get machinery working with all tests skipped.
+        - Get one test working in test_plan.py.
+        - Get a basic CLI usage working.
+
+    - Get all tests working:
+        x test_utils.py
+        - test_plan.py
+        - test_cli.py
+
 Tests:
     - do_rename(): exercise code branch with MF.unsupported_clobber.
     - New listing/reporting behavior: exercise the range of behaviors
@@ -159,7 +174,7 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
 
         - To eliminate that proliferation and complexity, organize the problems
           into two broad categories (unresolvable and resolvable). Each problem
-          will have a general name as well as an optional subtype.
+          will have a general name as well as an optional variety.
 
             - Unresolvable:
 
@@ -277,17 +292,17 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
 
     - PROBLEM_FORMATS and FAILURE_NAMES: convert to dicts:
 
-        (NAME, SUBTYPE) => FMT
+        (NAME, VARIETY) => FMT
 
     - Change Failure(all_filtered) message to include the new vocabulary:
       filtered, skipped, or excluded.
 
     - Problem control:
 
-        - Drop ProblemControl and CONTROLS.
+        x Drop ProblemControl and CONTROLS.
 
-        - Implement Problem.is_resolvable(cls, prob), which returns true if
-          (prob.name, prob.subtype) in Problem.RESOLVABLE.
+        x Implement Problem.is_resolvable(cls, prob), which returns true if
+          (prob.name, prob.variety) in Problem.RESOLVABLE.
 
         - The RenamingPlan receives a sequence of problem identifiers. Use them
           to build a set of Problem instances: SKIP_PROBLEMS.

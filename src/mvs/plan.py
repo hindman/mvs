@@ -14,28 +14,23 @@ from .utils import (
     ANY_EXISTENCE,
     CON,
     EXISTENCES,
+    FAILURE_FORMATS as FF,
+    FAILURE_NAMES as FN,
     FS_TYPES,
+    Failure,
     MSG_FORMATS as MF,
     MvsError,
     NAME_CHANGE_TYPES as NCT,
     PATH_TYPES,
+    PROBLEM_FORMATS as PF,
+    PROBLEM_NAMES as PN,
+    Problem,
     STRUCTURES,
     case_sensitivity,
     determine_path_type,
     get_source_code,
     is_non_empty_dir,
     path_existence_and_type,
-)
-
-from .problems import (
-    CONTROLS,
-    FAILURE_FORMATS as FF,
-    FAILURE_NAMES as FN,
-    PROBLEM_FORMATS as PF,
-    PROBLEM_NAMES as PN,
-    Failure,
-    Problem,
-    ProblemControl,
 )
 
 @dataclass
@@ -130,8 +125,8 @@ class RenamingPlan:
                  # Sequence numbering.
                  seq_start = 1,
                  seq_step = 1,
-                 # Problem controls.
-                 controls = None,
+                 # Problem handling.
+                 skip = None,
                  strict = False,
                  ):
 
@@ -180,29 +175,19 @@ class RenamingPlan:
         # Then merge the defaults problem controls with the user's into
         # a lookup dict mapping each Problem name to its control mechanism.
         self.strict = bool(strict)
-        try:
-            self.controls = ProblemControl.merge(controls)
-        except MvsError as e:
-            raise e
-        except Exception as e:
-            raise MvsError(MF.invalid_controls, controls = controls)
-        self.control_lookup = ProblemControl.merge(
-            ProblemControl.DEFAULTS,
-            self.controls,
-            ProblemControl.HALT_ALL if self.strict else (),
-            want_map = True,
-        )
 
-        # Problems that occur during the prepare() phase are stored in a dict.
-        # A problem can be either controlled (as requested by the user) or not
-        # (meaning that the only control is CONTROLS.halt). The dict maps each
-        # control mechanism to the problems that were controlled by that
-        # mechanism. If the dict ends up having any uncontrolled problems, the
-        # RenamingPlan will have failed.
-        # self.problems = {
-        #     c : []
-        #     for c in CONTROLS.keys()
-        # }
+        # try:
+        #     self.controls = ProblemControl.merge(controls)
+        # except MvsError as e:
+        #     raise e
+        # except Exception as e:
+        #     raise MvsError(MF.invalid_controls, controls = controls)
+        # self.control_lookup = ProblemControl.merge(
+        #     ProblemControl.DEFAULTS,
+        #     self.controls,
+        #     ProblemControl.HALT_ALL if self.strict else (),
+        #     want_map = True,
+        # )
 
         # Failures that will halt the RenamingPlan before any renaming.
         self.failures = []

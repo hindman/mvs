@@ -3,6 +3,7 @@ import pyperclip
 import stat
 import sys
 
+from dataclasses import dataclass
 from inspect import getsource
 from kwexception import Kwexception
 from pathlib import Path
@@ -87,7 +88,7 @@ Summary:
 '''
 
 
-MSG_FORMATS = constants('MsgFormats', dict(
+MSG_FORMATS = MF = constants('MsgFormats', dict(
     # MvsError instances in RenamingPlan.
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
@@ -430,4 +431,142 @@ def case_sensitivity():
         return fs_type
 
 case_sensitivity.cached = None
+
+####
+#
+# Failures and Problems.
+#
+#
+# Failures are not specific to a single Renaming and/or have
+# no meaningful resolution. Most relate to bad inputs.
+#
+# Problems are specific to one Renaming. Some of them are resolvable, some not.
+# Renamings with unresolvable problems must be skipped/excluded; those with
+# resolvable problems can be skipped if the user requests it. Both classes
+# have a name, and an optional variety to further classify them.
+#
+#   Resolvable | Name     | Varieties
+#   ----------------------------------------------
+#   no         | noop     | equal, same, recase
+#   no         | missing  | .
+#   no         | type     | .
+#   no         | code     | filter, rename
+#   no         | exists   | other
+#   ----------------------------------------------
+#   yes        | exists   | diff, full
+#   yes        | collides | diff, full
+#   yes        | parent   | .
+#
+# See command-line help text for more details.
+#
+####
+
+FAILURE_NAMES = FN = constants('FailureNames', (
+    'all_filtered',
+    'parsing',
+    'code',
+))
+
+FAILURE_VARIETIES = FV = constants('FailureVarieties', (
+    'no_paths',
+    'paragraphs',
+    'row',
+    'imbalance',
+))
+
+FAILURE_FORMATS = {
+    (FN.all_filtered, None):     'All paths were filtered, excluded, or skipped during processing',
+    (FN.parsing, FV.no_paths):   'No input paths',
+    (FN.parsing, FV.paragraphs): 'The --paragraphs option expects exactly two paragraphs',
+    (FN.parsing, FV.row):        'The --rows option expects rows with exactly two cells: {!r}',
+    (FN.parsing, FV.imbalance):  'Got an unequal number of original paths and new paths',
+    (FN.code, None):             'Invalid user-supplied {} code:\n{}',
+}
+
+PROBLEM_NAMES = PN = constants('ProblemNames', (
+    'noop',
+    'missing',
+    'type',
+    'code',
+    'exists',
+    'collides',
+    'parent',
+))
+
+PROBLEM_VARIETIES = PV = constants('ProblemVarieties', (
+    'equal',
+    'same',
+    'recase',
+    'filter',
+    'rename',
+    'other',
+    'diff',
+    'full',
+))
+
+PROBLEM_FORMATS = {
+    # Unresolvable.
+    (PN.noop, PV.equal):    'Original path and new path are the exactly equal',
+    (PN.noop, PV.same):     'Original path and new path are the functionally the same',
+    (PN.noop, PV.recase):   'User requested path-name case-change, but file system already agrees with new',
+    (PN.missing, None):     'Original path does not exist',
+    (PN.type, None):        'Original path is neither a regular file nor directory',
+    (PN.code, PV.filter):   'Error from user-supplied filtering code: {} [original path: {}]',
+    (PN.code, PV.rename):   'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
+    (PN.exists, PV.other):  'New path exists and is neither regular file nor directory',
+    # Resolvable.
+    (PN.exists, None):      'New path exists',
+    (PN.exists, PV.diff):   'New path exists and differs with original in type',
+    (PN.exists, PV.full):   'New path exists and is a non-empty directory',
+    (PN.collides, None):    'New path collides with another new path',
+    (PN.collides, PV.diff): 'New path collides with another new path, and they differ in type',
+    (PN.collides, PV.full): 'New path collides with another new path, and it is a non-empty directory',
+    (PN.parent, None):      'Parent directory of new path does not exist',
+}
+
+@dataclass(init = False, frozen = True)
+class Issue:
+    name: str
+    variety: str
+    msg: str
+
+    FORMATS = None
+
+    def __init__(self, name, *xs, variety = None):
+        # Custom initializer, because we need to build the ultimate msg from
+        # the name, variety, and arguments. To keep instances frozen,
+        # we update __dict__ directly.
+        self.__dict__.update(
+            name = name,
+            variety = variety,
+            msg = self.FORMATS[name, variety].format(*xs),
+        )
+
+    @property
+    def formatted(self):
+        return with_newline(self.msg)
+
+@dataclass(init = False, frozen = True)
+class Failure(Issue):
+
+    FORMATS = FAILURE_FORMATS
+
+@dataclass(init = False, frozen = True)
+class Problem(Issue):
+
+    FORMATS = PROBLEM_FORMATS
+
+    RESOLVABLE = {
+        (PN.exists, None),
+        (PN.exists, PV.diff),
+        (PN.exists, PV.full),
+        (PN.collides, None),
+        (PN.collides, PV.diff),
+        (PN.collides, PV.full),
+        (PN.parent, None),
+    }
+
+    @classmethod
+    def is_resolvable(cls, prob):
+        return (prob.name, prob.variety) in cls.RESOLVABLE
 
