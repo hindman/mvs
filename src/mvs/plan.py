@@ -512,6 +512,10 @@ class RenamingPlan:
             return None
 
         # Determine the type of Problem to return if clobbering would occur.
+        #
+        # TODO: need to add a check for rn.type_new of OTHER. If
+        # so return Problem(exists, other).
+        #
         if rn.type_new == PATH_TYPES.directory and rn.full_new:
             clobber_prob = Problem(PN.exists_full)
         elif rn.type_orig == rn.type_new:
