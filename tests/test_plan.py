@@ -166,7 +166,7 @@ def run_diagnostics(tr, wa, plan):
 # Convenience scheme for the inventory parameter in run_checks().
 EMPTY = '_'
 INV_MAP = {
-    '.': 'rns',
+    '.': 'active',
     'f': 'filtered',
     's': 'skipped',
     'H': 'halts',
@@ -401,7 +401,7 @@ def test_filtering_code(tr, create_wa):
     extras = ('d', 'dd', 'xyz/')
     run_args = (tr, create_wa, origs, news)
     exp_inv = dict(
-        rns = ['a', 'b', 'c'],
+        active = ['a', 'b', 'c'],
         filtered = ['d', 'dd', 'xyz'],
     )
 
@@ -783,11 +783,11 @@ def test_missing_orig(tr, create_wa):
     inputs = origs + missing_origs + news + missing_news
     run_args = (tr, create_wa, origs, news)
     exp_inv = dict(
-        rns = ['a', 'b'],
+        active = ['a', 'b'],
         skipped = ['c', 'd'],
     )
     exp_invH = dict(
-        rns = exp_inv['rns'],
+        active = exp_inv['active'],
         halts = exp_inv['skipped'],
     )
 
@@ -1087,7 +1087,7 @@ def test_new_exists_recase(tr, create_wa):
     else:
         pn = PN.recase
     assert plan.skipped[0].prob_name == pn
-    assert len(plan.rns) == 0
+    assert len(plan.active) == 0
 
 @pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_non_empty(tr, create_wa):
@@ -1203,7 +1203,7 @@ def test_news_collide_orig_missing(tr, create_wa):
     inputs = origs + news
     run_args = (tr, create_wa, origs[:-1], news)
     exp_inv = dict(
-        rns = ['a', 'b', 'c'],
+        active = ['a', 'b', 'c'],
         halts = ['d'],
     )
 

@@ -17,13 +17,12 @@ Overhaul [PC_OVERHAUL].
 
     - Initial conversion and editing pass:
         x utils.py
-        - plan.py
-        - cli.py
-
-    - Minimal functionality:
         x Get machinery working with all tests skipped.
-        - Get one test working in test_plan.py.
+        x plan.py
+        - Get a couple tests working in test_plan.py.
+        - cli.py
         - Get a basic CLI usage working.
+        - Get a couple tests working in test_cli.py.
 
     - Get all tests working:
         x test_utils.py

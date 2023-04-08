@@ -516,7 +516,7 @@ class CliRenamer:
         # Each tuple is (MSG_FMT, ITEMS).
         p = self.plan
         sections = (
-            (MF.listing_rename, p.rns),
+            (MF.listing_rename, p.active),
             (MF.listing_filter, p.filtered),
             (MF.listing_skip, p.skipped),
             (MF.listing_create, p.creates),
@@ -551,7 +551,7 @@ class CliRenamer:
         if any(controlled.values()):
             return MF.summary_table.format(
                 n_initial = p.n_initial,
-                n_active = len(p.rns),
+                n_active = len(p.active),
                 **controlled,
             ) + CON.newline
         else:

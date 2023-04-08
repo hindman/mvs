@@ -21,9 +21,10 @@ from .utils import (
     MSG_FORMATS as MF,
     MvsError,
     NAME_CHANGE_TYPES as NCT,
-    PATH_TYPES,
+    PATH_TYPES as PT,
     PROBLEM_FORMATS as PF,
     PROBLEM_NAMES as PN,
+    PROBLEM_VARIETIES as PV,
     Problem,
     STRUCTURES,
     case_sensitivity,
@@ -31,12 +32,15 @@ from .utils import (
     get_source_code,
     is_non_empty_dir,
     path_existence_and_type,
+    seq_or_str,
 )
+
+####
+# A data object to hold information about a single renaming.
+####
 
 @dataclass
 class Renaming:
-    # A data object to hold an original path and the corresponding new path.
-
     # Paths.
     orig: str
     new: str
@@ -60,42 +64,31 @@ class Renaming:
 
     # Attributes for problems.
     # - Problem with the Renaming, if any.
-    # - Whether user code filtered out the rn.
-    # - Whether rn caused a Problem that will halt the RenamingPlan.
-    # - Whether rn should be skipped due to a Problem.
+    # - Whether user code filtered out the Renaming.
     # - Whether to create new-parent before renaming.
     # - Whether renaming will clobber something.
     # - Whether renaming will involve case-change-only renaming (ie self-clobber).
     problem: Problem = None
-    exclude: bool = False
-    halt: bool = False
-    skip: bool = False
+    filtered: bool = False
     create: bool = False
     clobber: bool = False
     clobber_self: bool = False
 
     @property
-    def equal(self):
-        return self.orig == self.new
-
-    @property
     def prob_name(self):
-        if self.problem is None:
-            return None
-        else:
-            return self.problem.name
-
-    @property
-    def halt_or_skip(self):
-        return bool(self.halt or self.skip)
+        return getattr(self.problem, 'name', None)
 
     @property
     def formatted(self):
         prefix = (
-            f'# Problem: {self.prob_name}\n' if self.halt_or_skip
+            f'# Problem: {self.prob_name}\n' if self.problem
             else ''
         )
         return f'{prefix}{self.orig}\n{self.new}\n'
+
+####
+# A class to manage a batch of renamings.
+####
 
 class RenamingPlan:
 
@@ -134,19 +127,24 @@ class RenamingPlan:
         self.inputs = tuple(inputs)
         self.structure = structure or STRUCTURES.flat
 
-        # Based on the inputs we begin with the full universe of
-        # Renaming instances. During processing, those rns
-        # get put into four buckes:
-        # - active renamings
-        # - filtered out by user code
-        # - skipped via problem-control
-        # - those having problems that will cause plan halt.
-        # - initial N of rns (before filtering, etc)
+        # Based on the inputs we begin with the full universe of Renaming
+        # instances. During processing, those rns get put into four buckes:
+        # - renamings filtered out by user code;
+        # - renamings the user wants to skip, due to problems;
+        # - renamings that must be excluded, due to unresolvable problems;
+        # - active renamings.
         self.n_initial = None
-        self.rns = []
         self.filtered = []
         self.skipped = []
-        self.halts = []
+        self.excluded = []
+        self.active = []
+
+        # Renaming instances in self.active that (a) have a resolvable problem,
+        # and (b) were not skipped by the user. These attributes are populated
+        # at the end of prepare() and are used only for listing/reporting.
+        self.parent = []
+        self.exists = []
+        self.collides = []
 
         # User-supplied code.
         self.rename_code = rename_code
@@ -171,23 +169,10 @@ class RenamingPlan:
             str.lower
         )
 
-        # Validate and standardize the user's problem controls.
-        # Then merge the defaults problem controls with the user's into
-        # a lookup dict mapping each Problem name to its control mechanism.
+        # Validate and standardize the user's problem-handling parameters.
         self.strict = bool(strict)
-
-        # try:
-        #     self.controls = ProblemControl.merge(controls)
-        # except MvsError as e:
-        #     raise e
-        # except Exception as e:
-        #     raise MvsError(MF.invalid_controls, controls = controls)
-        # self.control_lookup = ProblemControl.merge(
-        #     ProblemControl.DEFAULTS,
-        #     self.controls,
-        #     ProblemControl.HALT_ALL if self.strict else (),
-        #     want_map = True,
-        # )
+        self.skip = self.validated_skip_ids(skip)
+        self.skip_lookup = self.build_skip_lookup()
 
         # Failures that will halt the RenamingPlan before any renaming.
         self.failures = []
@@ -199,11 +184,10 @@ class RenamingPlan:
     # This method performs various validations and computations needed before
     # renaming can occur.
     #
-    # The method does not return data; it sets self.rns.
-    #
-    # The method does not raise; rather, when problems occur, they are
-    # stored in self.problems based whether/how the user has configured
-    # the plan to control them.
+    # The method does not raise; rather, it keeps track of information
+    # about any failures or problems that occur and organizes the Renaming
+    # instances into appropriate buckets based on those problems, if any,
+    # and how the user wants to handle them.
     #
     ####
 
@@ -215,21 +199,23 @@ class RenamingPlan:
             self.has_prepared = True
 
         # Get the input paths and parse them to get Renaming instances.
-        self.rns = self.parse_inputs()
-        self.n_initial = len(self.rns)
+        self.active = self.parse_inputs()
+        self.n_initial = len(self.active)
         if self.failed:
             return
 
         # Create the renaming and filtering functions from
         # user-supplied code, if any was given.
-        self.filter_func = self.make_user_defined_func(CON.code_actions.filter)
-        self.rename_func = self.make_user_defined_func(CON.code_actions.rename)
+        self.filter_func = self.make_user_func(CON.code_actions.filter)
+        self.rename_func = self.make_user_func(CON.code_actions.rename)
         if self.failed:
             return
 
-        # Run various steps that process the Renaming instances individually:
-        # setting their path existence statuses and path types; filtering;
-        # computing new paths; and checking for problems.
+        # Run the steps that process Renaming instances individually:
+        # - setting their attributes related to path existence, type, etc.
+        # - filtering
+        # - computing new paths
+        # - checking for problems
         rn_steps = (
             (self.set_exists_and_types, None),
             (self.execute_user_filter, None),
@@ -247,36 +233,45 @@ class RenamingPlan:
             if prep_step:
                 prep_step()
 
-            # Prepare common-prefix and sequence numbering, which might
+            # Prepare common-prefix and sequence number iterator, which might
             # be used by the user-suppled renaming/filtering code.
             self.prefix_len = self.compute_prefix_len()
             seq = self.compute_sequence_iterator()
 
-            # Execute the step for each rn. Some steps set attributes on the rn
-            # to guide subsequent filtering, skipping, clobbering, etc.
+            # Execute the step for each Renaming. Some steps set attributes on
+            # the Renaming to guide subsequent filtering, renaming, etc.
+            # Steps return a Problem or None.
             active = []
-            for rn in self.rns:
-                # If the step returns a Problem, handle it and set the
-                # corresponding problem-related attributes on rn.
-                prob = step(rn, next(seq))
-                if prob:
-                    rn.problem = prob
-                    control = self.control_lookup[prob.name]
-                    if control:
-                        setattr(rn, control, True)
-                # Add each resulting rn to the appropriate list.
+            for rn in self.active:
+                # Run step and put the Renaming in the appropriate bucket.
+                rn.problem = step(rn, next(seq))
                 xs = (
-                    self.filtered if rn.exclude else
-                    self.skipped if rn.skip else
-                    self.halts if rn.halt else
-                    active
+                    self.filtered if rn.filtered else
+                    self.skipped if self.should_skip(rn) else
+                    self.excluded if self.should_exclude(rn) else
+                    self.active
                 )
                 xs.append(rn)
-            self.rns = active
+                # Set create and clobber attributes on the Renaming.
+                if rn.prob_name == PN.parent:
+                    rn.create = True
+                elif rn.prob_name in (PN.exists, PN.collides):
+                    rn.clobber = True
+            self.active = active
 
-        # Register problem if everything was filtered out.
-        if not self.rns:
+        # Register Failure if everything was filtered out.
+        if not self.active:
             self.handle_failure(FN.all_filtered)
+
+        # Populate the lists of active Renaming instances having problems.
+        for rn in self.active:
+            nm = rn.prob_name
+            if nm == PN.parent:
+                self.parent.append(rn)
+            elif nm == PN.exists:
+                self.exists.append(rn)
+            elif nm == PN.collides:
+                self.collides.append(rn)
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -363,7 +358,7 @@ class RenamingPlan:
     # Creating the user-defined functions for filtering and renaming.
     ####
 
-    def make_user_defined_func(self, action):
+    def make_user_func(self, action):
         # Get the user's code, if any.
         user_code = getattr(self, f'{action}_code')
         if not user_code:
@@ -415,7 +410,7 @@ class RenamingPlan:
             e, pt = path_existence_and_type(rn.orig)
             rn.exist_orig = e
             rn.type_orig = pt
-            if pt == PATH_TYPES.directory:
+            if pt == PT.directory:
                 rn.full_orig = is_non_empty_dir(rn.orig)
 
         # Handle attributes related to rn.new.
@@ -426,7 +421,7 @@ class RenamingPlan:
             e, pt = path_existence_and_type(rn.new)
             rn.exist_new = e
             rn.type_new = pt
-            if pt == PATH_TYPES.directory:
+            if pt == PT.directory:
                 rn.full_new = is_non_empty_dir(rn.new)
             # Existence of parent.
             e, _ = path_existence_and_type(pn.parent)
@@ -449,9 +444,9 @@ class RenamingPlan:
             try:
                 keep = self.filter_func(rn.orig, Path(rn.orig), seq_val, self)
                 if not keep:
-                    rn.exclude = True
+                    rn.filtered = True
             except Exception as e:
-                return Problem(PN.filter, e, rn.orig)
+                return Problem(PN.code, e, rn.orig, variety = PV.filter)
         return None
 
     def execute_user_rename(self, rn, seq_val):
@@ -460,18 +455,18 @@ class RenamingPlan:
             try:
                 new = self.rename_func(rn.orig, Path(rn.orig), seq_val, self)
             except Exception as e:
-                return Problem(PN.rename, e, rn.orig)
+                return Problem(PN.code, e, rn.orig, variety = PV.rename)
             # Validate its type and either set rn.new or return Problem.
             if isinstance(new, (str, Path)):
                 rn.new = str(new)
             else:
                 typ = type(new).__name__
-                return Problem(PN.rename, typ, rn.orig)
+                return Problem(PN.code, typ, rn.orig, variety = PV.rename)
         return None
 
     def check_equal(self, rn, seq_val):
-        if rn.equal:
-            return Problem(PN.equal)
+        if rn.orig == rn.new:
+            return Problem(PN.noop, variety = PN.equal)
         else:
             return None
 
@@ -483,7 +478,7 @@ class RenamingPlan:
             return Problem(PN.missing)
 
     def check_orig_type(self, rn, seq_val):
-        if rn.type_orig in (PATH_TYPES.file, PATH_TYPES.directory):
+        if rn.type_orig in (PT.file, PT.directory):
             return None
         else:
             return Problem(PN.type)
@@ -497,28 +492,27 @@ class RenamingPlan:
             return None
 
         # Determine the type of Problem to return if clobbering would occur.
-        #
-        # TODO: need to add a check for rn.type_new of OTHER. If
-        # so return Problem(exists, other).
-        #
-        if rn.type_new == PATH_TYPES.directory and rn.full_new:
-            clobber_prob = Problem(PN.exists_full)
-        elif rn.type_orig == rn.type_new:
-            clobber_prob = Problem(PN.exists)
+        tnew = rn.type_new
+        if tnew == PT.other:
+            prob = Problem(PN.exists, variety = PV.other)
+        elif tnew == PT.directory and rn.full_new:
+            prob = Problem(PN.exists, variety = PV.full)
+        elif tnew == rn.type_orig:
+            prob = Problem(PN.exists)
         else:
-            clobber_prob = Problem(PN.exists_diff)
+            prob = Problem(PN.exists, variety = PV.diff)
 
         # Handle the simplest file systems: case-sensistive or
         # case-insensistive. Since rn.new exists, we have clobbering
         if case_sensitivity() != FS_TYPES.case_preserving: # pragma: no cover
-            return clobber_prob
+            return prob
 
         # Handle case-preserving file system where rn.orig and rn.new have
         # different parent directories. Since the parent directories differ,
         # case-change-only renaming (ie, self clobber) is not at issue,
         # so we have regular clobbering.
         if not rn.same_parents:
-            return clobber_prob
+            return prob
 
         # Handle case-preserving file system where rn.orig and rn.new have
         # the same parent, which means the renaming involves only changes
@@ -528,20 +522,20 @@ class RenamingPlan:
             # path. User inputs implied that a renaming was desired (rn.orig
             # and rn.new were not equal) but the only difference lies in the
             # casing of the parent path. By policy, mvs does not rename parents.
-            return Problem(PN.same)
+            return Problem(PN.noop, variety = PV.same)
         elif rn.name_change_type == NCT.case_change:
             if rn.exist_new == EXISTENCES.exists_case:
                 # User inputs implied that a case-change renaming
                 # was desired, but the path's name-portion already
                 # agrees with the file system, so renaming is impossible.
-                return Problem(PN.recase)
+                return Problem(PN.noop, variety = PV.recase)
             else:
                 # User wants a case-change renaming (self-clobber).
                 rn.clobber_self = True
                 return None
         else:
             # User wants a name-change, and it would clobber something else.
-            return clobber_prob
+            return prob
 
     def check_new_parent_exists(self, rn, seq_val):
         # Key question: does renaming also require parent creation?
@@ -557,7 +551,7 @@ class RenamingPlan:
         # Those keys are stored as-is for case-sensistive file
         # systems and in lowercase for non-sensistive systems.
         self.new_groups = {}
-        for rn in self.rns:
+        for rn in self.active:
             k = self.new_collision_key_func(rn.new)
             self.new_groups.setdefault(k, []).append(rn)
 
@@ -580,19 +574,19 @@ class RenamingPlan:
 
         # Check for collisions with non-empty directories.
         if any(o.full_orig or o.full_new for o in others):
-            return Problem(PN.collides_full)
+            return Problem(PN.collides, variety = PV.full)
 
         # Check for collisions with a different path type.
         pt = rn.type_orig
         for o in others:
             if o.type_orig != pt or (o.type_new and o.type_new != pt):
-                return Problem(PN.collides_diff)
+                return Problem(PN.collides, variety = PV.diff)
 
         # Otherwise, it's a regular collision.
         return Problem(PN.collides)
 
     ####
-    # Methods related to problem control.
+    # Methods related to failure and problem handling.
     ####
 
     def handle_failure(self, name, *xs):
@@ -602,7 +596,31 @@ class RenamingPlan:
 
     @property
     def failed(self):
-        return bool(self.failures or self.halts)
+        return bool(self.failures)
+
+    def validated_skip_ids(self, skip):
+        try:
+            return tuple(set(
+                Problem.from_skip_id(sid).sid
+                for sid in seq_or_str(skip)
+            ))
+        except Exception:
+            raise MvsError(MF.invalid_skip, skip = skip)
+
+    def build_skip_lookup(self):
+        return set(
+            prob.sid
+            for sid in self.skip
+            for prob in Problem.probs_matching_sid(sid)
+        )
+
+    def should_skip(self, rn):
+        prob = rn.problem
+        return prob and prob.id in self.skip_lookup
+
+    def should_exclude(self, rn):
+        prob = rn.problem
+        return prob and not Problem.is_resolvable(prob)
 
     ####
     # Sequence number and common prefix.
@@ -612,7 +630,7 @@ class RenamingPlan:
         return iter(range(self.seq_start, sys.maxsize, self.seq_step))
 
     def compute_prefix_len(self):
-        origs = tuple(rn.orig for rn in self.rns)
+        origs = tuple(rn.orig for rn in self.active)
         return len(commonprefix(origs))
 
     def strip_prefix(self, orig):
@@ -633,14 +651,10 @@ class RenamingPlan:
         # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
-            raise MvsError(
-                MF.prepare_failed,
-                failures = self.failures,
-                halts = self.halts,
-            )
+            raise MvsError(MF.prepare_failed, failures = self.failures)
 
         # Rename paths.
-        for i, rn in enumerate(self.rns):
+        for i, rn in enumerate(self.active):
             self.tracking_index = i
             self.do_rename(rn)
         self.tracking_index = self.TRACKING.done
@@ -686,21 +700,18 @@ class RenamingPlan:
             elif rn.clobber:
                 # User requested a clobber for this Renaming.
                 # Make sure the clobber victim is (still) a supported path type.
-                # Select the appropriate deletion operation based on the path
-                # type and the user's control setting regarding non-empty dirs.
+                # Select the appropriate deletion operation.
                 pt = determine_path_type(rn.new)
-                if pt == PATH_TYPES.other:
+                if pt == PT.other:
                     raise MvsError(
                         MF.unsupported_clobber,
                         orig = rn.orig,
                         new = rn.new,
                     )
-                elif pt == PATH_TYPES.file:
+                elif pt == PT.file:
                     pn.unlink()
-                elif self.control_lookup[PN.exists_full] == CONTROLS.clobber:
-                    shutil.rmtree(rn.new)
                 else:
-                    pn.rmdir()
+                    shutil.rmtree(rn.new)
             else:
                 # An unrequested clobber.
                 raise MvsError(
@@ -717,14 +728,6 @@ class RenamingPlan:
     ####
 
     @property
-    def creates(self):
-        return [rn for rn in self.rns if rn.create]
-
-    @property
-    def clobbers(self):
-        return [rn for rn in self.rns if rn.clobber]
-
-    @property
     def tracking_rn(self):
         # The Renaming that was being renamed when rename_paths()
         # raised an exception.
@@ -732,7 +735,7 @@ class RenamingPlan:
         if ti in (self.TRACKING.not_started, self.TRACKING.done):
             return None
         else:
-            return self.rns[ti]
+            return self.active[ti]
 
     @property
     def as_dict(self):
@@ -746,13 +749,13 @@ class RenamingPlan:
             indent = self.indent,
             seq_start = self.seq_start,
             seq_step = self.seq_step,
-            controls = self.controls,
+            skip = self.skip,
             strict = self.strict,
             # Renaming instances.
-            renamings = [asdict(rn) for rn in self.rns],
             filtered = [asdict(rn) for rn in self.filtered],
             skipped = [asdict(rn) for rn in self.skipped],
-            halts = [asdict(rn) for rn in self.halts],
+            excluded = [asdict(rn) for rn in self.excluded],
+            active = [asdict(rn) for rn in self.active],
             # Other.
             failures = [asdict(f) for f in self.failures],
             prefix_len = self.prefix_len,

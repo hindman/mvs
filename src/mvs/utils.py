@@ -93,6 +93,7 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem control: {!r}',
+    invalid_skip           = 'Invalid valid for RenamingPlan.skip',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
     unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
@@ -569,4 +570,36 @@ class Problem(Issue):
     @classmethod
     def is_resolvable(cls, prob):
         return (prob.name, prob.variety) in cls.RESOLVABLE
+
+    @property
+    def sid(self):
+        # Resolvable problems have a skip ID, which is just the NAME-VARIETY
+        # string that a user provides when declaring which kinds of problems
+        # should cause a Renaming to be skipped.
+        nm, v = (self.name, self.variety)
+        return nm if v is None else f'{nm}-{v}'
+
+    @classmethod
+    def from_skip_id(cls, sid):
+        # Takes a skip ID.
+        # Returns the corresponding Problem or raises.
+        xs = underscores_to_hyphens(sid).split(CON.hyphen)
+        if len(xs) > 2:
+            raise MvsError(MF.invalid_skip, invalid = sid)
+        name, variety = (xs + [None])[0:2]
+        if (name, variety) in self.RESOLVABLE:
+            return cls(name, variety = variety)
+        else:
+            raise MvsError(MF.invalid_skip, invalid = sid)
+
+    @classmethod
+    def probs_matching_sid(cls, sid):
+        # Takes a skip ID.
+        # Returns all resolvable problems matching that ID.
+        query = cls.from_skip_id(sid)
+        return tuple(
+            cls(name, variety = variety)
+            for name, variety in cls.RESOLVABLE
+            if name == query.name and query.variety in (variety, None)
+        )
 
