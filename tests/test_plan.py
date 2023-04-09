@@ -671,47 +671,31 @@ def test_controls(tr, create_wa):
     assert err.msg == MF.invalid_controls
     assert err.params['controls'] == BAD_VAL
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_equal(tr, create_wa):
     # Paths and args.
-    # One of the origs equals its new counterpart.
     SAME = 'd'
     origs = ('a', 'b', 'c') + (SAME,)
     news = ('a.new', 'b.new', 'c.new') + (SAME,)
-    exp_inv = '...s'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_inv = '...E'
+    strict = 'excluded'
+    reason = Failure(FN.strict, strict)
     run_args = (tr, create_wa, origs, news)
 
-    # Scenario: renaming will succeed, because
-    # skip-equal is a default control.
+    # Scenario: one of the orig paths equals its new counterpart.
+    # By default, the offending Renaming will be excluded.
     wa, plan = run_checks(
         *run_args,
         inventory = exp_inv,
     )
+
+    # But in strict mode the plan will fail.
     wa, plan = run_checks(
         *run_args,
-        controls = 'skip-equal',
+        strict = strict,
+        failure = True,
+        no_change = True,
+        reason = reason,
         inventory = exp_inv,
-    )
-
-    # Scenario: but renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        controls = 'halt-equal',
-        failure = True,
-        no_change = True,
-        reason = PN.equal,
-        inventory = exp_invH,
-    )
-
-    # Scenario: it will also be rejected in strict mode.
-    wa, plan = run_checks(
-        *run_args,
-        strict = True,
-        failure = True,
-        no_change = True,
-        reason = PN.equal,
-        inventory = exp_invH,
     )
 
 @pytest.mark.skip(reason = 'overhaul')
@@ -858,7 +842,6 @@ def test_orig_type(tr, create_wa):
         inventory = exp_inv,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -867,35 +850,35 @@ def test_new_exists(tr, create_wa):
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'E')
+    strict = 'exists'
+    reason = Failure(FN.strict, strict)
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
-    # Renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        controls = 'halt-exists',
-        failure = True,
-        no_change = True,
-        reason = PN.exists,
-        inventory = exp_invH,
-    )
-
-    # Scenario: same. By default, offending paths are skipped.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        expecteds = expecteds_skip,
-        inventory = exp_inv,
-    )
-
-    # Scenario: renaming will also succeed if we clobber the offending paths.
+    # By default, the plan will forge ahead and clobber.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds_clobber,
-        controls = 'clobber-exists',
+    )
+
+    # User can skip the affected renamings.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = expecteds_skip,
+        skip = PN.exists,
+        inventory = exp_inv,
+    )
+
+    # Or halt the plan in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        strict = strict,
+        failure = True,
+        no_change = True,
+        reason = reason,
     )
 
 @pytest.mark.skip(reason = 'overhaul')

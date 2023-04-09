@@ -93,8 +93,8 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem control: {!r}',
-    invalid_skip           = 'Invalid value for RenamingPlan.skip',
-    invalid_strict         = 'Invalid value for RenamingPlan.strict',
+    invalid_skip           = 'Invalid value for RenamingPlan.skip: {!r}',
+    invalid_strict         = 'Invalid value for RenamingPlan.strict: {!r}',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
     unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
@@ -467,6 +467,7 @@ FAILURE_NAMES = FN = constants('FailureNames', (
     'all_filtered',
     'parsing',
     'code',
+    'strict',
 ))
 
 FAILURE_VARIETIES = FV = constants('FailureVarieties', (
@@ -483,6 +484,7 @@ FAILURE_FORMATS = {
     (FN.parsing, FV.row):        'The --rows option expects rows with exactly two cells: {!r}',
     (FN.parsing, FV.imbalance):  'Got an unequal number of original paths and new paths',
     (FN.code, None):             'Invalid user-supplied {} code:\n{}',
+    (FN.strict, None):           'RenamingPlan failed to satisfy strict requirements: {!r}',
 }
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (
@@ -588,7 +590,7 @@ class Problem(Issue):
         if len(xs) > 2:
             raise MvsError(MF.invalid_skip, invalid = sid)
         name, variety = (xs + [None])[0:2]
-        if (name, variety) in self.RESOLVABLE:
+        if (name, variety) in cls.RESOLVABLE:
             return cls(name, variety = variety)
         else:
             raise MvsError(MF.invalid_skip, invalid = sid)
@@ -619,27 +621,34 @@ class StrictMode:
     @classmethod
     def from_user(cls, strict):
         # Convert to tuple.
-        err = MvsError(MF.invalid_strict, strict = strict)
+        err = MvsError(MF.invalid_strict, strict)
         try:
             xs = seq_or_str(strict)
         except Exception:
             raise err
-        # Validate and return a StrictMode.
+        # Validate and process the tuple values.
+        all_strict = False
         excluded = False
         probs = set()
         for x in xs:
-            if x == cls.EXCLUDED:
+            if x == CON.all:
+                all_strict = True
+            elif x == cls.EXCLUDED:
                 excluded = True
             elif x in cls.STRICT_PROBS:
                 probs.add(x)
             else:
                 raise err
-        return cls(excluded, tuple(probs))
+        # Return a StrictMode.
+        if all_strict:
+            return cls(True, cls.STRICT_PROBS)
+        else:
+            return cls(excluded, tuple(probs))
 
     @property
     def as_str(self):
         xs = (
-            cls.EXCLUDED if self.excluded else None,
+            self.EXCLUDED if self.excluded else None,
             *self.probs,
         )
         return CON.space.join(filter(None, xs))

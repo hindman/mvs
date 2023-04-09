@@ -15,11 +15,11 @@ todos: TODOs
 
 Overhaul [PC_OVERHAUL].
 
-    - Initial conversion and editing pass:
+    . Initial conversion and editing pass:
         x utils.py
         x Get machinery working with all tests skipped.
         x plan.py
-        . Get a couple tests working in test_plan.py.
+        x Get a couple tests working in test_plan.py.
         - cli.py
         - Get a basic CLI usage working.
         - Get a couple tests working in test_cli.py.

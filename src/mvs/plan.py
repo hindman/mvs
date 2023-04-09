@@ -244,15 +244,17 @@ class RenamingPlan:
             # Execute the step for each Renaming. Some steps set attributes on
             # the Renaming to guide subsequent filtering, renaming, etc.
             # Steps return a Problem or None.
-            active = []
+            still_active = []
             for rn in self.active:
                 # Run step and put the Renaming in the appropriate bucket.
-                rn.problem = step(rn, next(seq))
+                prob = step(rn, next(seq))
+                if prob:
+                    rn.problem = prob
                 xs = (
                     self.filtered if rn.filtered else
                     self.skipped if self.should_skip(rn) else
                     self.excluded if self.should_exclude(rn) else
-                    self.active
+                    still_active
                 )
                 xs.append(rn)
                 # Set create and clobber attributes on the Renaming.
@@ -260,7 +262,7 @@ class RenamingPlan:
                     rn.create = True
                 elif rn.prob_name in (PN.exists, PN.collides):
                     rn.clobber = True
-            self.active = active
+            self.active = still_active
 
         # Register Failure if everything was filtered out.
         if not self.active:
@@ -273,10 +275,10 @@ class RenamingPlan:
             prob_names = set(rn.prob_name for rn in self.active)
             halt = (
                 (sm.excluded and self.excluded) or
-                any(p in prob_name for p in sm.probs)
+                any(p in prob_names for p in sm.probs)
             )
             if halt:
-                self.handle_failure(FN.strict_mode, strict = sm.as_str)
+                self.handle_failure(FN.strict, sm.as_str)
                 return
 
         # Populate the lists of active Renaming instances having problems.
@@ -482,7 +484,7 @@ class RenamingPlan:
 
     def check_equal(self, rn, seq_val):
         if rn.orig == rn.new:
-            return Problem(PN.noop, variety = PN.equal)
+            return Problem(PN.noop, variety = PV.equal)
         else:
             return None
 
@@ -621,7 +623,7 @@ class RenamingPlan:
                 for sid in seq_or_str(skip)
             ))
         except Exception:
-            raise MvsError(MF.invalid_skip, skip = skip)
+            raise MvsError(MF.invalid_skip, skip)
 
     def build_skip_lookup(self):
         return set(
@@ -632,7 +634,7 @@ class RenamingPlan:
 
     def should_skip(self, rn):
         prob = rn.problem
-        return prob and prob.id in self.skip_lookup
+        return prob and prob.sid in self.skip_lookup
 
     def should_exclude(self, rn):
         prob = rn.problem
@@ -773,7 +775,7 @@ class RenamingPlan:
             excluded = [asdict(rn) for rn in self.excluded],
             active = [asdict(rn) for rn in self.active],
             # Other.
-            failure = asdict(self.failure),
+            failure = asdict(self.failure) if self.failure else None,
             prefix_len = self.prefix_len,
             tracking_index = self.tracking_index,
         )
