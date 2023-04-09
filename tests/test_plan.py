@@ -7,11 +7,13 @@ from mvs.plan import RenamingPlan, Renaming
 from mvs.utils import (
     CON,
     FAILURE_NAMES as FN,
+    FAILURE_VARIETIES as FV,
     FS_TYPES,
     Failure,
     MSG_FORMATS as MF,
     MvsError,
     PROBLEM_NAMES as PN,
+    PROBLEM_VARIETIES as PV,
     Problem,
     STRUCTURES,
     case_sensitivity,
@@ -105,14 +107,15 @@ def run_checks(
     # Check for plan failure and its reason.
     if check_failure:
         if failure:
-            if reason:
-                if reason in Problem.FORMATS:
-                    got = tuple(rn.prob_name for rn in plan.halts)
-                else:
-                    got = tuple(f.name for f in plan.failures)
-                assert einfo.value.params['msg'] == MF.prepare_failed
-                assert reason in got
             assert plan.failed
+            if reason:
+                assert isinstance(reason, Failure) # TODO: remove.
+                assert einfo.value.params['msg'] == MF.prepare_failed
+                f = plan.failure
+                assert f
+                got = (f.name, f.variety)
+                exp = (reason.name, reason.variety)
+                assert got == exp
         else:
             assert not plan.failed
 
@@ -169,14 +172,13 @@ INV_MAP = {
     '.': 'active',
     'f': 'filtered',
     's': 'skipped',
-    'H': 'halts',
+    'E': 'excluded',
 }
 
 ####
 # Inputs and their structures.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_no_inputs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
@@ -193,7 +195,7 @@ def test_no_inputs(tr, create_wa):
             inputs = (),
             rename_code = code,
             failure = True,
-            reason = FN.parsing_no_paths,
+            reason = Failure(FN.parsing, variety = FV.no_paths),
             no_change = True,
             inventory = EMPTY,
         )
@@ -463,7 +465,7 @@ def test_code_execution_fails(tr, create_wa):
     news = ('aa', 'bb', 'cc')
     expecteds_skip = ('aa', FAILING_ORIG, 'cc')
     exp_inv = '.s.'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Code that will cause the second Renaming
@@ -566,7 +568,7 @@ def test_plan_as_dict(tr, create_wa):
             'renamings',
             'filtered',
             'skipped',
-            'halts',
+            'excluded',
             'failures',
             'prefix_len',
             'tracking_index',
@@ -677,7 +679,7 @@ def test_equal(tr, create_wa):
     origs = ('a', 'b', 'c') + (SAME,)
     news = ('a.new', 'b.new', 'c.new') + (SAME,)
     exp_inv = '...s'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: renaming will succeed, because
@@ -722,7 +724,7 @@ def test_same(tr, create_wa):
     expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
     expecteds_no_skip = origs + ('foo', 'BAR')
     exp_inv = 'ss.'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenarios: for the first two Renaming instances,
@@ -788,7 +790,7 @@ def test_missing_orig(tr, create_wa):
     )
     exp_invH = dict(
         active = exp_inv['active'],
-        halts = exp_inv['skipped'],
+        excluded = exp_inv['skipped'],
     )
 
     # Scenario: some orig paths are missing.
@@ -833,7 +835,7 @@ def test_orig_type(tr, create_wa):
     extras = (TARGET,)
     expecteds = ('a.new', 'b.new', 'c', TARGET)
     exp_inv = '..s'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are not regular files.
@@ -865,7 +867,7 @@ def test_new_exists(tr, create_wa):
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
@@ -905,7 +907,7 @@ def test_new_exists_diff(tr, create_wa):
     extras_full = ('a.new/', 'a.new/foo')
     expecteds_skip = ('a',) + news
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario 1: one of new paths already exists and it
@@ -973,7 +975,7 @@ def test_new_exists_diff_parents(tr, create_wa):
     extras = ('xy/', 'xy/b.new')
     expecteds = ('a.new', 'b') + extras
     exp_inv = '.s'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists and
@@ -1004,7 +1006,7 @@ def test_new_exists_different_case(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = ('B.NEW',)
     exp_inv = '.s.'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     if case_sensitivity() == FS_TYPES.case_sensitive:
@@ -1096,7 +1098,7 @@ def test_new_exists_non_empty(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new/', 'a.new/foo')
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: don't include the extras. Renaming succeeds.
@@ -1131,7 +1133,7 @@ def test_new_parent_missing(tr, create_wa):
     expecteds_skip = ('a.new', 'b.new', 'c')
     expecteds_create = news + ('xy/', 'xy/zzz/')
     exp_inv = '..s'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: a new-parent is missing.
@@ -1168,7 +1170,7 @@ def test_news_collide(tr, create_wa):
     expecteds_clobber = ('a.new', 'b.new')
     run_args = (tr, create_wa, origs, news)
     exp_inv = 's.s'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
 
     # Scenario: some new paths collide.
     # By default, offending paths are skipped.
@@ -1204,7 +1206,7 @@ def test_news_collide_orig_missing(tr, create_wa):
     run_args = (tr, create_wa, origs[:-1], news)
     exp_inv = dict(
         active = ['a', 'b', 'c'],
-        halts = ['d'],
+        excluded = ['d'],
     )
 
     # Scenario: inputs to RenamingPlan include all origs and news,
@@ -1233,7 +1235,7 @@ def test_news_collide_case(tr, create_wa):
     expecteds_skip = ('a.new', 'b', 'c')
     expecteds_clobber = ('a.new', 'B.NEW')
     exp_inv = '.ss'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: new paths "collide" in a case-insensitive way.
@@ -1270,7 +1272,7 @@ def test_news_collide_diff(tr, create_wa):
     expecteds_clobber = ('a.new', 'b.new')
     run_args = (tr, create_wa, origs, news)
     exp_inv = 's.ss'
-    exp_invH = exp_inv.replace('s', 'H')
+    exp_invH = exp_inv.replace('s', 'E')
 
     # Scenario: some new paths collide and differ in type.
     # By default, offending paths are skipped.
@@ -1324,17 +1326,17 @@ def test_news_collide_full(tr, create_wa):
         dict(
             controls = 'halt-collides-full',
             reason = PN.collides_full,
-            inventory = 'H.s',
+            inventory = 'E.s',
         ),
         dict(
             controls = 'halt-collides',
             reason = PN.collides,
-            inventory = 's.H',
+            inventory = 's.E',
         ),
         dict(
             controls = 'halt-collides halt-collides-full',
             reason = PN.collides,
-            inventory = 'H.H',
+            inventory = 'E.E',
         ),
     )
     for kws in scenarios:

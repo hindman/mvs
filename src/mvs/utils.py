@@ -93,7 +93,8 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem control: {!r}',
-    invalid_skip           = 'Invalid valid for RenamingPlan.skip',
+    invalid_skip           = 'Invalid value for RenamingPlan.skip',
+    invalid_strict         = 'Invalid value for RenamingPlan.strict',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
     unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
@@ -602,4 +603,44 @@ class Problem(Issue):
             for name, variety in cls.RESOLVABLE
             if name == query.name and query.variety in (variety, None)
         )
+
+####
+# Strict mode.
+####
+
+@dataclass(frozen = True)
+class StrictMode:
+    excluded: bool
+    probs: tuple
+
+    EXCLUDED = 'excluded'
+    STRICT_PROBS = (PN.parent, PN.exists, PN.collides)
+
+    @classmethod
+    def from_user(cls, strict):
+        # Convert to tuple.
+        err = MvsError(MF.invalid_strict, strict = strict)
+        try:
+            xs = seq_or_str(strict)
+        except Exception:
+            raise err
+        # Validate and return a StrictMode.
+        excluded = False
+        probs = set()
+        for x in xs:
+            if x == cls.EXCLUDED:
+                excluded = True
+            elif x in cls.STRICT_PROBS:
+                probs.add(x)
+            else:
+                raise err
+        return cls(excluded, tuple(probs))
+
+    @property
+    def as_str(self):
+        xs = (
+            cls.EXCLUDED if self.excluded else None,
+            *self.probs,
+        )
+        return CON.space.join(filter(None, xs))
 

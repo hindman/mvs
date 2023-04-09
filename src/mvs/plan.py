@@ -16,6 +16,7 @@ from .utils import (
     EXISTENCES,
     FAILURE_FORMATS as FF,
     FAILURE_NAMES as FN,
+    FAILURE_VARIETIES as FV,
     FS_TYPES,
     Failure,
     MSG_FORMATS as MF,
@@ -27,6 +28,7 @@ from .utils import (
     PROBLEM_VARIETIES as PV,
     Problem,
     STRUCTURES,
+    StrictMode,
     case_sensitivity,
     determine_path_type,
     get_source_code,
@@ -97,7 +99,7 @@ class RenamingPlan:
     # During rename_paths(), we track progress via self.tracking_index. It has
     # two special values (shown below in TRACKING). Otherwise, a non-negative
     # value indicates which Renaming we are currently trying to rename. If an
-    # unexpected failure occurs, that index tells us which Renaming failed.
+    # exception occurs, that index tells us which Renaming was in progress.
     # API users of RenamingPlan who care can catch the exception and infer
     # which paths were renamed and which were not. Similarly, CliRenamer logs
     # the necessary information to figure that out.
@@ -120,7 +122,7 @@ class RenamingPlan:
                  seq_step = 1,
                  # Problem handling.
                  skip = None,
-                 strict = False,
+                 strict = None,
                  ):
 
         # Input paths and structure.
@@ -170,12 +172,12 @@ class RenamingPlan:
         )
 
         # Validate and standardize the user's problem-handling parameters.
-        self.strict = bool(strict)
+        self.strict = StrictMode.from_user(strict)
         self.skip = self.validated_skip_ids(skip)
         self.skip_lookup = self.build_skip_lookup()
 
-        # Failures that will halt the RenamingPlan before any renaming.
-        self.failures = []
+        # Failure halting the plan.
+        self.failure = None
 
     ####
     #
@@ -185,7 +187,7 @@ class RenamingPlan:
     # renaming can occur.
     #
     # The method does not raise; rather, it keeps track of information
-    # about any failures or problems that occur and organizes the Renaming
+    # about any failure or problems that occur and organizes the Renaming
     # instances into appropriate buckets based on those problems, if any,
     # and how the user wants to handle them.
     #
@@ -206,10 +208,11 @@ class RenamingPlan:
 
         # Create the renaming and filtering functions from
         # user-supplied code, if any was given.
-        self.filter_func = self.make_user_func(CON.code_actions.filter)
-        self.rename_func = self.make_user_func(CON.code_actions.rename)
-        if self.failed:
-            return
+        for action in CON.code_actions.values():
+            func = self.make_user_func(action)
+            setattr(self, action + '_func', func)
+            if self.failed:
+                return
 
         # Run the steps that process Renaming instances individually:
         # - setting their attributes related to path existence, type, etc.
@@ -262,6 +265,19 @@ class RenamingPlan:
         # Register Failure if everything was filtered out.
         if not self.active:
             self.handle_failure(FN.all_filtered)
+            return
+
+        # Enforce strict mode.
+        if self.strict:
+            sm = self.strict
+            prob_names = set(rn.prob_name for rn in self.active)
+            halt = (
+                (sm.excluded and self.excluded) or
+                any(p in prob_name for p in sm.probs)
+            )
+            if halt:
+                self.handle_failure(FN.strict_mode, strict = sm.as_str)
+                return
 
         # Populate the lists of active Renaming instances having problems.
         for rn in self.active:
@@ -282,8 +298,8 @@ class RenamingPlan:
         # instances. Otherwise, registers a Failure and returns empty list.
 
         # Helper to handle a Failure and return empty.
-        def do_fail(name, *xs):
-            self.handle_failure(name, *xs)
+        def do_fail(name, variety, *xs):
+            self.handle_failure(name, *xs, variety = variety)
             return []
 
         # If we have rename_code, inputs are just original paths.
@@ -296,7 +312,7 @@ class RenamingPlan:
             if rns:
                 return rns
             else:
-                return do_fail(FN.parsing_no_paths)
+                return do_fail(FN.parsing, FV.no_paths)
 
         # Otherwise, organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.paragraphs:
@@ -311,7 +327,7 @@ class RenamingPlan:
             if len(groups) == 2:
                 origs, news = groups
             else:
-                return do_fail(FN.parsing_paragraphs)
+                return do_fail(FN.parsing, FV.paragraphs)
 
         elif self.structure == STRUCTURES.pairs:
             # Pairs: original path, new path, original path, etc.
@@ -334,7 +350,7 @@ class RenamingPlan:
                         origs.append(cells[0])
                         news.append(cells[1])
                     else:
-                        return do_fail(FN.parsing_row, row)
+                        return do_fail(FN.parsing, FV.row, row)
 
         else:
             # Flat: like paragraphs without the blank-line delimiter.
@@ -344,9 +360,9 @@ class RenamingPlan:
 
         # Failure if we got no paths or unequal original vs new.
         if not origs and not news:
-            return do_fail(FN.parsing_no_paths)
+            return do_fail(FN.parsing, FV.no_paths)
         elif len(origs) != len(news):
-            return do_fail(FN.parsing_imbalance)
+            return do_fail(FN.parsing, FV.imbalance)
 
         # Return the Renaming instances.
         return [
@@ -389,7 +405,7 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             tb = traceback.format_exc(limit = 0)
-            self.handle_failure(FN.user_code_exec, action, tb)
+            self.handle_failure(FN.code, action, tb)
             return None
 
     ####
@@ -589,14 +605,14 @@ class RenamingPlan:
     # Methods related to failure and problem handling.
     ####
 
-    def handle_failure(self, name, *xs):
+    def handle_failure(self, name, *xs, variety = None):
         # Takes name/args to create a Failure and then stores it.
-        f = Failure(name, *xs)
-        self.failures.append(f)
+        f = Failure(name, *xs, variety = variety)
+        self.failure = f
 
     @property
     def failed(self):
-        return bool(self.failures)
+        return bool(self.failure)
 
     def validated_skip_ids(self, skip):
         try:
@@ -651,7 +667,7 @@ class RenamingPlan:
         # Ensure than we have prepare, and raise if it failed.
         self.prepare()
         if self.failed:
-            raise MvsError(MF.prepare_failed, failures = self.failures)
+            raise MvsError(MF.prepare_failed, failure = self.failure)
 
         # Rename paths.
         for i, rn in enumerate(self.active):
@@ -750,14 +766,14 @@ class RenamingPlan:
             seq_start = self.seq_start,
             seq_step = self.seq_step,
             skip = self.skip,
-            strict = self.strict,
+            strict = asdict(self.strict),
             # Renaming instances.
             filtered = [asdict(rn) for rn in self.filtered],
             skipped = [asdict(rn) for rn in self.skipped],
             excluded = [asdict(rn) for rn in self.excluded],
             active = [asdict(rn) for rn in self.active],
             # Other.
-            failures = [asdict(f) for f in self.failures],
+            failure = asdict(self.failure),
             prefix_len = self.prefix_len,
             tracking_index = self.tracking_index,
         )

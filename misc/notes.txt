@@ -19,7 +19,7 @@ Overhaul [PC_OVERHAUL].
         x utils.py
         x Get machinery working with all tests skipped.
         x plan.py
-        - Get a couple tests working in test_plan.py.
+        . Get a couple tests working in test_plan.py.
         - cli.py
         - Get a basic CLI usage working.
         - Get a couple tests working in test_cli.py.
