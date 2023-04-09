@@ -15,14 +15,9 @@ todos: TODOs
 
 Overhaul [PC_OVERHAUL].
 
-    . Initial conversion and editing pass:
-        x utils.py
-        x Get machinery working with all tests skipped.
-        x plan.py
-        x Get a couple tests working in test_plan.py.
-        - cli.py
-        - Get a basic CLI usage working.
-        - Get a couple tests working in test_cli.py.
+    - Assess and fine-tune the CLI listing behavior.
+
+    - Get a couple tests passing in test_cli.py.
 
     - Get all tests working:
         x test_utils.py
@@ -232,7 +227,6 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
 
             --list CATEGORY...  # filtered|skipped|excluded|parent|exists|collides|ok
             --list all          # The default.
-            --list              # Same as all.
 
         - Options and preferences: the option simply replaces the upstream
           setting (no merging logic required).

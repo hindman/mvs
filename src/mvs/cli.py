@@ -16,15 +16,20 @@ from .version import __version__
 
 from .utils import (
     CON,
+    LISTING_CHOICES,
+    LISTING_FORMATS,
     MSG_FORMATS as MF,
     MvsError,
     OptConfig,
+    Problem,
     STRUCTURES,
+    StrictMode,
     edit_text,
     hyphens_to_underscores,
     positive_int,
     read_from_clipboard,
     read_from_file,
+    validated_choices,
     wrap_text,
 )
 
@@ -122,7 +127,7 @@ class CliRenamer:
                 seq_step = opts.step,
                 filter_code = opts.filter,
                 indent = opts.indent,
-                controls = opts.controls,
+                skip = opts.skip,
                 strict = opts.strict,
             )
             plan = self.plan
@@ -137,7 +142,7 @@ class CliRenamer:
         plan.prepare()
         self.write_log_file(self.LOG_TYPE.plan)
         if plan.failed:
-            self.paginate(self.failure_listing())
+            self.paginate(self.renaming_listing())
             self.wrapup(CON.exit_fail, MF.no_action_msg)
             return
 
@@ -251,8 +256,12 @@ class CliRenamer:
         self.validate_sources_structures(opts)
         if self.done:
             return None
-        else:
-            return opts
+
+        # Normalize opts.list (argparse already valided it).
+        opts.list = validated_choices(opts.list, LISTING_CHOICES)
+
+        # Done.
+        return opts
 
     def load_preferences(self):
         # Return empty if there is no user-preferences file.
@@ -296,9 +305,8 @@ class CliRenamer:
                 self.wrapup(CON.exit_fail, msg)
                 return None
 
-        # Attributes that either don't require merging (disable)
-        # or that need to be merged differently (controls).
-        special = ('disable', 'controls')
+        # Attributes that either don't require merging.
+        special = {'disable'}
 
         # Merge preferences into opts. If the current opts attribute
         # is unset and if the preference was not disabled on the
@@ -318,16 +326,8 @@ class CliRenamer:
                 if current in CLI.unset_opt_vals:
                     setattr(opts, oc.name, rd)
 
-        # Validate and merge the controls from pref and then opts.
-        try:
-            opts.controls = list(ProblemControl.merge(
-                prefs.get('controls'),
-                opts.controls,
-            ))
-            return opts
-        except MvsError as e:
-            self.wrapup(CON.exit_fail, e.msg)
-            return None
+        # Return.
+        return opts
 
     @property
     def user_prefs_path(self):
@@ -504,58 +504,52 @@ class CliRenamer:
 
     def renaming_listing(self):
         # A renaming listing shown to the user before asking for
-        # confirmation to proceed with renaming. It includes.
-        #
-        # - Summary table of tallies (shown if any renamings were
-        #   filtered, skipped, or otherwise controlled).
-        #
-        # - The active renamings and the various filtered, skipped
-        #   controlled renamings.
-        #
-        # Define the data for each section in the listing.
-        # Each tuple is (MSG_FMT, ITEMS).
-        p = self.plan
-        sections = (
-            (MF.listing_rename, p.active),
-            (MF.listing_filter, p.filtered),
-            (MF.listing_skip, p.skipped),
-            (MF.listing_create, p.creates),
-            (MF.listing_clobber, p.clobbers),
+        # confirmation to proceed with renaming.
+        sections = tuple(
+            (fmt, getattr(self.plan, k))
+            for k, fmt in LISTING_FORMATS
         )
-        if not self.opts.list_all:
-            sections = sections[0:1]
-        # Return the full listing.
-        return self.summary_listing() + self.section_listing(sections)
+        return self.para_join(
+            self.failure_listing(),
+            self.summary_listing(),
+            self.section_listing(sections),
+        )
+
+    def para_join(self, *msgs):
+        sep = CON.newline + CON.newline
+        return sep.join(
+            m.rstrip()
+            for m in msgs
+            if m
+        )
 
     def failure_listing(self):
         # A renaming listing shown if the renaming plan
         # was halted during preparation.
-        p = self.plan
-        sections = (
-            (MF.listing_failures, p.failures),
-            (MF.listing_halts, p.halts),
-            (MF.listing_skip, p.skipped),
-        )
-        return self.section_listing(sections)
+        f = self.plan.failure
+        if f:
+            return MF.plan_failed.format(f.msg)
+        else:
+            return ''
 
     def summary_listing(self):
         # Returns a message summarizing a renaming as a table of tallies,
-        # but only if there are any filtered, skipped, controlled renamings.
+        # but only if the plan would fail under strict=all.
         p = self.plan
-        controlled = dict(
-            n_filtered = len(p.filtered),
-            n_skipped = len(p.skipped),
-            n_create = len(p.creates),
-            n_clobber = len(p.clobbers),
-        )
-        if any(controlled.values()):
-            return MF.summary_table.format(
-                n_initial = p.n_initial,
-                n_active = len(p.active),
-                **controlled,
-            ) + CON.newline
-        else:
+        if p.passes_strict_all:
             return ''
+        else:
+            return MF.summary_table.format(
+                p.n_initial,
+                len(p.filtered),
+                len(p.skipped),
+                len(p.excluded),
+                len(p.active),
+                len(p.parent),
+                len(p.exists),
+                len(p.collides),
+                len(p.ok),
+            )
 
     def section_listing(self, sections):
         # Takes data defining the sections of a renaming or failure listing.
@@ -895,10 +889,12 @@ class CLI:
             ),
         ),
         OptConfig(
-            names = '--list-all',
-            validator = bool,
-            action = 'store_true',
-            help = 'Also lists filtered, skipped, and controlled renamings',
+            names = '--list',
+            metavar = 'NAME',
+            validator = OptConfig.list_of_str,
+            nargs = '+',
+            choices = LISTING_CHOICES,
+            help = 'Specify the sections to include in listings',
         ),
         OptConfig(
             names = '--limit',
@@ -909,13 +905,24 @@ class CLI:
         ),
 
         #
-        # Problem control and other configuration.
+        # Problem handling and other configuration.
         #
         OptConfig(
+            group = 'Problem handling and other configuration',
+            names = '--skip',
+            metavar = 'PROB',
+            validator = OptConfig.list_of_str,
+            nargs = '+',
+            choices = Problem.SKIP_CHOICES,
+            help = 'Skip renamings having the named problems [see --details]',
+        ),
+        OptConfig(
             names = '--strict',
-            validator = bool,
-            action = 'store_true',
-            help = 'Handle all problem strictly: halt renaming plan (overrides --controls)',
+            metavar = 'PROB',
+            validator = OptConfig.list_of_str,
+            nargs = '+',
+            choices = StrictMode.CHOICES,
+            help = 'Halt renaming plan if any renamings have the named problems [see --details]',
         ),
         OptConfig(
             names = '--disable',

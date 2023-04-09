@@ -76,17 +76,16 @@ STRUCTURES = constants('Structures', (
 ####
 
 SUMMARY_TABLE = '''
-Summary:
-    Inputs: {n_initial}
-    ----
-    Renamings: {n_active}
-    Filtered: {n_filtered}
-    Skipped: {n_skipped}
-    ----
-    Create parent: {n_create}
-    Clobber existing: {n_clobber}
+Total: {}
+  Filtered: {}
+  Skipped: {}
+  Excluded: {}
+  Active: {}
+    Parent: {}
+    Exists: {}
+    Collides: {}
+    OK: {}
 '''
-
 
 MSG_FORMATS = MF = constants('MsgFormats', dict(
     # MvsError instances in RenamingPlan.
@@ -112,20 +111,26 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     no_editor              = 'The --edit option requires an --editor',
     editor_cmd_nonzero     = 'Editor process exited unsuccessfully: editor={!r}, path={!r}',
     edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
+    plan_failed            = 'Plan failed: {}',
     # Other messages in CliRenamer.
     summary_table          = SUMMARY_TABLE.lstrip(),
-    listing_rename         = 'Paths to be renamed{}:\n',
-    listing_filter         = 'Renamings filtered out by user code{}:\n',
-    listing_skip           = 'Renamings skipped due to problems{}:\n',
-    listing_create         = 'Renamings that will create new parent{}:\n',
-    listing_clobber        = 'Renamings that will clobber existing paths{}:\n',
-    listing_failures       = 'General failures during preparation{}:\n',
-    listing_halts          = 'Renamings that halted the renaming plan during preparation{}:\n',
     confirm_prompt         = '\nRename paths',
     no_action_msg          = '\nNo action taken.',
     paths_renamed_msg      = '\nPaths renamed.',
     cli_version_msg        = f'{CON.app_name} v{__version__}',
 ))
+
+LISTING_FORMATS = constants('ListingFormats', dict(
+    filtered = 'Renamings filtered out by user code{}:\n',
+    skipped  = 'Renamings skipped by user due to problems{}:\n',
+    excluded = 'Renamings excluded due to unresolvable problems{}:\n',
+    parent   = 'Active renamings that will create new parent{}:\n',
+    exists   = 'Active renamings that will clobber existing paths{}:\n',
+    collides = 'Active renamings that will collide with another new path{}:\n',
+    ok       = 'Active renamings without problems{}:\n',
+))
+
+LISTING_CHOICES = (CON.all, *LISTING_FORMATS.keys())
 
 ####
 # Types of renaming changes affecting the name-portion of a path.
@@ -286,6 +291,9 @@ def underscores_to_hyphens(s):
 
 def hyphens_to_underscores(s):
     return s.replace(CON.hyphen, CON.underscore)
+
+def hyphen_join(*xs):
+    return CON.hyphen.join(filter(None, xs))
 
 def with_newline(s):
     if s.endswith(CON.newline):
@@ -478,13 +486,13 @@ FAILURE_VARIETIES = FV = constants('FailureVarieties', (
 ))
 
 FAILURE_FORMATS = {
-    (FN.all_filtered, None):     'All paths were filtered, excluded, or skipped during processing',
-    (FN.parsing, FV.no_paths):   'No input paths',
-    (FN.parsing, FV.paragraphs): 'The --paragraphs option expects exactly two paragraphs',
-    (FN.parsing, FV.row):        'The --rows option expects rows with exactly two cells: {!r}',
-    (FN.parsing, FV.imbalance):  'Got an unequal number of original paths and new paths',
-    (FN.code, None):             'Invalid user-supplied {} code:\n{}',
-    (FN.strict, None):           'RenamingPlan failed to satisfy strict requirements: {!r}',
+    (FN.all_filtered, None):     'all paths were filtered, excluded, or skipped during processing.',
+    (FN.parsing, FV.no_paths):   'no input paths.',
+    (FN.parsing, FV.paragraphs): 'the --paragraphs option expects exactly two paragraphs.',
+    (FN.parsing, FV.row):        'the --rows option expects rows with exactly two cells: {!r}.',
+    (FN.parsing, FV.imbalance):  'got an unequal number of original paths and new paths.',
+    (FN.code, None):             'invalid user-supplied {} code:\n{}',
+    (FN.strict, None):           'RenamingPlan failed to satisfy strict requirements: {!r}.',
 }
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (
@@ -560,7 +568,7 @@ class Problem(Issue):
 
     FORMATS = PROBLEM_FORMATS
 
-    RESOLVABLE = {
+    RESOLVABLE = (
         (PN.exists, None),
         (PN.exists, PV.diff),
         (PN.exists, PV.full),
@@ -568,7 +576,10 @@ class Problem(Issue):
         (PN.collides, PV.diff),
         (PN.collides, PV.full),
         (PN.parent, None),
-    }
+    )
+
+    SKIP_IDS = tuple(hyphen_join(*tup) for tup in RESOLVABLE)
+    SKIP_CHOICES = (CON.all, *SKIP_IDS)
 
     @classmethod
     def is_resolvable(cls, prob):
@@ -579,8 +590,7 @@ class Problem(Issue):
         # Resolvable problems have a skip ID, which is just the NAME-VARIETY
         # string that a user provides when declaring which kinds of problems
         # should cause a Renaming to be skipped.
-        nm, v = (self.name, self.variety)
-        return nm if v is None else f'{nm}-{v}'
+        return hyphen_join(self.name, self.variety)
 
     @classmethod
     def from_skip_id(cls, sid):
@@ -617,33 +627,19 @@ class StrictMode:
 
     EXCLUDED = 'excluded'
     STRICT_PROBS = (PN.parent, PN.exists, PN.collides)
+    CHOICES = (CON.all, EXCLUDED, *STRICT_PROBS)
 
     @classmethod
     def from_user(cls, strict):
-        # Convert to tuple.
-        err = MvsError(MF.invalid_strict, strict)
+        # Normalize and validate.
         try:
-            xs = seq_or_str(strict)
+            xs = validated_choices(strict, StrictMode.CHOICES)
         except Exception:
-            raise err
-        # Validate and process the tuple values.
-        all_strict = False
-        excluded = False
-        probs = set()
-        for x in xs:
-            if x == CON.all:
-                all_strict = True
-            elif x == cls.EXCLUDED:
-                excluded = True
-            elif x in cls.STRICT_PROBS:
-                probs.add(x)
-            else:
-                raise err
+            raise MvsError(MF.invalid_strict, strict)
         # Return a StrictMode.
-        if all_strict:
-            return cls(True, cls.STRICT_PROBS)
-        else:
-            return cls(excluded, tuple(probs))
+        EX = cls.EXCLUDED
+        probs = tuple(x for x in xs if x != EX)
+        return cls(EX in xs, probs)
 
     @property
     def as_str(self):
@@ -652,4 +648,21 @@ class StrictMode:
             *self.probs,
         )
         return CON.space.join(filter(None, xs))
+
+def validated_choices(raw_input, choices):
+    # Normalize to tuple.
+    if raw_input is None:
+        return ()
+    try:
+        xs = seq_or_str(raw_input)
+    except Exception:
+        raise ValueError
+    # Validate elements.
+    if any(x not in choices for x in xs):
+        raise ValueError
+    # Return, with special handling for 'all'.
+    if CON.all in xs:
+        return tuple(x for x in choices if x != CON.all)
+    else:
+        return tuple(set(xs))
 

@@ -35,6 +35,7 @@ from .utils import (
     is_non_empty_dir,
     path_existence_and_type,
     seq_or_str,
+    validated_choices,
 )
 
 ####
@@ -141,12 +142,13 @@ class RenamingPlan:
         self.excluded = []
         self.active = []
 
-        # Renaming instances in self.active that (a) have a resolvable problem,
-        # and (b) were not skipped by the user. These attributes are populated
-        # at the end of prepare() and are used only for listing/reporting.
+        # Attributes holding a breakdown of the active Renaming instances, by
+        # problem name. These are populated at the end of prepare() and are
+        # used for listing/reporting.
         self.parent = []
         self.exists = []
         self.collides = []
+        self.ok = []
 
         # User-supplied code.
         self.rename_code = rename_code
@@ -173,6 +175,7 @@ class RenamingPlan:
 
         # Validate and standardize the user's problem-handling parameters.
         self.strict = StrictMode.from_user(strict)
+        self.passes_strict_all = None
         self.skip = self.validated_skip_ids(skip)
         self.skip_lookup = self.build_skip_lookup()
 
@@ -200,22 +203,34 @@ class RenamingPlan:
         else:
             self.has_prepared = True
 
-        # Get the input paths and parse them to get Renaming instances.
-        self.active = self.parse_inputs()
-        self.n_initial = len(self.active)
-        if self.failed:
-            return
-
-        # Create the renaming and filtering functions from
-        # user-supplied code, if any was given.
-        for action in CON.code_actions.values():
-            func = self.make_user_func(action)
-            setattr(self, action + '_func', func)
+        # Run each step of preparation.
+        steps = (
+            [self.prepare_inputs],
+            [self.prepare_code, CON.code_actions.filter],
+            [self.prepare_code, CON.code_actions.rename],
+            [self.prepare_renamings],
+            [self.prepare_strict],
+            [self.prepare_probs],
+        )
+        for step, *xs in steps:
+            step(*xs)
             if self.failed:
                 return
 
+    def prepare_inputs(self):
+        # Parse input paths to get the Renaming instances.
+        self.active = self.parse_inputs()
+        self.n_initial = len(self.active)
+
+    def prepare_code(self, action):
+        # Create the filtering/renaming functions from
+        # user-supplied code, if any was given.
+        func = self.make_user_func(action)
+        setattr(self, action + '_func', func)
+
+    def prepare_renamings(self):
         # Run the steps that process Renaming instances individually:
-        # - setting their attributes related to path existence, type, etc.
+        # - setting their attributes related to path existence/type/etc.
         # - filtering
         # - computing new paths
         # - checking for problems
@@ -267,21 +282,19 @@ class RenamingPlan:
         # Register Failure if everything was filtered out.
         if not self.active:
             self.handle_failure(FN.all_filtered)
-            return
 
-        # Enforce strict mode.
-        if self.strict:
-            sm = self.strict
-            prob_names = set(rn.prob_name for rn in self.active)
-            halt = (
-                (sm.excluded and self.excluded) or
-                any(p in prob_names for p in sm.probs)
-            )
-            if halt:
-                self.handle_failure(FN.strict, sm.as_str)
-                return
+    def prepare_strict(self):
+        # Check for adherence to strict=all.
+        sm = StrictMode.from_user(CON.all)
+        self.passes_strict_all = self.passes_strict(sm)
+        # Check for adherence to the user's actual strict setting.
+        sm = self.strict
+        if not self.passes_strict(sm):
+            self.handle_failure(FN.strict, sm.as_str)
 
-        # Populate the lists of active Renaming instances having problems.
+    def prepare_probs(self):
+        # Populate the lists of active Renaming instances
+        # having problems (or not).
         for rn in self.active:
             nm = rn.prob_name
             if nm == PN.parent:
@@ -290,6 +303,8 @@ class RenamingPlan:
                 self.exists.append(rn)
             elif nm == PN.collides:
                 self.collides.append(rn)
+            else:
+                self.ok.append(rn)
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -618,12 +633,10 @@ class RenamingPlan:
 
     def validated_skip_ids(self, skip):
         try:
-            return tuple(set(
-                Problem.from_skip_id(sid).sid
-                for sid in seq_or_str(skip)
-            ))
+            return validated_choices(skip, Problem.SKIP_CHOICES)
         except Exception:
-            raise MvsError(MF.invalid_skip, skip)
+            msg = MF.invalid_skip.format(skip)
+            raise MvsError(msg)
 
     def build_skip_lookup(self):
         return set(
@@ -779,4 +792,18 @@ class RenamingPlan:
             prefix_len = self.prefix_len,
             tracking_index = self.tracking_index,
         )
+
+    def passes_strict(self, sm):
+        # Takes a StrictMode instance.
+        # Returns true if the plan passes its settings.
+        if sm is None:
+            return True
+        elif sm.excluded and self.excluded:
+            return False
+        else:
+            active_probs = set(rn.prob_name for rn in self.active)
+            return all(
+                p not in active_probs
+                for p in sm.probs
+            )
 
