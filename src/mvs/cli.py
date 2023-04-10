@@ -26,6 +26,7 @@ from .utils import (
     StrictMode,
     edit_text,
     hyphens_to_underscores,
+    indented,
     positive_int,
     read_from_clipboard,
     read_from_file,
@@ -141,13 +142,13 @@ class CliRenamer:
         # Prepare the RenamingPlan, log plan information, and halt if it failed.
         plan.prepare()
         self.write_log_file(self.LOG_TYPE.plan)
-        if plan.failed:
-            self.paginate(self.renaming_listing())
-            self.wrapup(CON.exit_fail, MF.no_action_msg)
-            return
 
         # Print the renaming listing.
         self.paginate(self.renaming_listing())
+
+        if plan.failed:
+            self.wrapup(CON.exit_fail, MF.no_action_msg)
+            return
 
         # Stop if dryrun mode.
         if opts.dryrun:
@@ -573,7 +574,10 @@ class CliRenamer:
         lim = n if self.opts.limit is None else self.opts.limit
         tally = f' (total {n})'
         msg = fmt.format(tally)
-        items = CON.newline.join(x.formatted for x in items[0:self.opts.limit])
+        items = CON.newline.join(
+            indented(x.formatted)
+            for x in items[0:self.opts.limit]
+        )
         return f'{msg}\n{items}'
 
     def paginate(self, text):
@@ -588,7 +592,7 @@ class CliRenamer:
             p.stdin.write(text.encode(CON.encoding))
             p.communicate()
         else:
-            self.stdout.write(text)
+            self.stdout.write(text + CON.newline)
 
     ####
     # Other.

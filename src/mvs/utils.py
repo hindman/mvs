@@ -38,6 +38,7 @@ class CON:
     hyphen = '-'
     comma_space = ', '
     dash = hyphen + hyphen
+    indent = '  '
     all = 'all'
     all_tup = (all,)
     yes = 'yes'
@@ -76,15 +77,17 @@ STRUCTURES = constants('Structures', (
 ####
 
 SUMMARY_TABLE = '''
-Total: {}
-  Filtered: {}
-  Skipped: {}
-  Excluded: {}
-  Active: {}
-    Parent: {}
-    Exists: {}
-    Collides: {}
-    OK: {}
+# Renaming plan summary:
+
+  Total: {}
+    Filtered: {}
+    Skipped: {}
+    Excluded: {}
+    Active: {}
+      Parent: {}
+      Exists: {}
+      Collides: {}
+      OK: {}
 '''
 
 MSG_FORMATS = MF = constants('MsgFormats', dict(
@@ -121,13 +124,13 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
 ))
 
 LISTING_FORMATS = constants('ListingFormats', dict(
-    filtered = 'Renamings filtered out by user code{}:\n',
-    skipped  = 'Renamings skipped by user due to problems{}:\n',
-    excluded = 'Renamings excluded due to unresolvable problems{}:\n',
-    parent   = 'Active renamings that will create new parent{}:\n',
-    exists   = 'Active renamings that will clobber existing paths{}:\n',
-    collides = 'Active renamings that will collide with another new path{}:\n',
-    ok       = 'Active renamings without problems{}:\n',
+    filtered = '# Renamings: filtered out by user code{}:\n',
+    skipped  = '# Renamings: skipped by user due to problems{}:\n',
+    excluded = '# Renamings: excluded due to unresolvable problems{}:\n',
+    parent   = '# Active renamings: will create new parent{}:\n',
+    exists   = '# Active renamings: will clobber existing path{}:\n',
+    collides = '# Active renamings: will collide with another new path{}:\n',
+    ok       = '# Active renamings: no problem{}:\n',
 ))
 
 LISTING_CHOICES = (CON.all, *LISTING_FORMATS.keys())
@@ -300,6 +303,15 @@ def with_newline(s):
         return s
     else:
         return s + CON.newline
+
+def indented(msg):
+    if msg:
+        return CON.newline.join(
+            CON.indent + line
+            for line in msg.split(CON.newline)
+        )
+    else:
+        return ''
 
 def wrap_text(text, width):
     # Takes some text and a max width.
@@ -492,7 +504,7 @@ FAILURE_FORMATS = {
     (FN.parsing, FV.row):        'the --rows option expects rows with exactly two cells: {!r}.',
     (FN.parsing, FV.imbalance):  'got an unequal number of original paths and new paths.',
     (FN.code, None):             'invalid user-supplied {} code:\n{}',
-    (FN.strict, None):           'RenamingPlan failed to satisfy strict requirements: {!r}.',
+    (FN.strict, None):           'renaming plan failed to satisfy strict: {!r}.',
 }
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (

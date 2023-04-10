@@ -32,6 +32,7 @@ from .utils import (
     case_sensitivity,
     determine_path_type,
     get_source_code,
+    indented,
     is_non_empty_dir,
     path_existence_and_type,
     seq_or_str,
@@ -83,10 +84,8 @@ class Renaming:
 
     @property
     def formatted(self):
-        prefix = (
-            f'# Problem: {self.prob_name}\n' if self.problem
-            else ''
-        )
+        p = self.problem
+        prefix = f'# Problem: {p.sid}\n' if p else ''
         return f'{prefix}{self.orig}\n{self.new}\n'
 
 ####
@@ -422,7 +421,7 @@ class RenamingPlan:
             return locs[func_name]
         except Exception as e:
             tb = traceback.format_exc(limit = 0)
-            self.handle_failure(FN.code, action, tb)
+            self.handle_failure(FN.code, action, indented(tb.lstrip()))
             return None
 
     ####

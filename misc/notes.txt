@@ -15,8 +15,6 @@ todos: TODOs
 
 Overhaul [PC_OVERHAUL].
 
-    - Assess and fine-tune the CLI listing behavior.
-
     - Get a couple tests passing in test_cli.py.
 
     - Get all tests working:
@@ -307,6 +305,12 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
           --strict.
 
         - Probably code in problems.py to utils.py.
+
+Scenario to exercise CLI listing behavior:
+
+    # Scenario in empty directory.
+    ln -s foo bar && touch a d e f g h i ii j jj n
+    mvs --dryrun --pager '' --filter 'return "k" not in o' --skip collides --pairs a b  c c  d xx/d  e x  f m g m  h xx/h  i ii  j jj  k1 kk1 k2 kk2 n nn
 
 Why runtime user-code problems are treated as unresolvable:
 
