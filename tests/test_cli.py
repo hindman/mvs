@@ -254,7 +254,7 @@ def run_checks(
         elif callable(out):
             assert cli.out == out(wa, outs, cli)
         elif out is None:
-            exp = '' if failure else outs.regular_output
+            exp = '' if failure else outs.renaming_listing()
             assert cli.out == exp
         elif out is not BYPASS:
             assert cli.out == out
@@ -426,7 +426,6 @@ def test_indent_and_posint(tr, creators):
 # Basic renaming usage.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_basic_use_cases(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -501,9 +500,6 @@ def test_odd_number_inputs(tr, creators):
         out_in = (FF.parsing_imbalance, pre_fmt(MF.listing_failures)),
         log = PLAN_LOG_OK,
     )
-
-    # tr.dump([cli.err])
-    # tr.dump([cli.out])
 
 @pytest.mark.skip(reason = 'overhaul')
 def test_sources(tr, creators):
@@ -1095,7 +1091,7 @@ def test_main(tr, create_wa, create_outs):
         k : fh.getvalue()
         for k, fh in fhs.items()
     })
-    assert cli.stdout == outs.regular_output
+    assert cli.stdout == outs.renaming_listing()
     assert cli.stderr == ''
     assert cli.stdin == ''
     check_log(cli, 'plan')
@@ -1105,7 +1101,6 @@ def test_main(tr, create_wa, create_outs):
 # Problem control.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_some_failed_rns(tr, creators):
     # Paths and args.
     origs = ('z1', 'z2', 'z3', 'z4')
@@ -1117,7 +1112,31 @@ def test_some_failed_rns(tr, creators):
     # Create a WorkArea just to get some paths that we need later.
     WA = creators[0](origs, news)
 
-    # Initial scenario: two of the new paths already exist.
+    # TODO: here.
+    return
+
+    # Scenario: two of the new paths already exist.
+    # By default, renaming forges ahead and clobbers.
+    wa, outs, cli = run_checks(
+        *run_args,
+        extras = extras,
+        # expecteds = expecteds,
+        # outs_origs = WA.origs[2:],
+        # outs_news = WA.news[2:],
+        summary = (4, 0, 2, 0, 4, 0, 2, 0, 2),
+        inventory = 'ee..',
+
+        # diagnostics = True,
+        check_outs = False,
+    )
+
+    tr.dump(cli.out)
+    tr.dump([rn.orig for rn in cli.plan.active])
+
+    return
+
+
+
     # No renaming occurs if with set control to halt.
     wa, outs, cli = run_checks(
         *run_args,
@@ -1128,17 +1147,6 @@ def test_some_failed_rns(tr, creators):
         err_in = MF.no_action_msg,
         out_in = (pre_fmt(MF.listing_halts), f'# Problem: {PN.exists}\n'),
         log = PLAN_LOG_OK,
-    )
-
-    # Scenario: but it works if well leave the skip default in place.
-    wa, outs, cli = run_checks(
-        *run_args,
-        '--controls', 'skip-exists',
-        extras = extras,
-        expecteds = expecteds,
-        outs_origs = WA.origs[2:],
-        outs_news = WA.news[2:],
-        summary = (4, 2, 0, 2, 0, 0),
     )
 
     # Scenario: pass conflicting failure-control options.

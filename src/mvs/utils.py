@@ -307,7 +307,7 @@ def with_newline(s):
 def indented(msg):
     if msg:
         return CON.newline.join(
-            CON.indent + line
+            (CON.indent + line) if line.strip() else line
             for line in msg.split(CON.newline)
         )
     else:

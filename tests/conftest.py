@@ -9,7 +9,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from mvs.utils import CON, MSG_FORMATS as MF
+from mvs.utils import (
+    CON,
+    MSG_FORMATS as MF,
+    LISTING_FORMATS as LF,
+)
 
 ####
 # Set the mvs environment variable so that (1) the user's personal
@@ -380,64 +384,98 @@ class WorkArea:
 
 class Outputs:
 
-    SUMMARY_KEYS = (
-        'n_initial',
-        'n_active',
-        'n_filtered',
-        'n_skipped',
-        'n_create',
-        'n_clobber',
-    )
+    INV_MAP = {
+        'f': 'filtered',
+        's': 'skipped',
+        'X': 'excluded',
+        'p': 'parent',
+        'e': 'exists',
+        'c': 'collides',
+        '.': 'ok',
+    }
 
     def __init__(self, origs, news, total = None, summary = None):
         self.origs = origs
         self.news = news
-        self.total = len(origs) if total is None else total
-        self.summary = None
-        if summary:
-            kws = dict(zip(self.SUMMARY_KEYS, summary))
-            self.summary = MF.summary_table.format(**kws) + CON.newline
+        self.total = (
+            len(origs) if total is None
+            else total
+        )
+        self.summary = (
+            None if summary is None else
+            MF.summary_table.format(*summary) + CON.newline
+        )
 
     @property
     def totlist(self):
-        return f'(total {self.total})'
+        return f' (total {self.total})'
 
-    @property
-    def regular_output(self):
+
+    def renaming_listing(self, inventory = None, plan = None):
         return ''.join((
             self.summary or '',
             self.listing_rename,
-            self.paths_renamed,
+            MF.paths_renamed_msg.lstrip(),
+            '\n',
         ))
+
+        # TODO
+
+        # Assemble the expected inventory of paths.
+
+        # The parameter can be dict or a shorthand format.
+        # if 
+
+
+        if isinstance(inventory, dict):
+            # If dict, it maps ATTR => [ORIGS].
+            exp = {
+                attr : sorted(inventory.get(attr, []))
+                for attr in self.INV_MAP.values()
+            }
+        else:
+            # 
+            # A str or None uses a convenience format based on INV_MAP.
+            n = len(wa.origs)
+            if inventory is None:
+                # Everything in the active bucket.
+                inventory = '.'
+            if len(inventory) == 1:
+                # Single char: all origs end up in same bucket.
+                inventory = inventory * n
+            assert len(inventory) == n
+            pairs = tuple(zip(inventory, wa.origs))
+            exp = {
+                attr : sorted(o for abbrev, o in pairs if abbrev == k)
+                for k, attr in self.INV_MAP.items()
+            }
+        # Assemble actual inventory and assert.
+        got = {
+            attr : sorted(rn.orig for rn in getattr(plan, attr))
+            for attr in self.INV_MAP.values()
+        }
+        assert got == exp
 
     @property
     def no_action_output(self):
-        return self.listing_rename + self.no_action
+        return self.listing_rename + MF.no_action_msg
 
     @property
     def no_confirm_output(self):
-        return self.listing_rename + self.confirm + self.no_action
+        return (
+            self.listing_rename +
+            f'{MF.confirm_prompt} [yes]? \n'.lstrip() +
+            MF.no_action_msg
+        )
 
     @property
     def listing_rename(self):
-        args = [f'Paths to be renamed {self.totlist}:\n']
+        args = [LF.ok.format(self.totlist)]
         args.extend(
-            f'{o}\n{n}\n'
+            f'  {o}\n  {n}\n'
             for o, n in zip(self.origs, self.news)
         )
         return '\n'.join(args) + '\n'
-
-    @property
-    def confirm(self):
-        return f'Rename paths [yes]? \n'
-
-    @property
-    def paths_renamed(self):
-        return 'Paths renamed.\n'
-
-    @property
-    def no_action(self):
-        return 'No action taken.\n'
 
 ####
 # A class used by the create_prefs() fixture to (1) write a user-preferences

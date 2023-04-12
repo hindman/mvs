@@ -130,7 +130,7 @@ def run_checks(
         # Assemble the expected inventory. The parmeter
         # can be dict, None, or str.
         if isinstance(inventory, dict):
-            # Dict provides the rn.orig values directly.
+            # If dict, it maps ATTR => [ORIGS].
             exp = {
                 attr : sorted(inventory.get(attr, []))
                 for attr in INV_MAP.values()
@@ -139,13 +139,15 @@ def run_checks(
             # A str or None uses a convenience format based on INV_MAP.
             n = len(wa.origs)
             if inventory is None:
+                # Everything in the active bucket.
                 inventory = '.'
             if len(inventory) == 1:
+                # Single char: all origs end up in same bucket.
                 inventory = inventory * n
             assert len(inventory) == n
             pairs = tuple(zip(inventory, wa.origs))
             exp = {
-                attr : sorted(o for i, o in pairs if i == k)
+                attr : sorted(o for abbrev, o in pairs if abbrev == k)
                 for k, attr in INV_MAP.items()
             }
         # Assemble actual inventory and assert.
@@ -172,7 +174,7 @@ INV_MAP = {
     '.': 'active',
     'f': 'filtered',
     's': 'skipped',
-    'E': 'excluded',
+    'X': 'excluded',
 }
 
 ####
@@ -465,7 +467,7 @@ def test_code_execution_fails(tr, create_wa):
     news = ('aa', 'bb', 'cc')
     expecteds_skip = ('aa', FAILING_ORIG, 'cc')
     exp_inv = '.s.'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Code that will cause the second Renaming
@@ -492,7 +494,7 @@ def test_code_execution_fails(tr, create_wa):
             failure = True,
             no_change = True,
             include_news = 'filter_code' in kws,
-            inventory = exp_invH,
+            inventory = exp_invX,
             **kws,
         )
 
@@ -676,7 +678,7 @@ def test_equal(tr, create_wa):
     SAME = 'd'
     origs = ('a', 'b', 'c') + (SAME,)
     news = ('a.new', 'b.new', 'c.new') + (SAME,)
-    exp_inv = '...E'
+    exp_inv = '...X'
     strict = 'excluded'
     reason = Failure(FN.strict, strict)
     run_args = (tr, create_wa, origs, news)
@@ -708,7 +710,7 @@ def test_same(tr, create_wa):
     expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
     expecteds_no_skip = origs + ('foo', 'BAR')
     exp_inv = 'ss.'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenarios: for the first two Renaming instances,
@@ -729,7 +731,7 @@ def test_same(tr, create_wa):
             controls = 'halt-parent',
             failure = True,
             reason = PN.parent,
-            inventory = exp_invH,
+            inventory = exp_invX,
         )
 
         # Scenario: it will succeed if we set the control to create.
@@ -756,7 +758,7 @@ def test_same(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.same,
-            inventory = exp_invH,
+            inventory = exp_invX,
         )
 
 @pytest.mark.skip(reason = 'overhaul')
@@ -772,7 +774,7 @@ def test_missing_orig(tr, create_wa):
         active = ['a', 'b'],
         skipped = ['c', 'd'],
     )
-    exp_invH = dict(
+    exp_invX = dict(
         active = exp_inv['active'],
         excluded = exp_inv['skipped'],
     )
@@ -795,7 +797,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Or if we use strict mode.
@@ -807,7 +809,7 @@ def test_missing_orig(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.missing,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
 @pytest.mark.skip(reason = 'overhaul')
@@ -819,7 +821,7 @@ def test_orig_type(tr, create_wa):
     extras = (TARGET,)
     expecteds = ('a.new', 'b.new', 'c', TARGET)
     exp_inv = '..s'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are not regular files.
@@ -831,7 +833,7 @@ def test_orig_type(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.type,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -890,7 +892,7 @@ def test_new_exists_diff(tr, create_wa):
     extras_full = ('a.new/', 'a.new/foo')
     expecteds_skip = ('a',) + news
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario 1: one of new paths already exists and it
@@ -911,7 +913,7 @@ def test_new_exists_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_diff,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # 1C: Renaming will also succeed if allow clobber.
@@ -939,7 +941,7 @@ def test_new_exists_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_full,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # 2C: And it will succeed if we allow clobber.
@@ -958,7 +960,7 @@ def test_new_exists_diff_parents(tr, create_wa):
     extras = ('xy/', 'xy/b.new')
     expecteds = ('a.new', 'b') + extras
     exp_inv = '.s'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists and
@@ -971,7 +973,7 @@ def test_new_exists_diff_parents(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -989,7 +991,7 @@ def test_new_exists_different_case(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = ('B.NEW',)
     exp_inv = '.s.'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     if case_sensitivity() == FS_TYPES.case_sensitive:
@@ -1009,7 +1011,7 @@ def test_new_exists_different_case(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.exists,
-            inventory = exp_invH,
+            inventory = exp_invX,
         )
 
         # Scenario: renaming will succeed if we request clobbering.
@@ -1081,7 +1083,7 @@ def test_new_exists_non_empty(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new/', 'a.new/foo')
     exp_inv = 's..'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: don't include the extras. Renaming succeeds.
@@ -1097,7 +1099,7 @@ def test_new_exists_non_empty(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.exists_full,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Scenario: if we exclude the last extras path, the
@@ -1116,7 +1118,7 @@ def test_new_parent_missing(tr, create_wa):
     expecteds_skip = ('a.new', 'b.new', 'c')
     expecteds_create = news + ('xy/', 'xy/zzz/')
     exp_inv = '..s'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: a new-parent is missing.
@@ -1127,7 +1129,7 @@ def test_new_parent_missing(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.parent,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Scenario: same. By default, offending paths are skipped.
@@ -1153,7 +1155,7 @@ def test_news_collide(tr, create_wa):
     expecteds_clobber = ('a.new', 'b.new')
     run_args = (tr, create_wa, origs, news)
     exp_inv = 's.s'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
 
     # Scenario: some new paths collide.
     # By default, offending paths are skipped.
@@ -1170,7 +1172,7 @@ def test_news_collide(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.collides,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Renaming will succeed if we request clobbering.
@@ -1218,7 +1220,7 @@ def test_news_collide_case(tr, create_wa):
     expecteds_skip = ('a.new', 'b', 'c')
     expecteds_clobber = ('a.new', 'B.NEW')
     exp_inv = '.ss'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: new paths "collide" in a case-insensitive way.
@@ -1242,7 +1244,7 @@ def test_news_collide_case(tr, create_wa):
             failure = True,
             no_change = True,
             reason = PN.collides,
-            inventory = exp_invH,
+            inventory = exp_invX,
         )
 
 @pytest.mark.skip(reason = 'overhaul')
@@ -1255,7 +1257,7 @@ def test_news_collide_diff(tr, create_wa):
     expecteds_clobber = ('a.new', 'b.new')
     run_args = (tr, create_wa, origs, news)
     exp_inv = 's.ss'
-    exp_invH = exp_inv.replace('s', 'E')
+    exp_invX = exp_inv.replace('s', 'X')
 
     # Scenario: some new paths collide and differ in type.
     # By default, offending paths are skipped.
@@ -1272,7 +1274,7 @@ def test_news_collide_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = PN.collides_diff,
-        inventory = exp_invH,
+        inventory = exp_invX,
     )
 
     # Renaming will succeed if we request clobbering.

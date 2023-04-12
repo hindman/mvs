@@ -17,6 +17,11 @@ Overhaul [PC_OVERHAUL].
 
     - Get a couple tests passing in test_cli.py.
 
+        x test_basic_use_cases()
+        . test_some_failed_rns()
+            - started work on this: currently it returns early
+            - started work on Outputs.renaming_listing()
+
     - Get all tests working:
         x test_utils.py
         - test_plan.py
