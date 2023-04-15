@@ -13,6 +13,8 @@ from mvs.utils import (
     CON,
     MSG_FORMATS as MF,
     LISTING_FORMATS as LF,
+    indented,
+    para_join,
 )
 
 ####
@@ -384,6 +386,9 @@ class WorkArea:
 
 class Outputs:
 
+    # Maps SHORTCUT => ATTRIBUTE for the purpose of checking
+    # the inventory of renamings in an Renaming Plan.
+    OK = '.'
     INV_MAP = {
         'f': 'filtered',
         's': 'skipped',
@@ -391,91 +396,114 @@ class Outputs:
         'p': 'parent',
         'e': 'exists',
         'c': 'collides',
-        '.': 'ok',
+        OK: 'ok',
     }
 
-    def __init__(self, origs, news, total = None, summary = None):
+    def __init__(self, origs, news, inventory = None):
         self.origs = origs
         self.news = news
-        self.total = (
-            len(origs) if total is None
-            else total
-        )
-        self.summary = (
-            None if summary is None else
-            MF.summary_table.format(*summary) + CON.newline
+        self.inventory = (
+            self.OK if inventory is None
+            else inventory
         )
 
-    @property
-    def totlist(self):
-        return f' (total {self.total})'
+    def total_msg(self, n):
+        return f' (total {n})'
 
-
-    def renaming_listing(self, inventory = None, plan = None):
-        return ''.join((
-            self.summary or '',
-            self.listing_rename,
-            MF.paths_renamed_msg.lstrip(),
-            '\n',
-        ))
-
-        # TODO
-
-        # Assemble the expected inventory of paths.
-
-        # The parameter can be dict or a shorthand format.
-        # if 
-
-
-        if isinstance(inventory, dict):
-            # If dict, it maps ATTR => [ORIGS].
-            exp = {
-                attr : sorted(inventory.get(attr, []))
+    def renaming_listing(self, plan):
+        # Convert the inventory supplied to Outputs to a dict mapping each
+        # INV_MAP attribute to the orig paths we expect.
+        #
+        # The inventory can be a dict already in that form. If so, we
+        # just add any missing keys.
+        #
+        # Or it can be a str using the abbreviations in INV_MAP, and
+        # optionally using the shortcut where a single character means
+        # that all renamings end up in the same bucket.
+        inv = self.inventory
+        if isinstance(inv, dict):
+            exp_origs = {
+                attr : inv.get(attr, [])
                 for attr in self.INV_MAP.values()
             }
         else:
-            # 
-            # A str or None uses a convenience format based on INV_MAP.
-            n = len(wa.origs)
-            if inventory is None:
-                # Everything in the active bucket.
-                inventory = '.'
-            if len(inventory) == 1:
-                # Single char: all origs end up in same bucket.
-                inventory = inventory * n
-            assert len(inventory) == n
-            pairs = tuple(zip(inventory, wa.origs))
-            exp = {
-                attr : sorted(o for abbrev, o in pairs if abbrev == k)
+            if len(inv) == 1:
+                inv = inv * len(self.origs)
+            pairs = tuple(zip(inv, self.origs))
+            exp_origs = {
+                attr : [o for abbrev, o in pairs if abbrev == k]
                 for k, attr in self.INV_MAP.items()
             }
-        # Assemble actual inventory and assert.
-        got = {
-            attr : sorted(rn.orig for rn in getattr(plan, attr))
-            for attr in self.INV_MAP.values()
-        }
-        assert got == exp
+
+        # Use those expected orig paths to assemble the expected summary table.
+        counts = [len(origs) for origs in exp_origs.values()]
+        inactive = counts[0:3]
+        active = counts[3:]
+        n_tot = sum(counts)
+        n_active = sum(active)
+        n_ok = counts[-1]
+        if n_ok == n_tot:
+            summary = ''
+        else:
+            summary = MF.summary_table.format(
+                n_tot,
+                *inactive,
+                n_active,
+                *active,
+            )
+
+        # Use the RenamingPlan to build a dict mapping each orig path to the
+        # Renaming instances with that path. This dict will allow us to connect
+        # the orig paths in exp_origs to the Renaming instances in the plan.
+        orig_lookup = {}
+        for attr in self.INV_MAP.values():
+            for rn in getattr(plan, attr):
+                orig_lookup.setdefault(rn.orig, []).append(rn)
+
+        # Assemble the paragraphs we expect to see in the renaming listing.
+        # It starts with the summary table and then adds a section of
+        # renamings for each non-empty bucket in exp_origs.
+        paras = [summary]
+        for attr, origs in exp_origs.items():
+            if origs:
+                # The heading.
+                tot = self.total_msg(len(origs))
+                heading = LF[attr].format(tot)
+                paras.append(heading)
+                # The indented/formatted Renaming instances.
+                paras.extend(
+                    indented(orig_lookup[o].pop(0).formatted)
+                    for o in origs
+                )
+
+        # Add the paths-renamed msg, combined the paragraphs, and return.
+        paras.append(MF.paths_renamed_msg.lstrip())
+        return para_join(*paras) + CON.newline
 
     @property
     def no_action_output(self):
+        # TODO: relies on obsolete listing property.
         return self.listing_rename + MF.no_action_msg
 
     @property
     def no_confirm_output(self):
+        # TODO: relies on obsolete listing property.
         return (
             self.listing_rename +
             f'{MF.confirm_prompt} [yes]? \n'.lstrip() +
             MF.no_action_msg
         )
 
-    @property
-    def listing_rename(self):
-        args = [LF.ok.format(self.totlist)]
-        args.extend(
-            f'  {o}\n  {n}\n'
-            for o, n in zip(self.origs, self.news)
-        )
-        return '\n'.join(args) + '\n'
+    # OBSOLETE:
+    #
+    # @property
+    # def listing_rename(self):
+    #     args = [LF.ok.format(self.totlist)]
+    #     args.extend(
+    #         f'  {o}\n  {n}\n'
+    #         for o, n in zip(self.origs, self.news)
+    #     )
+    #     return '\n'.join(args) + '\n'
 
 ####
 # A class used by the create_prefs() fixture to (1) write a user-preferences

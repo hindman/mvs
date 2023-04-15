@@ -130,7 +130,7 @@ LISTING_FORMATS = constants('ListingFormats', dict(
     parent   = '# Active renamings: will create new parent{}:\n',
     exists   = '# Active renamings: will clobber existing path{}:\n',
     collides = '# Active renamings: will collide with another new path{}:\n',
-    ok       = '# Active renamings: no problem{}:\n',
+    ok       = '# Active renamings: with no problems{}:\n',
 ))
 
 LISTING_CHOICES = (CON.all, *LISTING_FORMATS.keys())
@@ -312,6 +312,14 @@ def indented(msg):
         )
     else:
         return ''
+
+def para_join(*msgs):
+    sep = CON.newline + CON.newline
+    return sep.join(
+        m.rstrip()
+        for m in msgs
+        if m
+    )
 
 def wrap_text(text, width):
     # Takes some text and a max width.

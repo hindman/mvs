@@ -204,16 +204,16 @@ class RenamingPlan:
 
         # Run each step of preparation.
         steps = (
-            [self.prepare_inputs],
-            [self.prepare_code, CON.code_actions.filter],
-            [self.prepare_code, CON.code_actions.rename],
-            [self.prepare_renamings],
-            [self.prepare_strict],
-            [self.prepare_probs],
+            [True, self.prepare_inputs],
+            [True, self.prepare_code, CON.code_actions.filter],
+            [True, self.prepare_code, CON.code_actions.rename],
+            [False, self.prepare_renamings],
+            [False, self.prepare_probs],
+            [False, self.prepare_strict],
         )
-        for step, *xs in steps:
+        for halt_on_fail, step, *xs in steps:
             step(*xs)
-            if self.failed:
+            if halt_on_fail and self.failed:
                 return
 
     def prepare_inputs(self):
@@ -282,15 +282,6 @@ class RenamingPlan:
         if not self.active:
             self.handle_failure(FN.all_filtered)
 
-    def prepare_strict(self):
-        # Check for adherence to strict=all.
-        sm = StrictMode.from_user(CON.all)
-        self.passes_strict_all = self.passes_strict(sm)
-        # Check for adherence to the user's actual strict setting.
-        sm = self.strict
-        if not self.passes_strict(sm):
-            self.handle_failure(FN.strict, sm.as_str)
-
     def prepare_probs(self):
         # Populate the lists of active Renaming instances
         # having problems (or not).
@@ -304,6 +295,15 @@ class RenamingPlan:
                 self.collides.append(rn)
             else:
                 self.ok.append(rn)
+
+    def prepare_strict(self):
+        # Check for adherence to strict=all.
+        sm = StrictMode.from_user(CON.all)
+        self.passes_strict_all = self.passes_strict(sm)
+        # Check for adherence to the user's actual strict setting.
+        sm = self.strict
+        if not self.passes_strict(sm):
+            self.handle_failure(FN.strict, sm.as_str)
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.

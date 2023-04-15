@@ -27,6 +27,7 @@ from .utils import (
     edit_text,
     hyphens_to_underscores,
     indented,
+    para_join,
     positive_int,
     read_from_clipboard,
     read_from_file,
@@ -142,15 +143,18 @@ class CliRenamer:
         # Prepare the RenamingPlan, log plan information, and halt if it failed.
         plan.prepare()
         self.write_log_file(self.LOG_TYPE.plan)
+        if self.done:
+            return
 
         # Print the renaming listing.
         self.paginate(self.renaming_listing())
 
+        # Return if plan failed.
         if plan.failed:
             self.wrapup(CON.exit_fail, MF.no_action_msg)
             return
 
-        # Stop if dryrun mode.
+        # Return if dryrun mode.
         if opts.dryrun:
             self.wrapup(CON.exit_ok, MF.no_action_msg)
             return
@@ -159,6 +163,7 @@ class CliRenamer:
         if not opts.yes:
             if not self.get_confirmation(MF.confirm_prompt, expected = CON.yes):
                 self.wrapup(CON.exit_ok, MF.no_action_msg)
+                return
 
     def do_rename(self):
         # Don't execute more than once.
@@ -510,18 +515,10 @@ class CliRenamer:
             (fmt, getattr(self.plan, k))
             for k, fmt in LISTING_FORMATS
         )
-        return self.para_join(
+        return para_join(
             self.failure_listing(),
             self.summary_listing(),
             self.section_listing(sections),
-        )
-
-    def para_join(self, *msgs):
-        sep = CON.newline + CON.newline
-        return sep.join(
-            m.rstrip()
-            for m in msgs
-            if m
         )
 
     def failure_listing(self):

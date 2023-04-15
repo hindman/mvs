@@ -126,10 +126,7 @@ def run_checks(
                prefs = None,
                blob = None,
                # Outputs.
-               outs_origs = None,
-               outs_news = None,
-               total = None,
-               summary = None,
+               inventory = None,
                # Functions allowing user to do things midway through.
                other_prep = None,
                early_checks = None,
@@ -178,10 +175,9 @@ def run_checks(
 
     # Set up Outputs.
     outs = create_outs(
-        outs_origs or wa.origs,
-        outs_news or wa.news,
-        total = total,
-        summary = summary,
+        wa.origs,
+        wa.news,
+        inventory = inventory,
     )
 
     # Set up CliRenamer
@@ -254,7 +250,7 @@ def run_checks(
         elif callable(out):
             assert cli.out == out(wa, outs, cli)
         elif out is None:
-            exp = '' if failure else outs.renaming_listing()
+            exp = '' if failure else outs.renaming_listing(cli.plan)
             assert cli.out == exp
         elif out is not BYPASS:
             assert cli.out == out
@@ -1112,53 +1108,24 @@ def test_some_failed_rns(tr, creators):
     # Create a WorkArea just to get some paths that we need later.
     WA = creators[0](origs, news)
 
-    # TODO: here.
-    return
-
     # Scenario: two of the new paths already exist.
     # By default, renaming forges ahead and clobbers.
     wa, outs, cli = run_checks(
         *run_args,
         extras = extras,
-        # expecteds = expecteds,
-        # outs_origs = WA.origs[2:],
-        # outs_news = WA.news[2:],
-        summary = (4, 0, 2, 0, 4, 0, 2, 0, 2),
         inventory = 'ee..',
-
-        # diagnostics = True,
-        check_outs = False,
     )
 
-    tr.dump(cli.out)
-    tr.dump([rn.orig for rn in cli.plan.active])
-
-    return
-
-
-
-    # No renaming occurs if with set control to halt.
+    # In strict mode, the plan fails.
     wa, outs, cli = run_checks(
         *run_args,
-        '--controls', 'halt-exists',
+        '--strict', 'exists',
         extras = extras,
         no_change = True,
         failure = True,
-        err_in = MF.no_action_msg,
-        out_in = (pre_fmt(MF.listing_halts), f'# Problem: {PN.exists}\n'),
+        out = BYPASS,                                # TODO: fix.
+        err = MF.no_action_msg + CON.newline,
         log = PLAN_LOG_OK,
-    )
-
-    # Scenario: pass conflicting failure-control options.
-    # No renaming occurs.
-    wa, outs, cli = run_checks(
-        *run_args,
-        '--controls', 'skip-exists', 'clobber-exists',
-        extras = extras,
-        no_change = True,
-        failure = True,
-        err_starts = pre_fmt(MF.conflicting_controls),
-        err_in = (CONTROLS.skip, CONTROLS.clobber),
     )
 
 ####

@@ -15,12 +15,29 @@ todos: TODOs
 
 Overhaul [PC_OVERHAUL].
 
+    - New check: origs must be unique.
+
     - Get a couple tests passing in test_cli.py.
 
         x test_basic_use_cases()
         . test_some_failed_rns()
-            - started work on this: currently it returns early
-            - started work on Outputs.renaming_listing()
+
+            - Function is working for a non-failure usage.
+
+            - But not when failure=True. For now, I set out=BYPASS. Fix.
+
+            - The function is misnamed at this point. It could become a vehicle
+              or exemplar for wider testing of the listing behavior.
+
+            - run_checks() needs some adjustment.
+
+                - Under the new approach to listings, there's little
+                  distinction between a renaming listing on success vs failure.
+
+                - When failure occurs, the listing is still present.
+
+                - Very little output goes to STDERR. All of the listing
+                  goes to STDOUT.
 
     - Get all tests working:
         x test_utils.py
@@ -30,6 +47,11 @@ Overhaul [PC_OVERHAUL].
 Tests:
     - do_rename(): exercise code branch with MF.unsupported_clobber.
     - New listing/reporting behavior: exercise the range of behaviors
+        -
+    - Test this behavior independently.
+        indented()
+        para_join()
+        Renaming.formatted
 
 New documentation [see NEW_DOCS].
 
