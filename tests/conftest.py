@@ -11,8 +11,9 @@ from pathlib import Path
 
 from mvs.utils import (
     CON,
-    MSG_FORMATS as MF,
+    FAILURE_FORMATS as FF,
     LISTING_FORMATS as LF,
+    MSG_FORMATS as MF,
     indented,
     para_join,
 )
@@ -399,13 +400,21 @@ class Outputs:
         OK: 'ok',
     }
 
-    def __init__(self, origs, news, inventory = None):
+    def __init__(self, origs, news, inventory = None, fail_params = None):
         self.origs = origs
         self.news = news
         self.inventory = (
             self.OK if inventory is None
             else inventory
         )
+        if fail_params is None:
+            self.fail_msg = ''
+            self.no_change = False
+        else:
+            name, variety, *xs = fail_params
+            fmsg = FF[name, variety].format(*xs)
+            self.fail_msg = MF.plan_failed.format(fmsg)
+            self.no_change = True
 
     def total_msg(self, n):
         return f' (total {n})'
@@ -461,9 +470,10 @@ class Outputs:
                 orig_lookup.setdefault(rn.orig, []).append(rn)
 
         # Assemble the paragraphs we expect to see in the renaming listing.
-        # It starts with the summary table and then adds a section of
-        # renamings for each non-empty bucket in exp_origs.
-        paras = [summary]
+        # - Failure msg, if any.
+        # - Summary table, if needed.
+        # - Section for each non-empty category of Renaming instances.
+        paras = [self.fail_msg, summary]
         for attr, origs in exp_origs.items():
             if origs:
                 # The heading.
@@ -476,8 +486,11 @@ class Outputs:
                     for o in origs
                 )
 
-        # Add the paths-renamed msg, combined the paragraphs, and return.
-        paras.append(MF.paths_renamed_msg.lstrip())
+        # Add the paths-renamed message.
+        if not self.no_change:
+            paras.append(MF.paths_renamed_msg.lstrip())
+
+        # Combine the paragraphs and return.
         return para_join(*paras) + CON.newline
 
     @property

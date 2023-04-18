@@ -17,6 +17,7 @@ from mvs.version import __version__
 from mvs.utils import (
     CON,
     FAILURE_FORMATS as FF,
+    FAILURE_NAMES as FN,
     MSG_FORMATS as MF,
     PROBLEM_FORMATS as PF,
     PROBLEM_NAMES as PN,
@@ -127,6 +128,13 @@ def run_checks(
                blob = None,
                # Outputs.
                inventory = None,
+               out = None,
+               out_in = None,
+               fail_params = None,
+               err = None,
+               err_starts = None,
+               err_in = None,
+               log = None,
                # Functions allowing user to do things midway through.
                other_prep = None,
                early_checks = None,
@@ -135,12 +143,6 @@ def run_checks(
                check_outs = True,
                done = True,
                failure = False,
-               out = None,
-               out_in = None,
-               err = None,
-               err_starts = None,
-               err_in = None,
-               log = None,
                no_change = False,
                # CliRenamer.
                cli_cls = CliRenamerSIO,
@@ -178,6 +180,7 @@ def run_checks(
         wa.origs,
         wa.news,
         inventory = inventory,
+        fail_params = fail_params,
     )
 
     # Set up CliRenamer
@@ -250,8 +253,7 @@ def run_checks(
         elif callable(out):
             assert cli.out == out(wa, outs, cli)
         elif out is None:
-            exp = '' if failure else outs.renaming_listing(cli.plan)
-            assert cli.out == exp
+            assert cli.out == outs.renaming_listing(cli.plan)
         elif out is not BYPASS:
             assert cli.out == out
 
@@ -1103,6 +1105,7 @@ def test_some_failed_rns(tr, creators):
     news = ('A1', 'A2', 'A3', 'A4')
     extras = ('A1', 'A2')
     expecteds = ('z1', 'z2', 'A3', 'A4') + extras
+    inventory = 'ee..'
     run_args = (tr, creators, origs, news)
 
     # Create a WorkArea just to get some paths that we need later.
@@ -1113,7 +1116,7 @@ def test_some_failed_rns(tr, creators):
     wa, outs, cli = run_checks(
         *run_args,
         extras = extras,
-        inventory = 'ee..',
+        inventory = inventory,
     )
 
     # In strict mode, the plan fails.
@@ -1121,9 +1124,10 @@ def test_some_failed_rns(tr, creators):
         *run_args,
         '--strict', 'exists',
         extras = extras,
+        inventory = inventory,
         no_change = True,
         failure = True,
-        out = BYPASS,                                # TODO: fix.
+        fail_params = (FN.strict, None, PN.exists),
         err = MF.no_action_msg + CON.newline,
         log = PLAN_LOG_OK,
     )
