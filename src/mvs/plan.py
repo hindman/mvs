@@ -166,7 +166,7 @@ class RenamingPlan:
         self.call_at = None
 
         # Information used when checking Renaming instance for problems.
-        self.new_groups = None
+        self.path_groups = None
         self.new_collision_key_func = (
             str if case_sensitivity() == FS_TYPES.case_sensitive else
             str.lower
@@ -239,16 +239,17 @@ class RenamingPlan:
             (self.execute_user_rename, None),
             (self.set_exists_and_types, None),
             (self.check_equal, None),
+            (self.check_orig_uniq, 'orig'),
             (self.check_orig_exists, None),
             (self.check_orig_type, None),
             (self.check_new_exists, None),
             (self.check_new_parent_exists, None),
-            (self.check_new_collisions, self.prepare_new_groups),
+            (self.check_new_collisions, 'new'),
         )
-        for step, prep_step in rn_steps:
+        for step, prep_arg in rn_steps:
             # Run preparatory step.
-            if prep_step:
-                prep_step()
+            if prep_arg:
+                self.prepare_path_groups(prep_arg)
 
             # Prepare common-prefix and sequence number iterator, which might
             # be used by the user-suppled renaming/filtering code.
@@ -502,6 +503,14 @@ class RenamingPlan:
         else:
             return None
 
+    def check_orig_uniq(self, rn, seq_val):
+        k = self.new_collision_key_func(rn.orig)
+        others = [o for o in self.path_groups[k] if o is not rn]
+        if others:
+            return Problem(PN.duplicate)
+        else:
+            return None
+
     def check_orig_exists(self, rn, seq_val):
         # Key question: is renaming possible?
         if rn.exist_orig in ANY_EXISTENCE:
@@ -577,16 +586,6 @@ class RenamingPlan:
         else:
             return Problem(PN.parent)
 
-    def prepare_new_groups(self):
-        # A preparation-step for check_new_collisions().
-        # Organize rns into dict-of-list, keyed by the new path.
-        # Those keys are stored as-is for case-sensistive file
-        # systems and in lowercase for non-sensistive systems.
-        self.new_groups = {}
-        for rn in self.active:
-            k = self.new_collision_key_func(rn.new)
-            self.new_groups.setdefault(k, []).append(rn)
-
     def check_new_collisions(self, rn, seq_val):
         # Checks for collisions among all of the new paths in the RenamingPlan.
         # If any, returns the most serious problem: (1) collisions with
@@ -600,7 +599,7 @@ class RenamingPlan:
         # Get the other Renaming instances that have the same new-path as the
         # current rn. If rn.new is unique, there is no problem.
         k = self.new_collision_key_func(rn.new)
-        others = [o for o in self.new_groups[k] if o is not rn]
+        others = [o for o in self.path_groups[k] if o is not rn]
         if not others:
             return None
 
@@ -616,6 +615,17 @@ class RenamingPlan:
 
         # Otherwise, it's a regular collision.
         return Problem(PN.collides)
+
+    def prepare_path_groups(self, attrib):
+        # A preparation-step for check_orig_uniq() and check_new_collisions().
+        # Organize rns into dict-of-list, keyed by either rn.orig or rn.new.
+        # Those keys are stored as-is for case-sensistive file
+        # systems and in lowercase for non-sensistive systems.
+        self.path_groups = {}
+        for rn in self.active:
+            path = getattr(rn, attrib)
+            k = self.new_collision_key_func(path)
+            self.path_groups.setdefault(k, []).append(rn)
 
     ####
     # Methods related to failure and problem handling.

@@ -475,17 +475,18 @@ case_sensitivity.cached = None
 # resolvable problems can be skipped if the user requests it. Both classes
 # have a name, and an optional variety to further classify them.
 #
-#   Resolvable | Name     | Varieties
+#   Resolvable | Name      | Varieties
 #   ----------------------------------------------
-#   no         | noop     | equal, same, recase
-#   no         | missing  | .
-#   no         | type     | .
-#   no         | code     | filter, rename
-#   no         | exists   | other
+#   no         | noop      | equal, same, recase
+#   no         | duplicate | .
+#   no         | missing   | .
+#   no         | type      | .
+#   no         | code      | filter, rename
+#   no         | exists    | other
 #   ----------------------------------------------
-#   yes        | exists   | diff, full
-#   yes        | collides | diff, full
-#   yes        | parent   | .
+#   yes        | exists    | diff, full
+#   yes        | collides  | diff, full
+#   yes        | parent    | .
 #
 # See command-line help text for more details.
 #
@@ -517,6 +518,7 @@ FAILURE_FORMATS = {
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (
     'noop',
+    'duplicate',
     'missing',
     'type',
     'code',
@@ -542,6 +544,7 @@ PROBLEM_FORMATS = {
     (PN.noop, PV.same):     'Original path and new path are the functionally the same',
     (PN.noop, PV.recase):   'User requested path-name case-change, but file system already agrees with new',
     (PN.missing, None):     'Original path does not exist',
+    (PN.duplicate, None):   'Original path is the same as another original path',
     (PN.type, None):        'Original path is neither a regular file nor directory',
     (PN.code, PV.filter):   'Error from user-supplied filtering code: {} [original path: {}]',
     (PN.code, PV.rename):   'Error or invalid return from user-supplied renaming code: {} [original path: {}]',

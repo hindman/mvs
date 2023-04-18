@@ -13,25 +13,31 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Overhaul [PC_OVERHAUL].
+utils.py: split apart.
 
-    - New check: origs must be unique.
+Tests:
 
-    - Get all tests working:
+    - Rework existing tests and get them passing:
+
         x test_utils.py
         - test_plan.py
         - test_cli.py
 
-Tests:
+    - PN.duplicate:
+        - Exercise this new check.
+
     - do_rename(): exercise code branch with MF.unsupported_clobber.
+
     - New listing/reporting behavior: exercise the range of behaviors
         - See test_some_failed_rns().
         - Give the function a better name.
         - Use it as a starting point.
+
     - Test this behavior independently.
         indented()
         para_join()
         Renaming.formatted
+        Check conftest.py for other stuff.
 
 New documentation [see NEW_DOCS].
 
@@ -111,7 +117,7 @@ Tag file creation:
 misc-notes: Misc notes
 --------
 
-Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
+Why problem control was overhauled, yet again:
 
     - Current approach:
 
@@ -120,7 +126,7 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
           were fatal (eventually getting the explicit halt control) and others
           simply excluded the affected renamings (skip).
 
-        - To achieve a renaming that might involve more active measures (create
+        - To achieve a renaming that might require more active measures (create
           a new parent, clobber an existing file, or collide with another new
           path), the user must understand the problem control system and
           vocabulary.
@@ -136,8 +142,8 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
         - Drop the opinionated defaults. Instead, embrace the philosophy of
           informed consent.
 
-            - In other words, have a bias toward implemented the user's requested
-              renaming.
+            - In other words, have a bias toward implementing the user's
+              requested renaming.
 
             - And take effective action to warn the user before problematic
               operations occur (create, clobber, collide).
@@ -145,7 +151,7 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
         - The first step is to re-assess the problem controls. They come in
           three varieties:
 
-            1. Side effects that makes a renaming possible: create and clobber.
+            1. Side effects that make a renaming possible: create and clobber.
 
             2. Excluding problematic renamings while others proceed: skip.
 
@@ -155,13 +161,13 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
           those control varieties disappears:
 
             - The user never needs to ask for create or clobber, because the
-              library will simply do them when necessary.
+              library will simply do them when necessary and allowed.
 
             - The user never needs to ask for the halt control, because they
               can achieve the same outcome during user confirmation: say no.
 
         - If the default is to perform the renamings that the user requests and
-          confirms, the one control is needed: the ability skip renamings
+          confirms, only one control is needed: the ability skip renamings
           having problems.
 
             --skip PROB [PROB...]
@@ -177,11 +183,12 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
 
             - Unresolvable:
 
-                noop     | equal, same, recase
-                missing  | .
-                type     | .
-                code     | rename, filter
-                exists   | other
+                noop      | equal, same, recase
+                duplicate | .
+                missing   | .
+                type      | .
+                code      | rename, filter
+                exists    | other
 
             - Resolvable:
 
@@ -189,62 +196,23 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
                 exists   | diff, full
                 collides | diff, full
 
-    - Adjust the Failure class in a similar way: Failure(parsing, row).
+    - Store the full inventory of Renaming instances:
 
-    - To skip renamings having any of the resolvable problems:
+        - Early implementations did not preserve the full inventory of
+          Renaming instances created initially from the user's inputs.
 
-        --skip PROB...  # parent|exists[-diff|-full]|collides[-diff|-full]
-        --skip all
+        - For example, renamings filtered out by user code were just
+          tossed aside.
 
-    - How the renaming plan will store renamings:
+        - To make listings more informative, among other reasons, keeping a
+          full inventory makes sense.
 
-        self.filtered | Filtered out by user code.
-        self.skipped  | Resolvable problem, but user wants to skip the renaming.
-        self.excluded | Unresolvable problem.
-        self.active   | Active renamings.
+            self.filtered | Filtered out by user code.
+            self.skipped  | Resolvable problem, but user wants to skip the renaming.
+            self.excluded | Unresolvable problem.
+            self.active   | Active renamings.
 
-    - Listing formats:
-
-        - Summary table:
-
-            Total: _
-                Filtered: _
-                Skipped: _
-                Excluded: _
-                Active: _
-                    Parent: _
-                    Exists: _
-                    Collides: _
-                    OK: _
-
-        - Renamings, with and without problems:
-
-            foo/x
-            foo/x.new
-
-            # Problem: exists-full
-            foo/bar
-            foo/bar.new
-
-    - Listing configuration:
-
-        - Usage:
-
-            --list CATEGORY...  # filtered|skipped|excluded|parent|exists|collides|ok
-            --list all          # The default.
-
-        - Options and preferences: the option simply replaces the upstream
-          setting (no merging logic required).
-
-    - Listing behavior:
-
-        - The summary table is shown if the renaming plan would halt under
-          --strict=all [see below].
-
-        - Among the categories configured to appear, the non-empty ones are
-          listed.
-
-    - Confirmation behavior:
+    - Confirmation behavior and --strict:
 
         - By default, the user must confirm in the normal way, either via a
           "yes" reply or the --yes option.
@@ -257,61 +225,28 @@ Overhaul: dropping problem control as a concept [PC_OVERHAUL]:
         - It halts the renaming plan if any renamings have problems in the
           named categories.
 
-        - A --strict=all setting asserts that the renamings will have no
-          more problems that those declared in advance. The plan can
-          proceed only if:
+        - A --strict=all setting asserts that renamings will have no more
+          problems that those pre-declared. The plan can proceed only if:
 
             - There were no unresolvable problems.
 
-            - The active renamings have no problems (either because there
-              were none to begin with or becuase the user explicitly
-              skipped them).
+            - The active renamings have no problems (either because there were
+              none to begin with or because the user explicitly skipped them).
 
-        - Implement the strict check at the end of prepare().
+    - The informed consent model depends on useful listings:
 
-    - Renaming attributes:
+        - By default:
 
-        - A check-method runs and returns None or Problem.
+            - A summary table of counts is shown if the renaming plan would
+              halt under --strict=all.
 
-        - If Problem, attach it to the Renaming.
+            - Among the categories configured to appear, the non-empty ones are
+              listed.
 
-        - Based on the problem name, put the Renaming in the right bucket:
+        - User can request a narrowed set of categories, if desired:
 
-            - filtered: rn.filtered
-            - excluded: unresolvable Problem.
-            - skipped: resolvable specified by user's skip parameter.
-            - active: everything else.
-
-        - Attribute changes:
-
-            exclude   # Change to filtered
-            halt      # Drop.
-            skip      # Drop.
-
-    - PROBLEM_FORMATS and FAILURE_NAMES: convert to dicts:
-
-        (NAME, VARIETY) => FMT
-
-    - Change Failure(all_filtered) message to include the new vocabulary:
-      filtered, skipped, or excluded.
-
-    - Problem control:
-
-        x Drop ProblemControl and CONTROLS.
-
-        x Implement Problem.is_resolvable(cls, prob), which returns true if
-          (prob.name, prob.variety) in Problem.RESOLVABLE.
-
-        - The RenamingPlan receives a sequence of problem identifiers. Use them
-          to build a set of Problem instances: SKIP_PROBLEMS.
-
-        - Implement RenamingPlan.should_skip(self, rn), which returns true if
-          rn.problem in SKIP_PROBLEMS.
-
-        - Define constants to configure argparse for --skip, --list, and
-          --strict.
-
-        - Probably code in problems.py to utils.py.
+            --list CATEGORY...  # filtered|skipped|excluded|parent|exists|collides|ok
+            --list all          # The default.
 
 Scenario to exercise CLI listing behavior:
 
