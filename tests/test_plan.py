@@ -2,21 +2,19 @@ import pytest
 from itertools import chain
 from pathlib import Path
 
-from mvs.plan import RenamingPlan, Renaming
+from mvs.plan import RenamingPlan
+from mvs.renaming import Renaming
+from mvs.utils import CON, MvsError, STRUCTURES
+from mvs.filesys import FS_TYPES, case_sensitivity
+from mvs.messages import MSG_FORMATS as MF
 
-from mvs.utils import (
-    CON,
+from mvs.problems import (
     FAILURE_NAMES as FN,
     FAILURE_VARIETIES as FV,
-    FS_TYPES,
     Failure,
-    MSG_FORMATS as MF,
-    MvsError,
     PROBLEM_NAMES as PN,
     PROBLEM_VARIETIES as PV,
     Problem,
-    STRUCTURES,
-    case_sensitivity,
 )
 
 ####

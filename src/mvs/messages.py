@@ -1,0 +1,76 @@
+from short_con import constants
+
+from .utils import CON
+from .version import __version__
+
+####
+# Renaming categories using in listings.
+####
+
+LISTING_FORMATS = constants('ListingFormats', dict(
+    filtered = '# Renamings: filtered out by user code{}:\n',
+    skipped  = '# Renamings: skipped by user due to problems{}:\n',
+    excluded = '# Renamings: excluded due to unresolvable problems{}:\n',
+    parent   = '# Active renamings: will create new parent{}:\n',
+    exists   = '# Active renamings: will clobber existing path{}:\n',
+    collides = '# Active renamings: will collide with another new path{}:\n',
+    ok       = '# Active renamings: with no problems{}:\n',
+))
+
+LISTING_CHOICES = (CON.all, *LISTING_FORMATS.keys())
+
+####
+# Summary of counts shown before the renaming listing.
+####
+
+SUMMARY_TABLE = '''
+# Renaming plan summary:
+
+  Total: {}
+    Filtered: {}
+    Skipped: {}
+    Excluded: {}
+    Active: {}
+      Parent: {}
+      Exists: {}
+      Collides: {}
+      OK: {}
+'''
+
+####
+# Messages.
+####
+
+MSG_FORMATS = MF = constants('MsgFormats', dict(
+    # MvsError instances in RenamingPlan.
+    rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
+    prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
+    invalid_control        = 'Invalid problem control: {!r}',
+    invalid_skip           = 'Invalid value for RenamingPlan.skip: {!r}',
+    invalid_strict         = 'Invalid value for RenamingPlan.strict: {!r}',
+    conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
+    invalid_controls       = 'Invalid value for RenamingPlan controls parameter',
+    unrequested_clobber    = 'Renaming would cause unrequested clobbering to occur',
+    unsupported_clobber    = 'Renaming would cause unsupported path type to be clobbered',
+    # Error messages in CliRenamer.
+    path_collection_failed = 'Collection of input paths failed.\n\n{}',
+    plan_creation_failed   = 'Unexpected error during creation of renaming plan.\n\n{}',
+    log_writing_failed     = 'Unexpected error during writing to log file.\n\n{}',
+    prefs_reading_failed   = 'Unexpected error during reading of user preferences {!r}.\n\n{{}}',
+    renaming_raised        = '\nRenaming raised an error at tracking_index={}. Traceback follows:\n\n{{}}',
+    opts_require_one       = 'One of these options is required',
+    opts_mutex             = 'No more than one of these options should be used',
+    invalid_pref_val       = 'User preferences: invalid value for {}: expected {}: got {!r}',
+    invalid_pref_keys      = 'User preferences: invalid key(s): {}',
+    no_editor              = 'The --edit option requires an --editor',
+    editor_cmd_nonzero     = 'Editor process exited unsuccessfully: editor={!r}, path={!r}',
+    edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
+    plan_failed            = 'Plan failed: {}',
+    # Other messages in CliRenamer.
+    summary_table          = SUMMARY_TABLE.lstrip(),
+    confirm_prompt         = '\nRename paths',
+    no_action_msg          = '\nNo action taken.',
+    paths_renamed_msg      = '\nPaths renamed.',
+    cli_version_msg        = f'{CON.app_name} v{__version__}',
+))
+

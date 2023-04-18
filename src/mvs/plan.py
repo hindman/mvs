@@ -4,89 +4,50 @@ import sys
 import traceback
 
 from copy import deepcopy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from itertools import groupby
 from os.path import commonprefix, samefile
 from pathlib import Path
 from short_con import constants
 
-from .utils import (
-    ANY_EXISTENCE,
-    CON,
-    EXISTENCES,
+from .renaming import (
+    NAME_CHANGE_TYPES as NCT,
+    Renaming,
+)
+
+from .problems import (
     FAILURE_FORMATS as FF,
     FAILURE_NAMES as FN,
     FAILURE_VARIETIES as FV,
-    FS_TYPES,
     Failure,
-    MSG_FORMATS as MF,
-    MvsError,
-    NAME_CHANGE_TYPES as NCT,
-    PATH_TYPES as PT,
     PROBLEM_FORMATS as PF,
     PROBLEM_NAMES as PN,
     PROBLEM_VARIETIES as PV,
     Problem,
-    STRUCTURES,
     StrictMode,
-    case_sensitivity,
-    determine_path_type,
-    get_source_code,
-    indented,
-    is_non_empty_dir,
-    path_existence_and_type,
-    seq_or_str,
-    validated_choices,
 )
 
-####
-# A data object to hold information about a single renaming.
-####
+from .filesys import (
+    ANY_EXISTENCE,
+    EXISTENCES,
+    FS_TYPES,
+    PATH_TYPES as PT,
+    case_sensitivity,
+    determine_path_type,
+    is_non_empty_dir,
+    path_existence_and_type,
+)
 
-@dataclass
-class Renaming:
-    # Paths.
-    orig: str
-    new: str
+from .messages import MSG_FORMATS as MF
 
-    # Path EXISTENCES.
-    exist_orig: int = None
-    exist_new: int = None
-    exist_new_parent: int = None
-
-    # Path types.
-    type_orig: str = None
-    type_new: str = None
-
-    # The renaming type and whether orig and new have the same parents.
-    name_change_type: str = None
-    same_parents: bool = None
-
-    # Whether the orig and new paths points to non-empty directories.
-    full_orig: bool = False
-    full_new: bool = False
-
-    # Attributes for problems.
-    # - Problem with the Renaming, if any.
-    # - Whether user code filtered out the Renaming.
-    # - Whether to create new-parent before renaming.
-    # - Whether renaming will clobber something.
-    # - Whether renaming will involve case-change-only renaming (ie self-clobber).
-    problem: Problem = None
-    filtered: bool = False
-    create: bool = False
-    clobber: bool = False
-    clobber_self: bool = False
-
-    @property
-    def prob_name(self):
-        return getattr(self.problem, 'name', None)
-
-    @property
-    def formatted(self):
-        p = self.problem
-        prefix = f'# Problem: {p.sid}\n' if p else ''
-        return f'{prefix}{self.orig}\n{self.new}\n'
+from .utils import (
+    CON,
+    MvsError,
+    STRUCTURES,
+    get_source_code,
+    indented,
+    validated_choices,
+)
 
 ####
 # A class to manage a batch of renamings.

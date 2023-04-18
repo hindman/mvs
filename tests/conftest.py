@@ -9,14 +9,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from mvs.utils import (
-    CON,
-    FAILURE_FORMATS as FF,
-    LISTING_FORMATS as LF,
+from mvs.problems import FAILURE_FORMATS as FF
+from mvs.utils import CON, indented, para_join
+from mvs.messages import (
     MSG_FORMATS as MF,
-    indented,
-    para_join,
+    LISTING_FORMATS as LF,
 )
+
 
 ####
 # Set the mvs environment variable so that (1) the user's personal

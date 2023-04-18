@@ -11,18 +11,18 @@ from string import ascii_lowercase
 from types import SimpleNamespace
 
 from mvs.cli import main, CliRenamer, CLI
+from mvs.messages import MSG_FORMATS as MF
 from mvs.plan import RenamingPlan
+from mvs.utils import CON, write_to_clipboard
 from mvs.version import __version__
 
-from mvs.utils import (
-    CON,
+from mvs.problems import (
     FAILURE_FORMATS as FF,
     FAILURE_NAMES as FN,
-    MSG_FORMATS as MF,
     PROBLEM_FORMATS as PF,
     PROBLEM_NAMES as PN,
-    write_to_clipboard,
 )
+
 
 ####
 # Helper class to test CliRenamer instances.

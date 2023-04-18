@@ -13,8 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-utils.py: split apart.
-
 Tests:
 
     - Rework existing tests and get them passing:

@@ -11,24 +11,25 @@ from pathlib import Path
 from textwrap import dedent
 from short_con import constants
 
+from .optconfig import OptConfig, positive_int
 from .plan import RenamingPlan
+from .problems import Problem, StrictMode
 from .version import __version__
 
-from .utils import (
-    CON,
+from .messages import (
     LISTING_CHOICES,
     LISTING_FORMATS,
     MSG_FORMATS as MF,
+)
+
+from .utils import (
+    CON,
     MvsError,
-    OptConfig,
-    Problem,
     STRUCTURES,
-    StrictMode,
     edit_text,
     hyphens_to_underscores,
     indented,
     para_join,
-    positive_int,
     read_from_clipboard,
     read_from_file,
     validated_choices,
