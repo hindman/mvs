@@ -74,10 +74,13 @@ class TestResource:
     TEST_FAILER = 'python tests/failer.py'
 
     @classmethod
-    def dump(cls, val = None, label = 'dump()'):
+    def dump(cls, val = None, label = 'dump()', iterate = False):
         fmt = '\n--------\n# {label} =>\n{val}'
-        msg = fmt.format(label = label, val = val)
+        msg = fmt.format(label = label, val = '' if iterate else val)
         print(msg)
+        if iterate:
+            for x in val:
+                print(x)
 
     @classmethod
     def dumpj(cls, val = None, label = 'dumpj()', indent = 4):

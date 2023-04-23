@@ -1,3 +1,25 @@
+'''
+
+TODO:
+
+    test_new_exists_different_case()
+    test_new_exists_case_change_renaming()
+    test_new_exists_recase()
+    test_new_exists_non_empty()
+    test_new_parent_missing()
+    test_news_collide()
+    test_news_collide_orig_missing()
+    test_news_collide_case()
+    test_news_collide_diff()
+    test_news_collide_full()
+    test_failures_skip_all()
+    test_renaming()
+    test_unexpected_clobber()
+
+Check for any remaining TODO.
+
+'''
+
 import pytest
 from itertools import chain
 from pathlib import Path
@@ -13,8 +35,9 @@ from mvs.problems import (
     FAILURE_VARIETIES as FV,
     Failure,
     PROBLEM_NAMES as PN,
-    PROBLEM_VARIETIES as PV,
+    # PROBLEM_VARIETIES as PV,   # TODO: drop if unneeded.
     Problem,
+    StrictMode,
 )
 
 ####
@@ -76,7 +99,11 @@ def run_checks(
     # Helper to execute plan.prepare() and plan.rename_paths().
     def do_prepare_and_rename():
         # Prepare.
-        n_preps = int(prepare_before or prepare_only or diagnostics)
+        n_preps = int(
+            prepare_before or
+            prepare_only or
+            diagnostics
+        )
         for _ in range(n_preps):
             plan.prepare()
         if prepare_only:
@@ -175,6 +202,8 @@ INV_MAP = {
     'X': 'excluded',
 }
 
+PLACEHOLDER = 'PLACEHOLDER'
+
 ####
 # Inputs and their structures.
 ####
@@ -200,7 +229,6 @@ def test_no_inputs(tr, create_wa):
             inventory = EMPTY,
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_structure_default(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -216,7 +244,6 @@ def test_structure_default(tr, create_wa):
         )
         assert plan.structure == STRUCTURES.flat
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_structure_paragraphs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -273,12 +300,11 @@ def test_structure_paragraphs(tr, create_wa):
             inputs = assemble_inputs(**kws),
             structure = STRUCTURES.paragraphs,
             failure = True,
-            reason = FN.parsing_paragraphs,
+            reason = Failure(FN.parsing, variety = FV.paragraphs),
             no_change = True,
             inventory = EMPTY,
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_structure_pairs(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -319,11 +345,10 @@ def test_structure_pairs(tr, create_wa):
         structure = STRUCTURES.pairs,
         failure = True,
         no_change = True,
-        reason = FN.parsing_imbalance,
+        reason = Failure(FN.parsing, variety = FV.imbalance),
         inventory = EMPTY,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_structure_rows(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -366,7 +391,7 @@ def test_structure_rows(tr, create_wa):
             structure = STRUCTURES.rows,
             failure = True,
             no_change = True,
-            reason = FN.parsing_row,
+            reason = Failure(FN.parsing, PLACEHOLDER, variety = FV.row),
             inventory = EMPTY,
         )
 
@@ -374,7 +399,6 @@ def test_structure_rows(tr, create_wa):
 # User-supplied code.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_renaming_code(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -395,7 +419,6 @@ def test_renaming_code(tr, create_wa):
             rootless = True,
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_filtering_code(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -420,19 +443,20 @@ def test_filtering_code(tr, create_wa):
         inventory = exp_inv,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_code_compilation_fails(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
     run_args = (tr, create_wa, origs, news)
+    reason_rename = Failure(FN.code, CON.code_actions.rename, PLACEHOLDER)
+    reason_filter = Failure(FN.code, CON.code_actions.filter, PLACEHOLDER)
 
     # Some bad code to use for renaming and filtering.
     BAD_CODE = 'FUBB BLORT'
 
     # Helper to check some details about the first uncontrolled Problem.
     def check_fail(plan):
-        f = plan.failures[0]
+        f = plan.failure
         assert BAD_CODE in f.msg
         assert 'invalid syntax' in f.msg
 
@@ -443,9 +467,8 @@ def test_code_compilation_fails(tr, create_wa):
         rename_code = BAD_CODE,
         failure = True,
         no_change = True,
-        reason = FN.user_code_exec,
+        reason = reason_rename,
     )
-    check_fail(plan)
 
     # Scenario: invalid filtering code.
     wa, plan = run_checks(
@@ -453,19 +476,19 @@ def test_code_compilation_fails(tr, create_wa):
         filter_code = BAD_CODE,
         failure = True,
         no_change = True,
-        reason = FN.user_code_exec,
+        reason = reason_filter,
     )
     check_fail(plan)
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_code_execution_fails(tr, create_wa):
     # Paths and args.
     FAILING_ORIG = 'b'
     origs = ('a', FAILING_ORIG, 'c')
     news = ('aa', 'bb', 'cc')
     expecteds_skip = ('aa', FAILING_ORIG, 'cc')
-    exp_inv = '.s.'
-    exp_invX = exp_inv.replace('s', 'X')
+    exp_inv = '.X.'
+    strict = StrictMode.EXCLUDED
+    reason = Failure(FN.strict, strict)
     run_args = (tr, create_wa, origs, news)
 
     # Code that will cause the second Renaming
@@ -479,36 +502,34 @@ def test_code_execution_fails(tr, create_wa):
     # - Renaming code returns bad data type.
     # - Filtering code raises an exception.
     scenarios = (
-        dict(rename_code = rename_code1, reason = PN.rename),
-        dict(rename_code = rename_code2, reason = PN.rename),
-        dict(filter_code = filter_code, reason = PN.filter),
+        dict(rename_code = rename_code1, include_news = False),
+        dict(rename_code = rename_code2, include_news = False),
+        dict(filter_code = filter_code),
     )
 
-    # By default, user-code failures halt the renaming plan.
+    # By default, the offending renamings are excluded.
+    for kws in scenarios:
+        wa, plan = run_checks(
+            *run_args,
+            rootless = True,
+            expecteds = expecteds_skip,
+            inventory = exp_inv,
+            **kws,
+        )
+
+    # And in strict mode, the renaming will be rejected.
     for kws in scenarios:
         wa, plan = run_checks(
             *run_args,
             rootless = True,
             failure = True,
             no_change = True,
-            include_news = 'filter_code' in kws,
-            inventory = exp_invX,
-            **kws,
-        )
-
-    # Or the user can skip renamings with such problems.
-    for kws in scenarios:
-        wa, plan = run_checks(
-            *run_args,
-            controls = 'skip-filter skip-rename',
-            rootless = True,
-            include_news = 'filter_code' in kws,
-            expecteds = expecteds_skip,
             inventory = exp_inv,
+            strict = strict,
+            reason = reason,
             **kws,
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_seq(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -526,7 +547,6 @@ def test_seq(tr, create_wa):
         seq_step = 5,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_common_prefix(tr, create_wa):
     # Paths and args.
     origs = ('blah-a', 'blah-b', 'blah-c')
@@ -545,7 +565,6 @@ def test_common_prefix(tr, create_wa):
 # RenamingPlan data.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_plan_as_dict(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -563,13 +582,13 @@ def test_plan_as_dict(tr, create_wa):
             'indent',
             'seq_start',
             'seq_step',
-            'controls',
+            'skip',
             'strict',
-            'renamings',
             'filtered',
             'skipped',
             'excluded',
-            'failures',
+            'active',
+            'failure',
             'prefix_len',
             'tracking_index',
         ))
@@ -592,7 +611,6 @@ def test_plan_as_dict(tr, create_wa):
 # Check unexpected usage scenarios.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_prepare_rename_multiple_times(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -621,56 +639,6 @@ def test_prepare_rename_multiple_times(tr, create_wa):
 # Problems and problem-control.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
-def test_controls(tr, create_wa):
-    # Paths and args.
-    origs = ('a', 'b', 'c')
-    news = ('a.new', 'b.new', 'c.new')
-    run_args = (tr, create_wa, origs, news)
-
-    # Base scenario: it works fine.
-    # In addition, we will re-use the inputs defined here
-    # in subsequent tests, which don't need a WorkArea
-    # because the RenamingPlan will raise during initialization.
-    wa, plan = run_checks(*run_args)
-    INPUTS = plan.inputs
-
-    # But we cannot control the same problem in two different ways.
-    checks = (
-        (PN.parent, CONTROLS.skip, CONTROLS.create),
-        (PN.exists, CONTROLS.skip, CONTROLS.clobber),
-        (PN.collides, CONTROLS.skip, CONTROLS.clobber),
-    )
-    for prob, *controls in checks:
-        tup = tuple(f'{c}-{prob}' for c in controls)
-        with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(INPUTS, controls = tup)
-        msg = einfo.value.params['msg']
-        exp = MF.conflicting_controls.format(prob, *controls)
-        assert msg == exp
-
-    # And we cannot control a problem in an inappropriate way.
-    checks = (
-        (PN.equal, CONTROLS.clobber),
-        (PN.missing, CONTROLS.create),
-        (PN.parent, CONTROLS.clobber),
-    )
-    for prob, control in checks:
-        pc_name = f'{control}-{prob}'
-        with pytest.raises(MvsError) as einfo:
-            plan = RenamingPlan(INPUTS, controls = pc_name)
-        msg = einfo.value.params['msg']
-        exp = MF.invalid_control.format(pc_name)
-        assert msg == exp
-
-    # Or in a completely invalid way.
-    BAD_VAL = 999
-    with pytest.raises(MvsError) as einfo:
-        plan = RenamingPlan(INPUTS, controls = BAD_VAL)
-    err = einfo.value
-    assert err.msg == MF.invalid_controls
-    assert err.params['controls'] == BAD_VAL
-
 def test_equal(tr, create_wa):
     # Paths and args.
     SAME = 'd'
@@ -698,119 +666,88 @@ def test_equal(tr, create_wa):
         inventory = exp_inv,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_same(tr, create_wa):
     # Paths and args.
     origs = ('foo/xyz', 'BAR/xyz', 'a')
     news = ('FOO/xyz', 'bar/xyz', 'a.new')
-    expecteds_no_create = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a')
-    expecteds_create = ('foo', 'FOO', 'FOO/xyz', 'BAR', 'bar', 'bar/xyz', 'a.new')
-    expecteds_skip = ('foo', 'foo/xyz', 'BAR', 'BAR/xyz', 'a.new')
-    expecteds_no_skip = origs + ('foo', 'BAR')
-    exp_inv = 'ss.'
-    exp_invX = exp_inv.replace('s', 'X')
+    parents_orig = ('foo', 'BAR')
+    parents_new = ('FOO', 'bar')
+    expecteds_exclude = ('foo/xyz', 'BAR/xyz', 'a.new') + parents_orig
+    expecteds_create = news + parents_orig + parents_new
+    exp_invX = 'XX.'
+    exp_invS = 'ss.'
     run_args = (tr, create_wa, origs, news)
 
     # Scenarios: for the first two Renaming instances,
     # orig and new differ only in the casing of their parent.
     if case_sensitivity() == FS_TYPES.case_sensitive:
-        # Scenario: case-sensitive system: by default, renamings
-        # without new-parents will be skipped.
-        wa, plan = run_checks(
-            *run_args,
-            expecteds = expecteds_skip,
-            inventory = exp_inv,
-        )
-
-        # Scenario: it will be rejected if we set the control to halt.
-        wa, plan = run_checks(
-            *run_args,
-            expecteds = expecteds_no_create,
-            controls = 'halt-parent',
-            failure = True,
-            reason = PN.parent,
-            inventory = exp_invX,
-        )
-
-        # Scenario: it will succeed if we set the control to create.
+        # Scenario: case-sensitive system: by default, the
+        # parents needed for the renaming will be created.
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_create,
-            controls = 'create-parent',
+        )
+
+        # Or the user can skip renamings missing a parent.
+        wa, plan = run_checks(
+            *run_args,
+            skip = PN.parent,
+            expecteds = expecteds_exclude,
+            inventory = exp_invS,
+        )
+
+        # And in strict mode, the plan will fail.
+        wa, plan = run_checks(
+            *run_args,
+            strict = PN.parent,
+            failure = True,
+            no_change = True,
+            reason = Failure(FN.strict, PN.parent),
         )
 
     else:
-        # Scenario: case-insensitive system: renaming will succeed
-        # because skip-same is the default.
+        # Scenario: case-insensitive system: by default, the
+        # offending renamings will be excluded.
         wa, plan = run_checks(
             *run_args,
-            expecteds = expecteds_skip,
-            inventory = exp_inv,
-        )
-
-        # Scenario: but it will fail if we disable skip-same.
-        wa, plan = run_checks(
-            *run_args,
-            controls = 'halt-same',
-            expecteds = expecteds_no_skip,
-            failure = True,
-            no_change = True,
-            reason = PN.same,
+            expecteds = expecteds_exclude,
             inventory = exp_invX,
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_missing_orig(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
     news = ('a.new', 'b.new')
     missing_origs = ('c', 'd')
     missing_news = ('c.new', 'd.new')
-    inputs = origs + missing_origs + news + missing_news
+    INPUTS = origs + missing_origs + news + missing_news
     run_args = (tr, create_wa, origs, news)
     exp_inv = dict(
-        active = ['a', 'b'],
-        skipped = ['c', 'd'],
-    )
-    exp_invX = dict(
-        active = exp_inv['active'],
-        excluded = exp_inv['skipped'],
+        active = origs,
+        excluded = missing_origs,
     )
 
     # Scenario: some orig paths are missing.
-    # By default, offending paths are skipped.
+    # By default, offending paths are excluded.
     wa, plan = run_checks(
         *run_args,
-        inputs = inputs,
+        inputs = INPUTS,
         rootless = True,
         inventory = exp_inv,
     )
 
-    # Renaming will be rejected if we set the control to halt.
+    # Renaming will fail in strict mode.
     wa, plan = run_checks(
         *run_args,
-        inputs = inputs,
-        controls = 'halt-missing',
+        inputs = INPUTS,
+        strict = StrictMode.EXCLUDED,
         rootless = True,
         failure = True,
         no_change = True,
-        reason = PN.missing,
-        inventory = exp_invX,
+        reason = Failure(FN.strict, PN.missing),
+        inventory = exp_inv,
     )
 
-    # Or if we use strict mode.
-    wa, plan = run_checks(
-        *run_args,
-        inputs = inputs,
-        strict = True,
-        rootless = True,
-        failure = True,
-        no_change = True,
-        reason = PN.missing,
-        inventory = exp_invX,
-    )
-
-@pytest.mark.skip(reason = 'overhaul')
 def test_orig_type(tr, create_wa):
     # Paths and args.
     TARGET = 'c.target'
@@ -818,27 +755,26 @@ def test_orig_type(tr, create_wa):
     news = ('a.new', 'b.new', 'c.new')
     extras = (TARGET,)
     expecteds = ('a.new', 'b.new', 'c', TARGET)
-    exp_inv = '..s'
-    exp_invX = exp_inv.replace('s', 'X')
+    exp_inv = '..X'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: some orig paths are not regular files.
-    # Renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        controls = 'halt-type',
-        failure = True,
-        no_change = True,
-        reason = PN.type,
-        inventory = exp_invX,
-    )
-
-    # Scenario: same. By default, offending paths are skipped.
+    # By default, offending paths are excluded.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds,
+        inventory = exp_inv,
+    )
+
+    # Renaming will fail in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        strict = StrictMode.EXCLUDED,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, PN.type),
         inventory = exp_inv,
     )
 
@@ -849,9 +785,7 @@ def test_new_exists(tr, create_wa):
     extras = ('a.new',)
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
-    exp_inv = 's..'
-    strict = 'exists'
-    reason = Failure(FN.strict, strict)
+    exp_invS = 's..'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
@@ -868,118 +802,121 @@ def test_new_exists(tr, create_wa):
         extras = extras,
         expecteds = expecteds_skip,
         skip = PN.exists,
-        inventory = exp_inv,
+        inventory = exp_invS,
     )
 
     # Or halt the plan in strict mode.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        strict = strict,
+        strict = PN.exists,
         failure = True,
         no_change = True,
-        reason = reason,
+        reason = Failure(FN.strict, PN.exists),
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_diff(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new/',)
-    extras_full = ('a.new/', 'a.new/foo')
+    extras_full = extras + ('a.new/foo',)
     expecteds_skip = ('a',) + news
-    exp_inv = 's..'
-    exp_invX = exp_inv.replace('s', 'X')
+    exp_invS = 's..'
+    # exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario 1: one of new paths already exists and it
     # differs in type form the orig path.
-    # 1A: By default, offending paths are skipped.
+    # 1A: By default, renaming will proceed and clobber.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        expecteds = expecteds_skip,
-        inventory = exp_inv,
     )
 
-    # 1B: Renaming will be rejected if we set the control to halt.
+    # 1B: User can skip offending renamings.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'halt-exists-diff',
+        skip = PN.exists,
+        expecteds = expecteds_skip,
+        inventory = exp_invS,
+    )
+
+    # 1C: User can halt renaming in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        strict = PN.exists,
         failure = True,
         no_change = True,
-        reason = PN.exists_diff,
-        inventory = exp_invX,
-    )
-
-    # 1C: Renaming will also succeed if allow clobber.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        controls = 'clobber-exists-diff',
+        reason = Failure(FN.strict, PN.exists),
     )
 
     # Scenario 2: same as initial scenario, but the existing
     # directory is also non-empty.
-    # 2A: By default, offending paths are skipped.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras_full,
-        expecteds = expecteds_skip + extras_full,
-        inventory = exp_inv,
-    )
-
-    # 2B: Renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras_full,
-        controls = 'halt-exists-full',
-        failure = True,
-        no_change = True,
-        reason = PN.exists_full,
-        inventory = exp_invX,
-    )
-
-    # 2C: And it will succeed if we allow clobber.
+    # 2A: By default, renaming will proceed and clobber.
     wa, plan = run_checks(
         *run_args,
         extras = extras_full,
         expecteds = news,
-        controls = 'clobber-exists-full',
     )
 
-@pytest.mark.skip(reason = 'overhaul')
+    # 2B: User can skip offending renamings.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras_full,
+        skip = PN.exists,
+        expecteds = expecteds_skip + extras_full,
+        inventory = exp_invS,
+    )
+
+    # 2C: User can halt renaming in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras_full,
+        strict = PN.exists,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, PN.exists),
+    )
+
 def test_new_exists_diff_parents(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b')
     news = ('a.new', 'xy/b.new')
     extras = ('xy/', 'xy/b.new')
-    expecteds = ('a.new', 'b') + extras
-    exp_inv = '.s'
-    exp_invX = exp_inv.replace('s', 'X')
+    expecteds = ('a.new',) + extras
+    expecteds_skip = ('a.new', 'b') + extras
+    exp_invS = '.s'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists and
-    # it parent directory is different than orig path.
-    # Renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras,
-        controls = 'halt-exists',
-        failure = True,
-        no_change = True,
-        reason = PN.exists,
-        inventory = exp_invX,
-    )
-
-    # Scenario: same. By default, offending paths are skipped.
+    # its parent directory is different than parent of orig.
+    # By default, renaming proceeds and clobbers.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
         expecteds = expecteds,
-        inventory = exp_inv,
+    )
+
+    # User can skip offending renamings.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        skip = PN.exists,
+        expecteds = expecteds_skip,
+        inventory = exp_invS,
+    )
+
+    # In strict mode, renaming will fail.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        strict = PN.exists,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, PN.exists),
     )
 
 @pytest.mark.skip(reason = 'overhaul')
