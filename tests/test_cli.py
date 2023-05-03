@@ -1,3 +1,29 @@
+'''
+
+TODO:
+
+    test_version_and_help()
+    test_indent_and_posint()
+    test_no_input_paths()
+    test_odd_number_inputs()
+    test_sources()
+    test_edit()
+    test_preferences_file()
+    test_preferences_validation()
+    test_preferences_merging()
+    test_preferences_problem_control()
+    test_dryrun()
+    test_no_confirmation()
+    test_rename_paths_raises()
+    test_filter_all()
+    test_log()
+    test_pagination()
+    test_main()
+    test_wrapup_with_tb()
+
+'''
+
+
 import json
 import os
 import pytest

@@ -17,9 +17,9 @@ Tests:
 
     - Rework existing tests and get them passing:
 
-        . test_plan.py
+        x test_plan.py
+        x test_utils.py
         - test_cli.py
-        - test_utils.py
 
     - PN.duplicate:
         - Exercise this new check.

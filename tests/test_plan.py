@@ -1,25 +1,3 @@
-'''
-
-TODO:
-
-    test_new_exists_different_case()
-    test_new_exists_case_change_renaming()
-    test_new_exists_recase()
-    test_new_exists_non_empty()
-    test_new_parent_missing()
-    test_news_collide()
-    test_news_collide_orig_missing()
-    test_news_collide_case()
-    test_news_collide_diff()
-    test_news_collide_full()
-    test_failures_skip_all()
-    test_renaming()
-    test_unexpected_clobber()
-
-Check for any remaining TODO.
-
-'''
-
 import pytest
 from itertools import chain
 from pathlib import Path
@@ -35,7 +13,7 @@ from mvs.problems import (
     FAILURE_VARIETIES as FV,
     Failure,
     PROBLEM_NAMES as PN,
-    # PROBLEM_VARIETIES as PV,   # TODO: drop if unneeded.
+    PROBLEM_VARIETIES as PV,
     Problem,
     StrictMode,
 )
@@ -134,7 +112,6 @@ def run_checks(
         if failure:
             assert plan.failed
             if reason:
-                assert isinstance(reason, Failure) # TODO: remove.
                 assert einfo.value.params['msg'] == MF.prepare_failed
                 f = plan.failure
                 assert f
@@ -785,7 +762,7 @@ def test_new_exists(tr, create_wa):
     extras = ('a.new',)
     expecteds_skip = ('a', 'a.new', 'b.new', 'c.new')
     expecteds_clobber = news
-    exp_invS = 's..'
+    exp_inv = 's..'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists.
@@ -802,7 +779,7 @@ def test_new_exists(tr, create_wa):
         extras = extras,
         expecteds = expecteds_skip,
         skip = PN.exists,
-        inventory = exp_invS,
+        inventory = exp_inv,
     )
 
     # Or halt the plan in strict mode.
@@ -822,8 +799,7 @@ def test_new_exists_diff(tr, create_wa):
     extras = ('a.new/',)
     extras_full = extras + ('a.new/foo',)
     expecteds_skip = ('a',) + news
-    exp_invS = 's..'
-    # exp_invX = exp_inv.replace('s', 'X')
+    exp_inv = 's..'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario 1: one of new paths already exists and it
@@ -840,7 +816,7 @@ def test_new_exists_diff(tr, create_wa):
         extras = extras,
         skip = PN.exists,
         expecteds = expecteds_skip,
-        inventory = exp_invS,
+        inventory = exp_inv,
     )
 
     # 1C: User can halt renaming in strict mode.
@@ -868,7 +844,7 @@ def test_new_exists_diff(tr, create_wa):
         extras = extras_full,
         skip = PN.exists,
         expecteds = expecteds_skip + extras_full,
-        inventory = exp_invS,
+        inventory = exp_inv,
     )
 
     # 2C: User can halt renaming in strict mode.
@@ -888,7 +864,7 @@ def test_new_exists_diff_parents(tr, create_wa):
     extras = ('xy/', 'xy/b.new')
     expecteds = ('a.new',) + extras
     expecteds_skip = ('a.new', 'b') + extras
-    exp_invS = '.s'
+    exp_inv = '.s'
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: one of new paths already exists and
@@ -906,7 +882,7 @@ def test_new_exists_diff_parents(tr, create_wa):
         extras = extras,
         skip = PN.exists,
         expecteds = expecteds_skip,
-        inventory = exp_invS,
+        inventory = exp_inv,
     )
 
     # In strict mode, renaming will fail.
@@ -919,48 +895,41 @@ def test_new_exists_diff_parents(tr, create_wa):
         reason = Failure(FN.strict, PN.exists),
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_different_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('B.NEW',)
-    exp_inv = '.s.'
-    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
+    # Scenario: one of the new paths exists in a case-altered form.
     if case_sensitivity() == FS_TYPES.case_sensitive:
-        # Scenario: on a case-sensitive system, renaming should
-        # succeed because b.new and B.NEW are different files.
+        # On a case-sensitive system, renaming succeeds,
+        # because b.new and B.NEW are different files.
         wa, plan = run_checks(
             *run_args,
             extras = extras,
         )
     else:
-        # Scenario: but on a non-case-sensitive system,
-        # renaming will be rejected if we set the control to halt.
-        wa, plan = run_checks(
-            *run_args,
-            extras = extras,
-            controls = 'halt-exists',
-            failure = True,
-            no_change = True,
-            reason = PN.exists,
-            inventory = exp_invX,
-        )
-
-        # Scenario: renaming will succeed if we request clobbering.
-        # Also note that the case of b.new will agree the the
-        # users inputs (in news), not the original case of
-        # that path (B.NEW).
+        # By default, renaming will proceed via clobbering.
+        # Moreover, the new path's casing will agree with the
+        # new path, not the original.
         wa, plan = run_checks(
             *run_args,
             extras = extras,
             expecteds = news,
-            controls = 'clobber-exists',
         )
 
-@pytest.mark.skip(reason = 'overhaul')
+        # And in strict mode, renaming will fail.
+        wa, plan = run_checks(
+            *run_args,
+            extras = extras,
+            strict = PN.exists,
+            failure = True,
+            no_change = True,
+            reason = Failure(FN.strict, PN.exists),
+        )
+
 def test_new_exists_case_change_renaming(tr, create_wa):
     # Paths and args.
     origs = ('x/a',)
@@ -976,53 +945,46 @@ def test_new_exists_case_change_renaming(tr, create_wa):
         expecteds = expecteds,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_recase(tr, create_wa):
     # Paths and args.
     origs = ('xyz',)
     news = ('xyZ',)
-    exp_inv = 's'
+    exp_inv = dict(excluded = news)
     run_args = (tr, create_wa, origs, news)
 
-    # Reason for failure will vary by file system type.
-    if case_sensitivity() == FS_TYPES.case_sensitive:
-        reason = PN.missing
-    else:
-        reason = FN.all_filtered
-
     # Scenario: user reverses order of news and origs when supplying inputs.
-    # Renaming will be rejected because all renamings will be skipped, either
-    # due to PN.missing (case-sensitive) or PN.recase (case-insensitive).
+    # Renaming will be rejected because all renamings will be excluded.
     wa, plan = run_checks(
         *run_args,
         inputs = news + origs,
         rootless = True,
         failure = True,
         no_change = True,
-        reason = FN.all_filtered,
-        inventory = False,
+        reason = Failure(FN.all_filtered),
+        inventory = exp_inv,
     )
 
     # The precise problem will vary by file system type.
+    prob = plan.excluded[0].problem
     if case_sensitivity() == FS_TYPES.case_sensitive:
-        pn = PN.missing
+        assert prob == Problem(PN.missing)
     else:
-        pn = PN.recase
-    assert plan.skipped[0].prob_name == pn
-    assert len(plan.active) == 0
+        assert prob == Problem(PN.noop, variety = PV.recase)
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_exists_non_empty(tr, create_wa):
     # Paths and args.
     origs = ('a/', 'b', 'c')
     news = ('a.new', 'b.new', 'c.new')
     extras = ('a.new/', 'a.new/foo')
-    exp_inv = 's..'
-    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
-    # Scenario: don't include the extras. Renaming succeeds.
-    wa, plan = run_checks(*run_args)
+    # Scenario: a new path exists and it is a non-empty directory.
+    # By default, renaming will proceed and clobber.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = news,
+    )
 
     # Scenario: include extras and set the relevant
     # control to halt. Renaming is rejected because
@@ -1030,22 +992,12 @@ def test_new_exists_non_empty(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'halt-exists-full',
+        strict = PN.exists,
         failure = True,
         no_change = True,
-        reason = PN.exists_full,
-        inventory = exp_invX,
+        reason = Failure(FN.strict, PN.exists),
     )
 
-    # Scenario: if we exclude the last extras path, the
-    # existing directory will be empty and renaming succeeds.
-    wa, plan = run_checks(
-        *run_args,
-        extras = extras[:-1],
-        controls = 'clobber-exists',
-    )
-
-@pytest.mark.skip(reason = 'overhaul')
 def test_new_parent_missing(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1053,71 +1005,65 @@ def test_new_parent_missing(tr, create_wa):
     expecteds_skip = ('a.new', 'b.new', 'c')
     expecteds_create = news + ('xy/', 'xy/zzz/')
     exp_inv = '..s'
-    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: a new-parent is missing.
-    # Renaming will be rejected if we set the control to halt.
-    wa, plan = run_checks(
-        *run_args,
-        controls = 'halt-parent',
-        failure = True,
-        no_change = True,
-        reason = PN.parent,
-        inventory = exp_invX,
-    )
-
-    # Scenario: same. By default, offending paths are skipped.
-    wa, plan = run_checks(
-        *run_args,
-        expecteds = expecteds_skip,
-        inventory = exp_inv,
-    )
-
-    # Scenario: renaming will succeed if we create the missing parents.
+    # By default, renaming will proceed by creating the parent.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_create,
-        controls = 'create-parent',
     )
 
-@pytest.mark.skip(reason = 'overhaul')
+    # User can skip the renamings with missing parents.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds_skip,
+        skip = PN.parent,
+        inventory = exp_inv,
+    )
+
+    # User can halt the renaming in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        strict = PN.parent,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, PN.parent),
+    )
+
 def test_news_collide(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('a.new', 'b.new', 'a.new')
     expecteds_skip = ('a', 'b.new', 'c')
     expecteds_clobber = ('a.new', 'b.new')
-    run_args = (tr, create_wa, origs, news)
     exp_inv = 's.s'
-    exp_invX = exp_inv.replace('s', 'X')
+    run_args = (tr, create_wa, origs, news)
 
     # Scenario: some new paths collide.
-    # By default, offending paths are skipped.
+    # By default, renaming will proceed and clobber.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds_clobber,
+    )
+
+    # User can skip the colliding renamings.
     wa, plan = run_checks(
         *run_args,
         expecteds = expecteds_skip,
         inventory = exp_inv,
+        skip = PN.collides,
     )
 
-    # Renaming will be rejected if we set the control to halt.
+    # User can halt the renaming in strict mode.
     wa, plan = run_checks(
         *run_args,
-        controls = 'halt-collides',
+        strict = PN.collides,
         failure = True,
         no_change = True,
-        reason = PN.collides,
-        inventory = exp_invX,
+        reason = Failure(FN.strict, PN.collides),
     )
 
-    # Renaming will succeed if we request clobbering.
-    wa, plan = run_checks(
-        *run_args,
-        expecteds = expecteds_clobber,
-        controls = 'clobber-collides',
-    )
-
-@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_orig_missing(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c', 'd')
@@ -1139,15 +1085,24 @@ def test_news_collide_orig_missing(tr, create_wa):
     wa, plan = run_checks(
         *run_args,
         inputs = inputs,
-        controls = 'halt-missing',
         rootless = True,
+        expecteds = news[:-1],
+        inventory = exp_inv,
+    )
+    assert plan.excluded[0].problem.name == PN.missing
+
+    # In strict mode, the renaming can be halted.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = inputs,
+        rootless = True,
+        strict = StrictMode.EXCLUDED,
         failure = True,
         no_change = True,
-        reason = PN.missing,
+        reason = Failure(FN.strict, PN.missing),
         inventory = exp_inv,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_case(tr, create_wa):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1155,7 +1110,6 @@ def test_news_collide_case(tr, create_wa):
     expecteds_skip = ('a.new', 'b', 'c')
     expecteds_clobber = ('a.new', 'B.NEW')
     exp_inv = '.ss'
-    exp_invX = exp_inv.replace('s', 'X')
     run_args = (tr, create_wa, origs, news)
 
     # Scenario: new paths "collide" in a case-insensitive way.
@@ -1164,25 +1118,29 @@ def test_news_collide_case(tr, create_wa):
         # Renaming will succeed.
         wa, plan = run_checks(*run_args)
     else:
-        # On case-insensitive system, renaming will succeed
-        # because offending paths will be skipped.
+        # On case-insensitive system, renaming will proceed and clobber.
+        wa, plan = run_checks(
+            *run_args,
+            expecteds = expecteds_clobber,
+        )
+
+        # User can skip the colliding renamings.
         wa, plan = run_checks(
             *run_args,
             expecteds = expecteds_skip,
+            skip = PN.collides,
             inventory = exp_inv,
         )
 
-        # Renaming will be rejected if we set the control to halt.
+        # User can halt renaming in strict mode.
         wa, plan = run_checks(
             *run_args,
-            controls = 'halt-collides',
+            strict = PN.collides,
             failure = True,
             no_change = True,
-            reason = PN.collides,
-            inventory = exp_invX,
+            reason = Failure(FN.strict, PN.collides),
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_diff(tr, create_wa):
     # Paths and args.
     SAME = 'a.new'
@@ -1190,124 +1148,113 @@ def test_news_collide_diff(tr, create_wa):
     news = (SAME, 'b.new', SAME, SAME)
     expecteds_skip = ('a', 'b.new', 'c', 'd')
     expecteds_clobber = ('a.new', 'b.new')
-    run_args = (tr, create_wa, origs, news)
     exp_inv = 's.ss'
-    exp_invX = exp_inv.replace('s', 'X')
+    run_args = (tr, create_wa, origs, news)
 
     # Scenario: some new paths collide and differ in type.
-    # By default, offending paths are skipped.
+    # By default, renaming will proceed and clobber.
     wa, plan = run_checks(
         *run_args,
+        expecteds = expecteds_clobber,
+    )
+
+    # User can skipp colliding renamings.
+    wa, plan = run_checks(
+        *run_args,
+        skip = PN.collides,
         expecteds = expecteds_skip,
         inventory = exp_inv,
     )
 
-    # Renaming will be rejected if we set the control to halt.
+    # User can halt renaming in strict mode.
     wa, plan = run_checks(
         *run_args,
-        controls = 'halt-collides-diff',
+        strict = PN.collides,
         failure = True,
         no_change = True,
-        reason = PN.collides_diff,
-        inventory = exp_invX,
+        reason = Failure(FN.strict, PN.collides),
     )
 
-    # Renaming will succeed if we request clobbering.
-    wa, plan = run_checks(
-        *run_args,
-        expecteds = expecteds_clobber,
-        controls = 'clobber-collides-diff',
-    )
-
-@pytest.mark.skip(reason = 'overhaul')
 def test_news_collide_full(tr, create_wa):
     # Paths and args.
     SAME = 'a.new'
     origs = ('a/', 'b', 'c/')
     news = (SAME, 'b.new', SAME)
     extras = ('c/foo',)
-    expecteds_skip = ('a', 'b.new', 'c') + extras
     expecteds_clobber = ('a.new', 'a.new/foo', 'b.new')
-    run_args = (tr, create_wa, origs, news)
+    expecteds_skip = ('a', 'b.new', 'c') + extras
+    expecteds_skip_full = ('a', 'b.new', 'a.new', 'a.new/foo')
     exp_inv = 's.s'
+    exp_invSF = 's..'
+    run_args = (tr, create_wa, origs, news)
 
-    # Scenario: some new paths collide and differ in type.
-    # By default, offending paths are skipped.
+    # Scenario: some new paths collide and differ in type,
+    # and the directory is non-empty.
+    # By default, renaming proceeds and clobbers.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
+        expecteds = expecteds_clobber,
+    )
+    assert plan.active[0].problem == Problem(PN.collides, variety = PV.full)
+
+    # User can skip the colliding renamings.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        skip = PN.collides,
         expecteds = expecteds_skip,
         inventory = exp_inv,
     )
 
-    # If either applicable control is set to halt, the
-    # renaming plan will be rejected.
-    scenarios = (
-        dict(
-            controls = 'halt-collides-full',
-            reason = PN.collides_full,
-            inventory = 'E.s',
-        ),
-        dict(
-            controls = 'halt-collides',
-            reason = PN.collides,
-            inventory = 's.E',
-        ),
-        dict(
-            controls = 'halt-collides halt-collides-full',
-            reason = PN.collides,
-            inventory = 'E.E',
-        ),
-    )
-    for kws in scenarios:
-        wa, plan = run_checks(
-            *run_args,
-            extras = extras,
-            failure = True,
-            no_change = True,
-            **kws,
-        )
-
-    # If we request clobbering, renaming succeeds.
+    # User can skip only the collides-full renaming.
     wa, plan = run_checks(
         *run_args,
         extras = extras,
-        controls = 'clobber-collides-full clobber-collides',
-        expecteds = expecteds_clobber,
+        skip = 'collides-full',
+        expecteds = expecteds_skip_full,
+        inventory = exp_invSF,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_failures_skip_all(tr, create_wa):
     # Paths and args.
+    SAME = 'Z'
     origs = ('a', 'b', 'c')
-    news = ('Z', 'Z', 'Z')
-    exp_inv = 'sss'
+    news = (SAME, SAME, SAME)
     run_args = (tr, create_wa, origs, news)
 
-    # Scenario: all new paths collide. Renaming will be rejected
-    # because by default offending paths will be filtered out,
-    # leaving nothing to rename.
+    # Scenario: all new paths collide.
+    # By default, renaming will proceed and clobber.
     wa, plan = run_checks(
         *run_args,
+        expecteds = (SAME,),
+    )
+
+    # User can skip colliding renamings.
+    # That will filter everything out.
+    wa, plan = run_checks(
+        *run_args,
+        skip = PN.collides,
         failure = True,
         no_change = True,
-        reason = FN.all_filtered,
-        inventory = exp_inv,
+        reason = Failure(FN.all_filtered),
+        inventory = 's',
+    )
+
+    # User can halt the renaming in strict mode.
+    # That will filter everything out.
+    wa, plan = run_checks(
+        *run_args,
+        strict = PN.collides,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, PN.collides),
     )
 
 ####
 # Other.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
-def test_renaming(tr):
-    rn = Renaming('a', 'a.new')
-    assert rn.prob_name is None
-    nm = PN.equal
-    rn.problem = Problem(nm)
-    assert rn.prob_name == nm
-
-@pytest.mark.skip(reason = 'overhaul')
 def test_unexpected_clobber(tr, create_wa):
     # Paths and args.
     VICTIM = 'b.new'
@@ -1327,7 +1274,7 @@ def test_unexpected_clobber(tr, create_wa):
 
     # Scenario: but if we create the clobbering victim in the middle of
     # renaming, RenamingPlan.rename_paths() will raise an exception and
-    # renaming will be aborted in the midway through.
+    # renaming will be aborted in midway through.
     wa, plan, einfo = run_checks(
         *run_args,
         rootless = True,
