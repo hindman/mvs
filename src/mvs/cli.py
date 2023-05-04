@@ -11,6 +11,7 @@ from pathlib import Path
 from textwrap import dedent
 from short_con import constants
 
+from .constants import CON, STRUCTURES
 from .optconfig import OptConfig, positive_int
 from .plan import RenamingPlan
 from .problems import Problem, StrictMode
@@ -23,9 +24,7 @@ from .messages import (
 )
 
 from .utils import (
-    CON,
     MvsError,
-    STRUCTURES,
     edit_text,
     hyphens_to_underscores,
     indented,
@@ -152,18 +151,18 @@ class CliRenamer:
 
         # Return if plan failed.
         if plan.failed:
-            self.wrapup(CON.exit_fail, MF.no_action_msg)
+            self.wrapup(CON.exit_fail, MF.no_action)
             return
 
         # Return if dryrun mode.
         if opts.dryrun:
-            self.wrapup(CON.exit_ok, MF.no_action_msg)
+            self.wrapup(CON.exit_ok, MF.no_action)
             return
 
         # User confirmation.
         if not opts.yes:
             if not self.get_confirmation(MF.confirm_prompt, expected = CON.yes):
-                self.wrapup(CON.exit_ok, MF.no_action_msg)
+                self.wrapup(CON.exit_ok, MF.no_action)
                 return
 
     def do_rename(self):
@@ -176,7 +175,7 @@ class CliRenamer:
         # Rename paths.
         try:
             self.plan.rename_paths()
-            self.wrapup(CON.exit_ok, MF.paths_renamed_msg)
+            self.wrapup(CON.exit_ok, MF.paths_renamed)
         except Exception as e: # pragma: no cover
             msg = MF.renaming_raised.format(self.plan.tracking_index)
             self.wrapup_with_tb(msg)
@@ -256,7 +255,7 @@ class CliRenamer:
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.version:
-            self.wrapup(CON.exit_ok, MF.cli_version_msg)
+            self.wrapup(CON.exit_ok, MF.cli_version)
             return None
 
         # Validate the options related to input sources and structures.
@@ -532,10 +531,11 @@ class CliRenamer:
             return ''
 
     def summary_listing(self):
-        # Returns a message summarizing a renaming as a table of tallies,
-        # but only if the plan would fail under strict=all.
+        # Returns a message summarizing a renaming as a table of tallies.
+        # The tallies are suppressed if all renamings are active and OK.
         p = self.plan
-        if p.passes_strict_all:
+        N = len(p.active)
+        if p.n_initial == N and N == len(p.ok):
             return ''
         else:
             return MF.summary_table.format(

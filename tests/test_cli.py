@@ -1,33 +1,6 @@
-'''
-
-TODO:
-
-    test_version_and_help()
-    test_indent_and_posint()
-    test_no_input_paths()
-    test_odd_number_inputs()
-    test_sources()
-    test_edit()
-    test_preferences_file()
-    test_preferences_validation()
-    test_preferences_merging()
-    test_preferences_problem_control()
-    test_dryrun()
-    test_no_confirmation()
-    test_rename_paths_raises()
-    test_filter_all()
-    test_log()
-    test_pagination()
-    test_main()
-    test_wrapup_with_tb()
-
-'''
-
-
 import json
 import os
 import pytest
-import re
 import sys
 import traceback
 
@@ -37,14 +10,16 @@ from string import ascii_lowercase
 from types import SimpleNamespace
 
 from mvs.cli import main, CliRenamer, CLI
+from mvs.constants import CON
 from mvs.messages import MSG_FORMATS as MF
 from mvs.plan import RenamingPlan
-from mvs.utils import CON, write_to_clipboard
+from mvs.utils import write_to_clipboard
 from mvs.version import __version__
 
 from mvs.problems import (
     FAILURE_FORMATS as FF,
     FAILURE_NAMES as FN,
+    FAILURE_VARIETIES as FV,
     PROBLEM_FORMATS as PF,
     PROBLEM_NAMES as PN,
 )
@@ -364,7 +339,6 @@ def can_use_clipboard():
 # Command-line arguments and options.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_version_and_help(tr, creators):
     # Exercise the command-line options that report
     # information about the app and exit immediately.
@@ -384,7 +358,7 @@ def test_version_and_help(tr, creators):
     wa, outs, cli = run_checks(
         *run_args,
         '--version',
-        out = MF.cli_version_msg + CON.newline,
+        out = MF.cli_version + CON.newline,
         **kws,
     )
 
@@ -408,12 +382,11 @@ def test_version_and_help(tr, creators):
     N = 40
     assert got.startswith(f'Usage: {CON.app_name}')
     assert CLI.description[0:N] in got
-    for opt in ('--clipboard', '--paragraphs', '--rename'):
-        assert f'\n  {opt}' in got
     for oc in CLI.opt_configs.values():
         assert oc.params['help'][0:N] in got
+        if oc.name != 'paths':
+            assert f'\n  --{oc.name}' in got
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_indent_and_posint(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -444,6 +417,7 @@ def test_indent_and_posint(tr, creators):
             no_change = True,
             err_in = '--indent: invalid positive_int value',
             err_starts = f'Usage: {CON.app_name}',
+            out = '',
         )
 
 ####
@@ -473,7 +447,6 @@ def test_basic_use_cases(tr, creators):
 # Input paths and sources.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_no_input_paths(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -493,6 +466,7 @@ def test_no_input_paths(tr, creators):
         no_change = True,
         err_starts = MF.opts_require_one,
         err_in = CLI.sources.keys(),
+        out = '',
     )
 
     # It also fails if the input paths are empty.
@@ -503,12 +477,11 @@ def test_no_input_paths(tr, creators):
         include_news = False,
         failure = True,
         no_change = True,
-        err_in = MF.no_action_msg,
-        out_in = (FF.parsing_no_paths, pre_fmt(MF.listing_failures)),
+        err_in = MF.no_action,
+        out_in = FF[FN.parsing, FV.no_paths],
         log = PLAN_LOG_OK,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_odd_number_inputs(tr, creators):
     # An odd number of inputs will fail.
     origs = ('z1', 'z2', 'z3')
@@ -520,12 +493,11 @@ def test_odd_number_inputs(tr, creators):
         news,
         failure = True,
         no_change = True,
-        err_in = MF.no_action_msg,
-        out_in = (FF.parsing_imbalance, pre_fmt(MF.listing_failures)),
+        err_in = MF.no_action,
+        out_in = FF[FN.parsing, FV.imbalance],
         log = PLAN_LOG_OK,
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_sources(tr, creators):
     # Paths and args.
     origs = ('z1', 'z2', 'z3')
@@ -594,13 +566,13 @@ def test_sources(tr, creators):
         no_change = True,
         err_starts = MF.opts_mutex,
         err_in = ('--clipboard', '--stdin'),
+        out = '',
     )
 
 ####
 # The --edit and --editor options.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_edit(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -624,6 +596,7 @@ def test_edit(tr, creators):
         failure = True,
         no_change = True,
         err = MF.no_editor + '\n',
+        out = '',
     )
 
     # Renaming attempt fails if the editor exits unsuccessfully.
@@ -638,13 +611,13 @@ def test_edit(tr, creators):
             pre_fmt(MF.editor_cmd_nonzero),
             pre_fmt(MF.edit_failed_unexpected),
         ),
+        out = '',
     )
 
 ####
 # Preferences.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_preferences_file(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -665,6 +638,7 @@ def test_preferences_file(tr, creators):
         no_change = True,
         err_starts = pre_fmt(MF.prefs_reading_failed),
         err_in = 'JSONDecodeError',
+        out = '',
     )
 
     # Scenario: a valid JSON file; confirm that we affect cli.opts.
@@ -696,7 +670,6 @@ def test_preferences_file(tr, creators):
     finally:
         os.environ[nm] = prev
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_preferences_validation(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -712,6 +685,7 @@ def test_preferences_validation(tr, creators):
         failure = True,
         err_starts = pre_fmt(MF.invalid_pref_keys),
         err_in = ('foo', 'bar'),
+        out = '',
     )
 
     # Scenario: invalid preferences value.
@@ -731,9 +705,9 @@ def test_preferences_validation(tr, creators):
             prepare_only = True,
             failure = True,
             err = exp + '\n',
+            out = '',
         )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_preferences_merging(tr, create_prefs):
     # Paths and args.
     origs = ('a', 'b')
@@ -751,25 +725,22 @@ def test_preferences_merging(tr, create_prefs):
         yes = True,
         nolog = True,
         limit = 20,
-        controls = ['create-parent', 'skip-equal', 'skip-recase', 'skip-same'],
     )
 
     # Helper to get cli.opts and confirm that CliRenamer did
     # not gripe about invalid arguments.
     def get_opts(*args):
         cli = CliRenamer(origs + news + args)
-        opts = vars(cli.parse_command_line_args())
+        opts = cli.parse_command_line_args()
+        assert opts is not None
         assert not cli.done
-        return opts
+        return vars(opts)
 
     # Helper to check resulting opts against expecations.
-    def check_opts(got, exp1, **exp2):
-        # Should have same keys as DEFAULTS.
+    def check_opts(got, exp):
         assert sorted(got) == sorted(DEFAULTS)
-        # Check values.
         for k, def_val in DEFAULTS.items():
-            exp = exp1.get(k, exp2.get(k, def_val))
-            assert (k, got[k]) == (k, exp)
+            assert (k, got[k]) == (k, exp.get(k, def_val))
 
     # Setup: get the defaults for cli.opts.
     DEFAULTS = get_opts()
@@ -808,67 +779,12 @@ def test_preferences_merging(tr, create_prefs):
         '--editor', 'awk',
         '--limit', '100',
     )
-    check_opts(opts, OVERRIDES, controls = PREFS['controls'])
-
-@pytest.mark.skip(reason = 'overhaul')
-def test_preferences_problem_control(tr, creators):
-    # Paths and args.
-    origs = ('a', 'b', 'c')
-    news = ('aa', 'bb', 'cc')
-    run_args = (tr, creators, origs, news)
-
-    # Problem controls: application defaults and some other controls.
-    app_defs = list(ProblemControl.DEFAULTS)
-    others = ['skip-exists', 'create-parent', 'clobber-collides']
-
-    # Helper to get cli.opts and confirm that CliRenamer did
-    # not gripe about invalid arguments.
-    def get_opts(*args, failure = False):
-        args = origs + news + args
-        cli = CliRenamerSIO(*args)
-        opts = cli.parse_command_line_args()
-        if failure:
-            assert cli.failure
-            return (cli, opts)
-        else:
-            assert not cli.done
-            return opts
-
-    # Scenario: with no user-prefs and command line controls,
-    # we should get no controls.
-    opts = get_opts()
-    assert opts.controls == []
-
-    # Scenario: some other controls.
-    opts = get_opts('--controls', *others)
-    assert opts.controls == others
-
-    # Scenario: invalid control.
-    wa, outs, cli = run_checks(
-        *run_args,
-        '--controls', 'no-fubb',
-        failure = True,
-        no_change = True,
-        err_in = ('--controls', 'invalid choice', 'no-fubb'),
-    )
-    assert cli.opts is None
-
-    # Scenario: conflicting controls.
-    wa, outs, cli = run_checks(
-        *run_args,
-        '--controls', 'create-parent', 'skip-parent',
-        failure = True,
-        no_change = True,
-        err_starts = pre_fmt(MF.conflicting_controls),
-        err_in = ('parent', 'create', 'skip'),
-    )
-    assert cli.opts is None
+    check_opts(opts, OVERRIDES)
 
 ####
 # Dryrun and no-confirmation.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_dryrun(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -876,7 +792,7 @@ def test_dryrun(tr, creators):
     run_args = (tr, creators, origs, news)
 
     # Callable to check cli.out.
-    exp_out = lambda wa, outs, cli: outs.no_action_output
+    exp_out = lambda wa, outs, cli: outs.no_action_output(cli.plan)
 
     # In dryrun mode, we get the usual listing,
     # but no renaming or logging occurs.
@@ -892,7 +808,6 @@ def test_dryrun(tr, creators):
         log = '',
     )
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_no_confirmation(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -900,7 +815,7 @@ def test_no_confirmation(tr, creators):
     run_args = (tr, creators, origs, news)
 
     # Callable to check cli.out.
-    exp_out = lambda wa, outs, cli: outs.no_confirm_output
+    exp_out = lambda wa, outs, cli: outs.no_confirm_output(cli.plan)
 
     # If user does not confirm, we get the usual listing,
     # but no renaming or logging occurs.
@@ -1011,7 +926,6 @@ def test_rename_paths_raises(tr, creators):
     assert cli.log_tracking_dict == dict(tracking_index = N)
     assert cli.out.rstrip() == outs.listing_rename.rstrip()
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_filter_all(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1028,16 +942,16 @@ def test_filter_all(tr, creators):
         'return False',
         failure = True,
         no_change = True,
-        err_in = MF.no_action_msg,
-        out_in = (FF.all_filtered, pre_fmt(MF.listing_failures)),
+        err_in = MF.no_action,
         log = PLAN_LOG_OK,
+        inventory = 'f',
+        fail_params = (FN.all_filtered, None),
     )
 
 ####
 # Textual outputs.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_log(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
@@ -1048,28 +962,32 @@ def test_log(tr, creators):
     # We can load its logging data and check that both dicts
     # contain expected some of the expected keys and/or vals.
     wa, outs, cli = run_checks(*run_args)
-    d1 = cli.log_plan_dict
-    d2 = cli.log_tracking_dict
-    assert d1['version'] == __version__
-    for k in ('current_directory', 'opts', 'inputs', 'renamings'):
-        assert k in d1
-    assert d2 == dict(tracking_index = cli.plan.TRACKING.done)
+    assert cli.log_tracking_dict == dict(tracking_index = cli.plan.TRACKING.done)
+    d = cli.log_plan_dict
+    assert d['version'] == __version__
+    exp_keys = (
+        'current_directory',
+        'opts',
+        'inputs',
+        'active',
+        'filtered',
+        'skipped',
+        'excluded',
+    )
+    for k in exp_keys:
+        assert k in d
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_pagination(tr, creators):
     # Paths and args.
     origs = tuple(ascii_lowercase)
     news = tuple(o + o for o in origs)
     run_args = (tr, creators, origs, news)
 
-    # Callable to check cli.out.
-    exp_out = lambda wa, outs, cli: '\n' + outs.paths_renamed
-
     # A scenario to exercise the paginate() function.
     wa, outs, cli = run_checks(
         *run_args,
         pager = tr.TEST_PAGER,
-        out = exp_out,
+        out_in = MF.paths_renamed,
     )
 
 ####
@@ -1154,7 +1072,7 @@ def test_some_failed_rns(tr, creators):
         no_change = True,
         failure = True,
         fail_params = (FN.strict, None, PN.exists),
-        err = MF.no_action_msg + CON.newline,
+        err = MF.no_action + CON.newline,
         log = PLAN_LOG_OK,
     )
 
@@ -1162,7 +1080,6 @@ def test_some_failed_rns(tr, creators):
 # Miscellaneous.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_wrapup_with_tb(tr, create_wa):
     # Excercises all calls of wrapup_with_tb() and checks for expected
     # attribute changes. Most of those code branches (1) are a hassle to reach

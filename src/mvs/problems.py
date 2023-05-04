@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from short_con import constants
 
+from .constants import CON
 from .messages import MSG_FORMATS as MF
 
 from .utils import(
-    CON,
     MvsError,
     underscores_to_hyphens,
     hyphen_join,

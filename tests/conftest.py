@@ -9,13 +9,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from mvs.constants import CON
 from mvs.problems import FAILURE_FORMATS as FF
-from mvs.utils import CON, indented, para_join
+from mvs.utils import indented, para_join
+
 from mvs.messages import (
     MSG_FORMATS as MF,
     LISTING_FORMATS as LF,
 )
-
 
 ####
 # Set the mvs environment variable so that (1) the user's personal
@@ -421,7 +422,7 @@ class Outputs:
     def total_msg(self, n):
         return f' (total {n})'
 
-    def renaming_listing(self, plan):
+    def renaming_listing(self, plan, final_msg = False):
         # Convert the inventory supplied to Outputs to a dict mapping each
         # INV_MAP attribute to the orig paths we expect.
         #
@@ -488,37 +489,23 @@ class Outputs:
                     for o in origs
                 )
 
-        # Add the paths-renamed message.
-        if not self.no_change:
-            paras.append(MF.paths_renamed_msg.lstrip())
+        # Add the final message.
+        final_msg = (
+            final_msg if final_msg else
+            '' if self.no_change else
+            MF.paths_renamed
+        )
+        paras.append(final_msg.lstrip())
 
         # Combine the paragraphs and return.
         return para_join(*paras) + CON.newline
 
-    @property
-    def no_action_output(self):
-        # TODO: relies on obsolete listing property.
-        return self.listing_rename + MF.no_action_msg
+    def no_action_output(self, plan):
+        return self.renaming_listing(plan, final_msg = MF.no_action)
 
-    @property
-    def no_confirm_output(self):
-        # TODO: relies on obsolete listing property.
-        return (
-            self.listing_rename +
-            f'{MF.confirm_prompt} [yes]? \n'.lstrip() +
-            MF.no_action_msg
-        )
-
-    # OBSOLETE:
-    #
-    # @property
-    # def listing_rename(self):
-    #     args = [LF.ok.format(self.totlist)]
-    #     args.extend(
-    #         f'  {o}\n  {n}\n'
-    #         for o, n in zip(self.origs, self.news)
-    #     )
-    #     return '\n'.join(args) + '\n'
+    def no_confirm_output(self, plan):
+        msg = f'{MF.confirm_prompt} [yes]? \n{MF.no_action.lstrip()}'
+        return self.renaming_listing(plan, final_msg = msg)
 
 ####
 # A class used by the create_prefs() fixture to (1) write a user-preferences

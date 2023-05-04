@@ -1,6 +1,6 @@
 from short_con import constants
 
-from .utils import CON
+from .constants import CON
 from .version import __version__
 
 ####
@@ -69,8 +69,8 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     # Other messages in CliRenamer.
     summary_table          = SUMMARY_TABLE.lstrip(),
     confirm_prompt         = '\nRename paths',
-    no_action_msg          = '\nNo action taken.',
-    paths_renamed_msg      = '\nPaths renamed.',
-    cli_version_msg        = f'{CON.app_name} v{__version__}',
+    no_action              = '\nNo action taken.',
+    paths_renamed          = '\nPaths renamed.',
+    cli_version            = f'{CON.app_name} v{__version__}',
 ))
 

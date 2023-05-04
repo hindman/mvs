@@ -19,7 +19,14 @@ Tests:
 
         x test_plan.py
         x test_utils.py
-        - test_cli.py
+        . test_cli.py
+            test_rename_paths_raises()
+            test_main()
+
+    - Test this behavior independently.
+        indented()
+        para_join()
+        Renaming.formatted
 
     - PN.duplicate:
         - Exercise this new check.
@@ -30,12 +37,6 @@ Tests:
         - See test_some_failed_rns().
         - Give the function a better name.
         - Use it as a starting point.
-
-    - Test this behavior independently.
-        indented()
-        para_join()
-        Renaming.formatted
-        Check conftest.py for other stuff.
 
 New documentation [see NEW_DOCS].
 
@@ -235,8 +236,8 @@ Why problem control was overhauled, yet again:
 
         - By default:
 
-            - A summary table of counts is shown if the renaming plan would
-              halt under --strict=all.
+            - A summary table of counts is shown unless all renamings are
+              active and OK.
 
             - Among the categories configured to appear, the non-empty ones are
               listed.

@@ -1,4 +1,4 @@
-from .utils import CON
+from .constants import CON
 
 ####
 # Type validating functions given to argparse.

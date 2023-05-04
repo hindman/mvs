@@ -10,9 +10,18 @@ from os.path import commonprefix, samefile
 from pathlib import Path
 from short_con import constants
 
-from .renaming import (
-    NAME_CHANGE_TYPES as NCT,
-    Renaming,
+from .constants import CON, STRUCTURES
+from .messages import MSG_FORMATS as MF
+
+from .filesys import (
+    ANY_EXISTENCE,
+    EXISTENCES,
+    FS_TYPES,
+    PATH_TYPES as PT,
+    case_sensitivity,
+    determine_path_type,
+    is_non_empty_dir,
+    path_existence_and_type,
 )
 
 from .problems import (
@@ -27,23 +36,13 @@ from .problems import (
     StrictMode,
 )
 
-from .filesys import (
-    ANY_EXISTENCE,
-    EXISTENCES,
-    FS_TYPES,
-    PATH_TYPES as PT,
-    case_sensitivity,
-    determine_path_type,
-    is_non_empty_dir,
-    path_existence_and_type,
+from .renaming import (
+    NAME_CHANGE_TYPES as NCT,
+    Renaming,
 )
 
-from .messages import MSG_FORMATS as MF
-
 from .utils import (
-    CON,
     MvsError,
-    STRUCTURES,
     get_source_code,
     indented,
     validated_choices,
@@ -135,7 +134,6 @@ class RenamingPlan:
 
         # Validate and standardize the user's problem-handling parameters.
         self.strict = StrictMode.from_user(strict)
-        self.passes_strict_all = None
         self.skip = self.validated_skip_ids(skip)
         self.skip_lookup = self.build_skip_lookup()
 
@@ -259,13 +257,21 @@ class RenamingPlan:
                 self.ok.append(rn)
 
     def prepare_strict(self):
-        # Check for adherence to strict=all.
-        sm = StrictMode.from_user(CON.all)
-        self.passes_strict_all = self.passes_strict(sm)
-        # Check for adherence to the user's actual strict setting.
         sm = self.strict
         if not self.passes_strict(sm):
             self.handle_failure(FN.strict, sm.as_str)
+
+    def passes_strict(self, sm):
+        # Takes a StrictMode instance.
+        # Returns true if the plan passes its settings.
+        if sm.excluded and self.excluded:
+            return False
+        else:
+            active_probs = set(rn.prob_name for rn in self.active)
+            return all(
+                p not in active_probs
+                for p in sm.probs
+            )
 
     ####
     # Parsing inputs to obtain the original and, in some cases, new paths.
@@ -762,18 +768,4 @@ class RenamingPlan:
             prefix_len = self.prefix_len,
             tracking_index = self.tracking_index,
         )
-
-    def passes_strict(self, sm):
-        # Takes a StrictMode instance.
-        # Returns true if the plan passes its settings.
-        if sm is None:
-            return True
-        elif sm.excluded and self.excluded:
-            return False
-        else:
-            active_probs = set(rn.prob_name for rn in self.active)
-            return all(
-                p not in active_probs
-                for p in sm.probs
-            )
 
