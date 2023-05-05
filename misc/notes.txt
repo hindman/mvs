@@ -15,23 +15,40 @@ todos: TODOs
 
 Tests:
 
-    - Rework existing tests and get them passing:
+    - Coverage gaps:
 
-        x test_plan.py
-        x test_utils.py
-        . test_cli.py
-            test_rename_paths_raises()
-            test_main()
+        - indented():
+            - test independently
+            - both regular and invalid usage.
 
-    - Test this behavior independently.
-        indented()
-        para_join()
-        Renaming.formatted
+        - para_join()
+            - test independently
 
-    - PN.duplicate:
-        - Exercise this new check.
+        - Renaming.formatted
+            - test independently
 
-    - do_rename(): exercise code branch with MF.unsupported_clobber.
+        - cli.py: log writing fails
+
+        - Problem.from_skip_id(): invalid usages.
+
+        - StrictMode.from_user(): invalid usage.
+
+        - validated_choices():
+            - invalid input
+            - invalid element value
+            - 'all' usage
+
+        - OptConfig.list_of_str(): valid usage.
+            - figure out why the current tests are not exercising this
+
+        - RenamingPlan.check_new_exists(): where rn.type_new is PT.other.
+
+        - RenamingPlan.validated_skip_ids(): invalid inputs.
+
+        - RenamingPlan.do_rename(): MF.unsupported_clobber
+
+        - PN.duplicate:
+            - Exercise this new check.
 
     - New listing/reporting behavior: exercise the range of behaviors
         - See test_some_failed_rns().

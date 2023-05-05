@@ -835,7 +835,6 @@ def test_no_confirmation(tr, creators):
 # User-supplied code.
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_rename_paths_raises(tr, creators):
     # Paths, etc.
     origs = ('z1', 'z2', 'z3')
@@ -874,7 +873,7 @@ def test_rename_paths_raises(tr, creators):
     def raiser(plan):
         raise ZeroDivisionError('SIMULATED_ERROR')
 
-    # Basic scenario.
+    # Basic scenario: it works.
     wa, outs, cli = run_checks(*run_args)
 
     # Same thing, but using do_prepare() and do_rename().
@@ -904,7 +903,8 @@ def test_rename_paths_raises(tr, creators):
         log = LOGS_OK,
     )
     assert cli.plan.tracking_index == NSTART
-    assert cli.out.rstrip() == outs.listing_rename.rstrip()
+    exp = outs.renaming_listing(cli.plan, final_msg = False).rstrip()
+    assert cli.out.rstrip() == exp
 
     # Same scenario, but this time we will trigger the exception via
     # the call_at attribute, so we can check the tracking_index in
@@ -924,7 +924,8 @@ def test_rename_paths_raises(tr, creators):
     assert cli.plan.tracking_rn.orig == wa.origs[N]
     assert cli.plan.tracking_index == N
     assert cli.log_tracking_dict == dict(tracking_index = N)
-    assert cli.out.rstrip() == outs.listing_rename.rstrip()
+    exp = outs.renaming_listing(cli.plan, final_msg = False).rstrip()
+    assert cli.out.rstrip() == exp
 
 def test_filter_all(tr, creators):
     # Paths and args.
@@ -994,7 +995,6 @@ def test_pagination(tr, creators):
 # Exercising main().
 ####
 
-@pytest.mark.skip(reason = 'overhaul')
 def test_main(tr, create_wa, create_outs):
     # Paths.
     origs = ('xx', 'yy')
@@ -1018,9 +1018,16 @@ def test_main(tr, create_wa, create_outs):
     # Create work area.
     wa = create_wa(origs, news)
     outs = create_outs(wa.origs, wa.news)
+    inputs = wa.origs + wa.news
+
+    # Separately, create a RenamingPlan using the same inputs.
+    # We do this because the main() below will not give us access to
+    # the plan, which is needed when checking STDOUT.
+    plan = RenamingPlan(inputs = wa.origs + wa.news)
+    plan.prepare()
 
     # Call main(). It should exit successfully.
-    args = wa.origs + wa.news + ('--yes', '--pager', '')
+    args = inputs + ('--yes', '--pager', '')
     with pytest.raises(SystemExit) as einfo:
         main(args, **fhs)
     einfo.value.code == CON.exit_ok
@@ -1033,7 +1040,7 @@ def test_main(tr, create_wa, create_outs):
         k : fh.getvalue()
         for k, fh in fhs.items()
     })
-    assert cli.stdout == outs.renaming_listing()
+    assert cli.stdout == outs.renaming_listing(plan)
     assert cli.stderr == ''
     assert cli.stdin == ''
     check_log(cli, 'plan')

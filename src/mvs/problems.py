@@ -134,10 +134,6 @@ class Issue:
             msg = self.FORMATS[name, variety].format(*xs),
         )
 
-    @property
-    def formatted(self):
-        return with_newline(self.msg)
-
 ####
 # Failure.
 ####

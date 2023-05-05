@@ -559,24 +559,22 @@ class CliRenamer:
             if items
         )
 
-    def listing_msg(self, fmt, items):
-        # Takes a message format and a sequence of items
-        # having a formatted @property (in practice, the items
-        # are Failure or Renaming instances).
+    def listing_msg(self, fmt, rns):
+        # Takes a message format and a sequence of Renaming instances.
         #
-        # Attaches a tally of the items to the message.
+        # Attaches a tally of the renamings to the message.
         #
-        # Returns that message followed by a listing of those items.
+        # Returns that message followed by a listing of those renamings.
         # The listing might be limited in size.
-        n = len(items)
+        n = len(rns)
         lim = n if self.opts.limit is None else self.opts.limit
         tally = f' (total {n})'
         msg = fmt.format(tally)
-        items = CON.newline.join(
-            indented(x.formatted)
-            for x in items[0:self.opts.limit]
+        rns_text = CON.newline.join(
+            indented(rn.formatted)
+            for rn in rns[0:self.opts.limit]
         )
-        return f'{msg}\n{items}'
+        return f'{msg}\n{rns_text}'
 
     def paginate(self, text):
         # Takes some text and either send it to the

@@ -422,7 +422,7 @@ class Outputs:
     def total_msg(self, n):
         return f' (total {n})'
 
-    def renaming_listing(self, plan, final_msg = False):
+    def renaming_listing(self, plan, final_msg = None):
         # Convert the inventory supplied to Outputs to a dict mapping each
         # INV_MAP attribute to the orig paths we expect.
         #
@@ -492,6 +492,7 @@ class Outputs:
         # Add the final message.
         final_msg = (
             final_msg if final_msg else
+            '' if final_msg is False else
             '' if self.no_change else
             MF.paths_renamed
         )
