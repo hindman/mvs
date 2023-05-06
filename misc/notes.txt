@@ -15,49 +15,16 @@ todos: TODOs
 
 Tests:
 
-    - Coverage gaps:
+    - cli.py:
 
-        - indented():
-            - test independently
-            - both regular and invalid usage.
+        - log writing fails
 
-        - para_join()
-            - test independently
+        - New listing/reporting behavior: exercise the range of behaviors
+            - See test_some_failed_rns().
+            - Give the function a better name.
+            - Use it as a starting point.
 
-        - Renaming.formatted
-            - test independently
-
-        - cli.py: log writing fails
-
-        - Problem.from_skip_id(): invalid usages.
-
-        - StrictMode.from_user(): invalid usage.
-
-        - validated_choices():
-            - invalid input
-            - invalid element value
-            - 'all' usage
-
-        - OptConfig.list_of_str(): valid usage.
-            - figure out why the current tests are not exercising this
-
-        - RenamingPlan.check_new_exists(): where rn.type_new is PT.other.
-
-        - RenamingPlan.validated_skip_ids(): invalid inputs.
-
-        - RenamingPlan.do_rename(): MF.unsupported_clobber
-
-        - PN.duplicate:
-            - Exercise this new check.
-
-    - New listing/reporting behavior: exercise the range of behaviors
-        - See test_some_failed_rns().
-        - Give the function a better name.
-        - Use it as a starting point.
-
-New documentation [see NEW_DOCS].
-
-Editing pass [see NEW_DOCS].
+New documentation and editing pass [see NEW_DOCS].
 
 Publish with major version bump.
 

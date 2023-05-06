@@ -644,6 +644,35 @@ def test_equal(tr, create_wa):
         inventory = exp_inv,
     )
 
+def test_duplicate(tr, create_wa):
+    # Paths and args.
+    SAME = 'b'
+    origs = ('a', SAME, SAME, SAME)
+    news = ('a.new', 'b.new', 'c.new', 'd.new')
+    expecteds = ('a.new', SAME)
+    exp_inv = '.XXX'
+    strict = 'excluded'
+    reason = Failure(FN.strict, strict)
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: the orig paths are not unique.
+    # By default, the offending Renaming will be excluded.
+    wa, plan = run_checks(
+        *run_args,
+        expecteds = expecteds,
+        inventory = exp_inv,
+    )
+
+    # But in strict mode the plan will fail.
+    wa, plan = run_checks(
+        *run_args,
+        strict = strict,
+        failure = True,
+        no_change = True,
+        reason = reason,
+        inventory = exp_inv,
+    )
+
 def test_same(tr, create_wa):
     # Paths and args.
     origs = ('foo/xyz', 'BAR/xyz', 'a')
@@ -856,6 +885,37 @@ def test_new_exists_diff(tr, create_wa):
         failure = True,
         no_change = True,
         reason = Failure(FN.strict, PN.exists),
+    )
+
+def test_new_exists_other(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'c.new')
+    TARGET = 'c.target'
+    extras = (f'c.new->{TARGET}',)
+    expecteds = news + ('c',)
+    exp_inv = '..X'
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: one of new paths already exists and it is
+    # not a supported path type. By default, the renaming will
+    # proceed, excluding the offending renaming.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        expecteds = expecteds,
+        inventory = exp_inv,
+    )
+
+    # User can halt renaming in strict mode.
+    wa, plan = run_checks(
+        *run_args,
+        extras = extras,
+        strict = StrictMode.EXCLUDED,
+        failure = True,
+        no_change = True,
+        reason = Failure(FN.strict, StrictMode.EXCLUDED),
+        inventory = exp_inv,
     )
 
 def test_new_exists_diff_parents(tr, create_wa):
@@ -1217,7 +1277,7 @@ def test_news_collide_full(tr, create_wa):
         inventory = exp_invSF,
     )
 
-def test_failures_skip_all(tr, create_wa):
+def test_failures_filter_all(tr, create_wa):
     # Paths and args.
     SAME = 'Z'
     origs = ('a', 'b', 'c')
@@ -1259,34 +1319,73 @@ def test_failures_skip_all(tr, create_wa):
 def test_unexpected_clobber(tr, create_wa):
     # Paths and args.
     VICTIM = 'b.new'
+    TARGET = 'TARGET'
     origs = ('a', 'b', 'c')
     news = ('a.new', VICTIM, 'c.new')
     expecteds = ('a.new', 'b', 'c', VICTIM)
     run_args = (tr, create_wa, origs, news)
 
-    # Helper to create an unexpected clobbering situation
+    # Helper to create unexpected clobbering situations
     # in the middle of renaming.
-    def set_call_at(wa, plan):
-        f = lambda _: Path(VICTIM).touch()
-        plan.call_at = (news.index(VICTIM), f)
+    def toucher(plan):
+        Path(VICTIM).touch()
 
-    # Scenario: basic renaming; it works.
+    def linker(plan):
+        Path(VICTIM).unlink()
+        Path(TARGET).touch()
+        Path(VICTIM).symlink_to(TARGET)
+
+    def create_call_at_setter(operation):
+        def f(wa, plan):
+            plan.call_at = (news.index(VICTIM), operation)
+        return f
+
+    # Helper to check stuff across different scenarios.
+    def do_checks(err, exp):
+        assert err.msg == exp
+        assert err.params['orig'] == 'b'
+        assert err.params['new'] == VICTIM
+
+    # Scenario 1: basic renaming; it works.
     wa, plan = run_checks(*run_args, rootless = True)
 
-    # Scenario: but if we create the clobbering victim in the middle of
+    # Scenario 2: if we create the clobbering victim in the middle of
     # renaming, RenamingPlan.rename_paths() will raise an exception and
     # renaming will be aborted in midway through.
     wa, plan, einfo = run_checks(
         *run_args,
         rootless = True,
         expecteds = expecteds,
-        early_checks = set_call_at,
+        early_checks = create_call_at_setter(toucher),
         failure = True,
         check_failure = False,
         return_einfo = True,
     )
-    err = einfo.value
-    assert err.msg == MF.unrequested_clobber
-    assert err.params['orig'] == 'b'
-    assert err.params['new'] == VICTIM
+    do_checks(einfo.value, MF.unrequested_clobber)
+
+    # Scenario 3: this time the clobbering victim is expected (because
+    # we include it in extras), but during the middle of renaming
+    # the new path gets replaced by an unsupported path type.
+    # Here the renaming should halt in the middle with a different
+    # error message.
+    wa, plan, einfo = run_checks(
+        *run_args,
+        rootless = True,
+        extras = (VICTIM,),
+        expecteds = expecteds + (TARGET,),
+        early_checks = create_call_at_setter(linker),
+        failure = True,
+        check_failure = False,
+        return_einfo = True,
+    )
+    do_checks(einfo.value, MF.unsupported_clobber)
+
+def test_invalid_skip(tr):
+    # Exercise code path involving invalid input for skip.
+    inputs = ('a', 'b', 'a.new', 'b.new')
+    bad = 'exists-fubb'
+    with pytest.raises(MvsError) as einfo:
+        plan = RenamingPlan(inputs, skip = bad)
+    exp = MF.invalid_skip.format(bad)
+    assert einfo.value.msg == exp
 

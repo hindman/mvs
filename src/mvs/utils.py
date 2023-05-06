@@ -87,11 +87,8 @@ def indented(msg):
 
 def para_join(*msgs):
     sep = CON.newline + CON.newline
-    return sep.join(
-        m.rstrip()
-        for m in msgs
-        if m
-    )
+    gen = (m.rstrip() for m in msgs)
+    return sep.join(m for m in gen if m)
 
 def wrap_text(text, width):
     # Takes some text and a max width.
@@ -101,14 +98,12 @@ def wrap_text(text, width):
     NL = CON.newline
     SP = CON.space
 
-    # Split text into words. If none, return immediately.
+    # Split text into words.
     words = [
         w
         for line in text.split(NL)
         for w in line.strip().split(SP)
     ]
-    if not words: # pragma: no cover
-        return ''
 
     # Assemble the words into a list-of-list, where each
     # inner list will become a line within the width limit.
@@ -116,7 +111,7 @@ def wrap_text(text, width):
     tot = 0
     for w in words:
         n = len(w)
-        if n == 0: # pragma: no cover
+        if n == 0:
             continue
         elif tot + n + 1 <= width:
             lines[-1].append(w)
@@ -161,7 +156,11 @@ def validated_choices(raw_input, choices):
     if CON.all in xs:
         return tuple(x for x in choices if x != CON.all)
     else:
-        return tuple(set(xs))
+        uniq = []
+        for x in xs:
+            if x not in uniq:
+                uniq.append(x)
+        return tuple(uniq)
 
 ####
 # Other.

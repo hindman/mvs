@@ -705,7 +705,6 @@ class RenamingPlan:
                 # User requested case-change renaming. No problem.
                 pass
             elif rn.clobber:
-                # User requested a clobber for this Renaming.
                 # Make sure the clobber victim is (still) a supported path type.
                 # Select the appropriate deletion operation.
                 pt = determine_path_type(rn.new)

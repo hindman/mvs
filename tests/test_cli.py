@@ -725,6 +725,7 @@ def test_preferences_merging(tr, create_prefs):
         yes = True,
         nolog = True,
         limit = 20,
+        skip = [PN.exists],
     )
 
     # Helper to get cli.opts and confirm that CliRenamer did
@@ -741,6 +742,15 @@ def test_preferences_merging(tr, create_prefs):
         assert sorted(got) == sorted(DEFAULTS)
         for k, def_val in DEFAULTS.items():
             assert (k, got[k]) == (k, exp.get(k, def_val))
+
+    # Helper to convert OVERRIDES to command-line-style args.
+    def overrides_as_args():
+        for k, v in OVERRIDES.items():
+            yield f'--{k}'
+            if isinstance(v, list):
+                yield from map(str, v)
+            else:
+                yield str(v)
 
     # Setup: get the defaults for cli.opts.
     DEFAULTS = get_opts()
@@ -768,17 +778,10 @@ def test_preferences_merging(tr, create_prefs):
         editor = 'awk',
         limit = 100,
         disable = ['paragraphs', 'edit', 'yes', 'nolog'],
+        skip = [PN.collides],
     )
     create_prefs(**PREFS)
-    opts = get_opts(
-        '--disable', *OVERRIDES['disable'],
-        '--indent', '2',
-        '--seq', '50',
-        '--step', '5',
-        '--filter', OVERRIDES['filter'],
-        '--editor', 'awk',
-        '--limit', '100',
-    )
+    opts = get_opts(*overrides_as_args())
     check_opts(opts, OVERRIDES)
 
 ####

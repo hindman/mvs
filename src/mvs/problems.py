@@ -182,12 +182,12 @@ class Problem(Issue):
         # Returns the corresponding Problem or raises.
         xs = underscores_to_hyphens(sid).split(CON.hyphen)
         if len(xs) > 2:
-            raise MvsError(MF.invalid_skip, invalid = sid)
+            raise MvsError(MF.invalid_skip.format(sid))
         name, variety = (xs + [None])[0:2]
         if (name, variety) in cls.RESOLVABLE:
             return cls(name, variety = variety)
         else:
-            raise MvsError(MF.invalid_skip, invalid = sid)
+            raise MvsError(MF.invalid_skip.format(sid))
 
     @classmethod
     def probs_matching_sid(cls, sid):
@@ -221,7 +221,7 @@ class StrictMode:
         try:
             xs = validated_choices(strict, StrictMode.CHOICES)
         except Exception:
-            raise MvsError(MF.invalid_strict, strict)
+            raise MvsError(MF.invalid_strict.format(strict))
         # Return a StrictMode.
         EX = cls.EXCLUDED
         probs = tuple(x for x in xs if x != EX)
