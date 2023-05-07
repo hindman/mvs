@@ -1,9 +1,11 @@
 import json
 import os
+import platform
 import pytest
 import sys
 import traceback
 
+from collections import namedtuple
 from io import StringIO
 from pathlib import Path
 from string import ascii_lowercase
@@ -333,7 +335,7 @@ def pre_fmt(fmt):
 def can_use_clipboard():
     # I could not get pyperclip working on ubuntu in Github Actions,
     # I'm using this to bypass clipboard checks.
-    return sys.platform != 'linux'
+    return platform.system() != 'Linux'
 
 ####
 # Command-line arguments and options.
@@ -981,6 +983,34 @@ def test_log(tr, creators):
     for k in exp_keys:
         assert k in d
 
+def test_log_write_fail(tr, creators):
+    # Exercise code path where log writing fails.
+    # It is sufficient to do this just on MacOS.
+    if platform.system() != 'Darwin':
+        return
+
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'c.new')
+    run_args = (tr, creators, origs, news)
+
+    # Modify the mvs application directory to a unwritable path,
+    # which will cause log writing to raise.
+    k = CON.app_dir_env_var
+    prev = os.environ[k]
+    try:
+        os.environ[k] = '/'
+        wa, outs, cli = run_checks(
+            *run_args,
+            failure = True,
+            no_change = True,
+            err_starts = pre_fmt(MF.log_writing_failed),
+            out = '',
+            log = '',
+        )
+    finally:
+        os.environ[k] = prev
+
 def test_pagination(tr, creators):
     # Paths and args.
     origs = tuple(ascii_lowercase)
@@ -1053,37 +1083,70 @@ def test_main(tr, create_wa, create_outs):
 # Problem control.
 ####
 
-def test_some_failed_rns(tr, creators):
-    # Paths and args.
-    origs = ('z1', 'z2', 'z3', 'z4')
-    news = ('A1', 'A2', 'A3', 'A4')
-    extras = ('A1', 'A2')
-    expecteds = ('z1', 'z2', 'A3', 'A4') + extras
-    inventory = 'ee..'
-    run_args = (tr, creators, origs, news)
-
-    # Create a WorkArea just to get some paths that we need later.
-    WA = creators[0](origs, news)
-
-    # Scenario: two of the new paths already exist.
-    # By default, renaming forges ahead and clobbers.
-    wa, outs, cli = run_checks(
-        *run_args,
-        extras = extras,
-        inventory = inventory,
+def test_listings(tr, creators):
+    # Define some paths data to set up a situation where
+    # the renaming listing will contain every category.
+    Pd = namedtuple('PathsData', 'inv orig new')
+    pds = (
+        # Filtered.
+        Pd('f', 'F1', 'F1.new'),
+        Pd('f', 'F2', 'F2.new'),
+        # Skipped.
+        Pd('s', 's1', 's1.new'),
+        Pd('s', 's2', 's2.new'),
+        # Excluded.
+        Pd('X', 'SAME_A', 'same1.new'),
+        Pd('X', 'SAME_A', 'same2.new'),
+        Pd('X', 'SAME_B', 'same3.new'),
+        Pd('X', 'SAME_B', 'same4.new'),
+        # Parent.
+        Pd('p', 'p1', 'parent/p1.new'),
+        Pd('p', 'p2', 'parent/p2.new'),
+        Pd('p', 'p3', 'parent/p3.new'),
+        Pd('p', 'p4', 'parent/p4.new'),
+        # Exists.
+        Pd('e', 'e1', 'e1.new'),
+        Pd('e', 'e2', 'e2.new'),
+        Pd('e', 'e3', 'e3.new'),
+        # Collides.
+        Pd('c', 'c1', 'c12.new'),
+        Pd('c', 'c2', 'c12.new'),
+        Pd('c', 'c3', 'c34.new'),
+        Pd('c', 'c4', 'c34.new'),
+        # OK.
+        Pd('.', 'a', 'a.new'),
+        Pd('.', 'b', 'b.new'),
     )
 
-    # In strict mode, the plan fails.
+    # Use that data to set up the paths and args.
+    origs = tuple(t.orig for t in pds)
+    news = tuple(t.new for t in pds)
+    inventory = tuple(t.inv for t in pds)
+    extras = (
+        # The paths that exists and the paths that will
+        # be skipped due to exists-full.
+        tuple(t.new for t in pds if t.inv == 'e') +
+        ('s1.new/', 's1.new/bar', 's2.new/', 's2.new/bar')
+    )
+    expecteds = (
+        # The extras, plus the needed parent directory, plus
+        # either the orig path or new path from pds.
+        extras +
+        ('parent',) +
+        tuple(t.orig if t.inv in 'fsX' else t.new for t in pds)
+    )
+    run_args = (tr, creators, origs, news)
+
+    # Run the scenario. This will end up using Outputs.renaming_listing() to
+    # confirm expectations for both the inventory of Renaming instances in the
+    # RenamingPlan and for the text output sent to cli.out.
     wa, outs, cli = run_checks(
         *run_args,
-        '--strict', 'exists',
+        '--filter', 'return "F" not in o',
+        '--skip', 'exists-full',
         extras = extras,
+        expecteds = expecteds,
         inventory = inventory,
-        no_change = True,
-        failure = True,
-        fail_params = (FN.strict, None, PN.exists),
-        err = MF.no_action + CON.newline,
-        log = PLAN_LOG_OK,
     )
 
 ####

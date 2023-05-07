@@ -13,18 +13,86 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Tests:
+New documentation and editing pass:
 
-    - cli.py:
+    - Don't delete this until just before publish.
 
-        - log writing fails
+    - New features:
+        - User-prefs
+        - The --edit option.
+        - New problem control API.
+        - skip-equal as default
+        - case-change renamings
 
-        - New listing/reporting behavior: exercise the range of behaviors
-            - See test_some_failed_rns().
-            - Give the function a better name.
-            - Use it as a starting point.
+    - Bug fixes:
+        - Windows replace.
+        - README and argparse configuration for --create was incorrect.
 
-New documentation and editing pass [see NEW_DOCS].
+    - Policy changes.
+        - Orig paths must be regular file or directory.
+        - In clobbering, like must overwrite like (file => file; dir => dir).
+        - Only empty directories can be clobbered.
+        - The --create control will create parents, not move-create.
+        - New Problem('same')
+            - This less strong variant of Problem('equal').
+            - equal speaks to user input: did user ask for renaming of this rn?
+            - same speaks to whether renaming is supported by the policies of mvs.
+        - New Problem('recase')
+            - skipped by default
+            - affects only case-preserving systems
+
+    - Document that --pager and --editor are executed with shell=True.
+
+    - CHANGES file.
+
+    - Add caveats:
+
+        - Renaming is implemented with pathlib, which depends on os.rename()
+          os.replace().
+
+        - Renames across file systems can fail according to those docs.
+
+        - Be sensible.
+
+            - If you have a lot of renaming to do involving complex scenarios (eg
+              files replacing nonempty dirs), break it down into more sane steps.
+
+            - Don't rename stuff that could affect the ability of subsequent
+              renames to succeed. The mvs library checks the renaming plan against
+              the current file system: it does not check each rename against the
+              future file system after some renamings have occurred.
+
+            - Complex interactions among renamings are not guarded against with
+              any rigor. For example:
+
+                - For example, a prior renaming alters directory path needed by
+                  subsequent renaming.
+
+                - Multiple new-collisions on the same new-path.
+
+        - The package is not tested on case-sensitive and case-preserving
+          operating systems, but not on case-insensitive systems. In that
+          context, regular renamings will probably work fine. Some
+          case-change-only renamings won't be treated as problems by the checks
+          (if rn.new fails to exists-strict), so the renaming would be tried,
+          and it will fail.
+
+        - Renaming renames the leaf, not the leaf plus its parent. When
+          renaming something, mvs asks whether the parent of its new path
+          exists.
+
+            - If yes, then the renaming does not need to concern itself with
+              the parent and the renaming affects only the leaf node.
+
+            - If no, then the renaming will be refused unless the user requests
+              create-parent and, if so, the new-parent is created. The
+              old-parent will be unchanged.
+
+            - That behavior is reasonable: old-parent might contain other stuff
+              and mvs was not instructed modify it.
+
+            - And it most renaming scenarios, the behavior is not surprising
+              or counter-intuitive.
 
 Publish with major version bump.
 
@@ -273,87 +341,6 @@ Why runtime user-code problems are treated as unresolvable:
 
         - It would also require an additional problem sub-category, such as
           Problem(noop, undef).
-
-New documentation [NEW_DOCS]:
-
-    - Don't delete this until just before publish.
-
-    - New features:
-        - User-prefs
-        - The --edit option.
-        - New problem control API.
-        - skip-equal as default
-        - case-change renamings
-
-    - Bug fixes:
-        - Windows replace.
-        - README and argparse configuration for --create was incorrect.
-
-    - Policy changes.
-        - Orig paths must be regular file or directory.
-        - In clobbering, like must overwrite like (file => file; dir => dir).
-        - Only empty directories can be clobbered.
-        - The --create control will create parents, not move-create.
-        - New Problem('same')
-            - This less strong variant of Problem('equal').
-            - equal speaks to user input: did user ask for renaming of this rn?
-            - same speaks to whether renaming is supported by the policies of mvs.
-        - New Problem('recase')
-            - skipped by default
-            - affects only case-preserving systems
-
-    - Document that --pager and --editor are executed with shell=True.
-
-    - CHANGES file.
-
-    - Add caveats:
-
-        - Renaming is implemented with pathlib, which depends on os.rename()
-          os.replace().
-
-        - Renames across file systems can fail according to those docs.
-
-        - Be sensible.
-
-            - If you have a lot of renaming to do involving complex scenarios (eg
-              files replacing nonempty dirs), break it down into more sane steps.
-
-            - Don't rename stuff that could affect the ability of subsequent
-              renames to succeed. The mvs library checks the renaming plan against
-              the current file system: it does not check each rename against the
-              future file system after some renamings have occurred.
-
-            - Complex interactions among renamings are not guarded against with
-              any rigor. For example:
-
-                - For example, a prior renaming alters directory path needed by
-                  subsequent renaming.
-
-                - Multiple new-collisions on the same new-path.
-
-        - The package is not tested on case-sensitive and case-preserving
-          operating systems, but not on case-insensitive systems. In that
-          context, regular renamings will probably work fine. Some
-          case-change-only renamings won't be treated as problems by the checks
-          (if rn.new fails to exists-strict), so the renaming would be tried,
-          and it will fail.
-
-        - Renaming renames the leaf, not the leaf plus its parent. When
-          renaming something, mvs asks whether the parent of its new path
-          exists.
-
-            - If yes, then the renaming does not need to concern itself with
-              the parent and the renaming affects only the leaf node.
-
-            - If no, then the renaming will be refused unless the user requests
-              create-parent and, if so, the new-parent is created. The
-              old-parent will be unchanged.
-
-            - That behavior is reasonable: old-parent might contain other stuff
-              and mvs was not instructed modify it.
-
-            - And it most renaming scenarios, the behavior is not surprising
-              or counter-intuitive.
 
 Other operations: copy, link, chmod, times, touch [OTHER_OPS]:
     - copy: given old-paths, copy them to new-paths.
