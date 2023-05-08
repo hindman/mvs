@@ -106,11 +106,11 @@ paths were supplied via a source other than positional arguments, each path
 should be on its own line.
 
 ```bash
-# The default: a flat sequence of paths.
+# The default: a flat sequence of paths (first original paths, then new).
 $ mvs a b a.new b.new
 $ mvs a b a.new b.new --flat
 
-# Alternating pairs: old, new, etc.
+# Alternating pairs: original, new, etc.
 $ mvs a a.new b b.new --pairs
 
 # Paragraphs delimited by at least one blank.
@@ -123,7 +123,7 @@ local variable `o`. See the program's help text for additional details about
 user-supplied code.
 
 ```bash
-$ mvs a b --rename 'return r"{o}.new"'
+$ mvs a b --rename 'return f"{o}.new"'
 ```
 
 #### Programmatic usage
@@ -190,13 +190,21 @@ print(plan.uncontrolled_problems)
 try:
     plan.rename_paths()
 except Exception as e:
-    # The index of the Renaming that was being handled
+    # The index of the active Renaming that was being handled
     # when the exception occurred. Renamings before that index were
     # renamed succesfully; renamings after it were not attempted.
-    print(plan.tracking_index)
+    i = plan.tracking_index
+    print(i)
 
-    # The offending renaming.
+    # Two ways to see the offending renaming.
     print(plan.tracking_rn)
+    print(plan.active[i])
+
+    # Renamings that were performed.
+    print(plan.active[:i])
+
+    # Renamings that were not attempted.
+    print(plan.active[i + 1:])
 ```
 
 --------

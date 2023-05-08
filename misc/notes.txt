@@ -15,23 +15,67 @@ todos: TODOs
 
 New documentation and editing pass:
 
+    - First draft:
+
+        README.md
+        mvs --help
+        mvs --details
+        CHANGES.md
+
+    - Editing pass:
+
+        misc/notes.txt
+        src/__init__.py
+        src/cli.py
+        src/constants.py
+        src/filesys.py
+        src/messages.py
+        src/optconfig.py
+        src/plan.py
+        src/problems.py
+        src/renaming.py
+        src/utils.py
+        src/version.py
+        tests/__init__.py
+        tests/conftest.py
+        tests/editor.py
+        tests/empty_pager.py
+        tests/failer.py
+        tests/test_cli.py
+        tests/test_plan.py
+        tests/test_problems.py
+        tests/test_renaming.py
+        tests/test_utils.py
+        CHANGES.md
+        LICENSE
+        README.md
+        requirements.txt
+        setup.py
+        tags
+        tasks.py
+        tox.ini
+
     - Don't delete this until just before publish.
 
-    - New features:
-        - User-prefs
-        - The --edit option.
-        - New problem control API.
-        - skip-equal as default
-        - case-change renamings
-
-    - Bug fixes:
-        - Windows replace.
-        - README and argparse configuration for --create was incorrect.
+    - Changes:
+        - Support for case-change renamings
+        - Added user-prefs (and --disable)
+        - The --edit option (and --editor)
+        - Problem control:
+            - Informed-consent model rather than avoid-all-problems.
+            - Problems re-organized, simplified, and expanded to cover other situations.
+            - Dropped old mechanisms:
+                --skip PROB...
+                --clobber PROB...
+                --create PROB...
+            - Added new ones:
+                --skip PROB...
+                --strict PROB...
+        - Enhanced listing behavior (and added --list).
+        - Bug fix: Windows when replacing/clobbering a path.
 
     - Policy changes.
         - Orig paths must be regular file or directory.
-        - In clobbering, like must overwrite like (file => file; dir => dir).
-        - Only empty directories can be clobbered.
         - The --create control will create parents, not move-create.
         - New Problem('same')
             - This less strong variant of Problem('equal').
@@ -42,8 +86,6 @@ New documentation and editing pass:
             - affects only case-preserving systems
 
     - Document that --pager and --editor are executed with shell=True.
-
-    - CHANGES file.
 
     - Add caveats:
 
@@ -93,6 +135,15 @@ New documentation and editing pass:
 
             - And it most renaming scenarios, the behavior is not surprising
               or counter-intuitive.
+
+tasks.py: bump:
+
+    - Set version tag
+
+    - Retroactively set this tag:
+
+        v1.0.0
+        f5019972d33e6ea0ea4f418bfac0d03427e744fb
 
 Publish with major version bump.
 
