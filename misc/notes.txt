@@ -13,6 +13,13 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Bug with --stdin:
+
+    mvs: if you supply paths via --stdin, input() does not work during
+    confirmation step.
+
+    Solution: https://stackoverflow.com/a/66143581/55857
+
 Listings:
 
     - The long list of "problems" for noop-equal is annoying.
