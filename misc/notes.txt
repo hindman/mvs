@@ -13,6 +13,35 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Listings:
+
+    - The long list of "problems" for noop-equal is annoying.
+
+    - Maybe leave listing alone but enhance the counts.
+
+        - Add problem sub-tallies under Skipped and Excluded. [easy to do; annoying to test]
+        - Lowercase Active sub-tally names. [easy]
+
+        # Renaming plan summary:
+
+          Total: 48
+            Filtered: 5
+            Skipped: 7
+              exists: 1
+              exists-full: 2
+              collides: 3
+              parent: 1
+            Excluded: 16
+              noop-equal: 10
+              duplicate: 2
+              missing: 1
+              type: 3
+            Active: 20
+              parent: 2
+              exists: 4
+              collides: 6
+              ok: 8
+
 New documentation and editing pass:
 
     - First draft:
