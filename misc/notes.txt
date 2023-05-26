@@ -13,6 +13,62 @@ toc: Table of contents
 todos: TODOs
 --------
 
+LISTINGS: new chunk of notes/thoughts:
+
+    Some of these ideas might work. But remember that there are
+    two things needed in conftest:
+
+        - Ability to build summary table.
+
+        - Ability to group renamings under the right headings in the listing
+          itself. For this, order matters, and dict-ordering did not arrive
+          until Python 3.7.
+
+    Define summary table as fmt using keyword params, with every possible row.
+
+    CliRenamer:
+
+        renaming_listing():
+            - Use plan to build params.
+            - Return build_summary_table(params).
+
+    messages.py:
+
+        build_summary_table(params):
+            - Build table, using a marker for detail rows with None.
+            - Remove lines with the marker.
+            - Return text.
+
+        Test this function separately.
+
+    Outputs:
+
+        - The inventory must be params data as tuple-of-tuple or None:
+
+            If None:
+
+                inventory = (('active', None, ORIG, ...),)
+
+            Otherwise:
+
+                inventory = (
+                    ('filtered', None, ORIG, ...),
+                    ('skipped', SID, ORIG, ...),
+                    ...
+                    ('excluded', SID, ORIG, ...),
+                    ...
+                    ('active', SID, ORIG, ...),
+                    ...
+                )
+
+        - Convert to params dict.
+
+        - Assemble summary table: build_summary_table(params).
+
+        - Assemble the expected listing based on the tuple.
+
+
+
 Listings:
 
     - The long list of "problems" for noop-equal is annoying.
