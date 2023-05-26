@@ -427,7 +427,7 @@ class CliRenamer:
                 elif opts.file:
                     text = read_from_file(opts.file)
                 else:
-                    text = self.stdin.read()
+                    text = self.read_from_stdin()
             except Exception as e: # pragma: no cover
                 self.wrapup_with_tb(MF.path_collection_failed)
                 return None
@@ -446,6 +446,17 @@ class CliRenamer:
         # Split, strip, return.
         paths = text.split(CON.newline)
         return tuple(path.strip() for path in paths)
+
+    def read_from_stdin(self):
+        # Reads from self.stdin and returns its content.
+        # If the file handle is sys.stdin we close and reopen it,
+        # because user confirmation will need to read self.stdin.
+        blob = self.stdin.read()
+        if self.stdin is sys.stdin:
+            terminal = os.ctermid()
+            self.stdin.close()
+            self.stdin = open(terminal)
+        return blob
 
     ####
     # Logging.

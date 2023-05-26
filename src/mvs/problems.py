@@ -171,9 +171,10 @@ class Problem(Issue):
 
     @property
     def sid(self):
-        # Resolvable problems have a skip ID, which is just the NAME-VARIETY
-        # string that a user provides when declaring which kinds of problems
-        # should cause a Renaming to be skipped.
+        # Problems have a skip ID, which is just the NAME-VARIETY string that a
+        # user provides when declaring which kinds of resolvable problems
+        # should cause a Renaming to be skipped. These IDs are also used in the
+        # CliRenamer's summary tally.
         return hyphen_join(self.name, self.variety)
 
     @classmethod

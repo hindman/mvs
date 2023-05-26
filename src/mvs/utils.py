@@ -1,3 +1,4 @@
+import os
 import pyperclip
 import sys
 

@@ -13,21 +13,14 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Bug with --stdin:
-
-    mvs: if you supply paths via --stdin, input() does not work during
-    confirmation step.
-
-    Solution: https://stackoverflow.com/a/66143581/55857
-
 Listings:
 
     - The long list of "problems" for noop-equal is annoying.
 
     - Maybe leave listing alone but enhance the counts.
 
-        - Add problem sub-tallies under Skipped and Excluded. [easy to do; annoying to test]
-        - Lowercase Active sub-tally names. [easy]
+        - Add problem sub-tallies under Skipped and Excluded.
+        - Lowercase Active sub-tally names.
 
         # Renaming plan summary:
 
@@ -48,6 +41,62 @@ Listings:
               exists: 4
               collides: 6
               ok: 8
+
+    - Affected tests: only two tests use inventory:
+
+        # test_cli.py
+        test_filter_all()
+        test_listings()
+
+        - I can define any format I want for inventory. Another format is
+          needed. And a more explicit one could simplify code in conftest.
+
+    - Thoughts:
+
+        - Problem: reframe SID concept: not a skip ID, but a string ID.
+
+        - To generate SID values in CliRenamer:
+
+            p = Problem(name, '', '', '', '', variety = variety).sid
+
+            hyphen_join(*tup)
+
+        - Not sure I need plan.prepare_probs() and its attributes. The only
+          prepare-step that follows it is the strict check, which does not need
+          the attributes.
+
+        - More useful would be a plan method to return a RenamingInventory. The
+          inventory could drive CliRenamer's creation of the summary table.
+
+            tally = {
+
+                total??
+                n_filtered??
+                ...
+
+                filtered: [],
+                skipped: {SID: [], ...},
+                excluded: {SID: [], ...},
+                active: {SID: [], ...},
+
+            }
+
+        Resolvable | Name      | Varieties
+        ----------------------------------------------
+        no         | noop      | equal, same, recase
+        no         | duplicate | .
+        no         | missing   | .
+        no         | type      | .
+        no         | code      | filter, rename
+        no         | exists    | other
+        ----------------------------------------------
+        yes        | exists    | diff, full
+        yes        | collides  | diff, full
+        yes        | parent    | .
+
+Tests:
+
+    - Scenario involving --stdin and a user confirmation step.
 
 New documentation and editing pass:
 
