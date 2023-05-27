@@ -134,7 +134,7 @@ class RenamingPlan:
 
         # Validate and standardize the user's problem-handling parameters.
         self.strict = StrictMode.from_user(strict)
-        self.skip = self.validated_skip_ids(skip)
+        self.skip = self.validated_str_ids(skip)
         self.skip_lookup = self.build_skip_lookup()
 
         # Failure halting the plan.
@@ -607,7 +607,7 @@ class RenamingPlan:
     def failed(self):
         return bool(self.failure)
 
-    def validated_skip_ids(self, skip):
+    def validated_str_ids(self, skip):
         try:
             return validated_choices(skip, Problem.SKIP_CHOICES)
         except Exception:

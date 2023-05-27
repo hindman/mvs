@@ -47,6 +47,7 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
     invalid_control        = 'Invalid problem control: {!r}',
     invalid_skip           = 'Invalid value for RenamingPlan.skip: {!r}',
+    invalid_problem        = 'Invalid Problem name or variety: name={!r}, variety={!r}',
     invalid_strict         = 'Invalid value for RenamingPlan.strict: {!r}',
     conflicting_controls   = 'Conflicting controls for problem {!r}: {!r} and {!r}',
     invalid_controls       = 'Invalid value for RenamingPlan controls parameter',

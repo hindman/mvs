@@ -9,21 +9,21 @@ from mvs.problems import (
     StrictMode,
 )
 
-def test_from_skip_id(tr):
+def test_from_str_id(tr):
     # Basic usages.
-    p = Problem.from_skip_id('exists')
+    p = Problem.from_str_id('exists')
     assert p.name == 'exists'
     assert p.variety is None
-    p = Problem.from_skip_id('exists-diff')
+    p = Problem.from_str_id('exists-diff')
     assert p.name == 'exists'
     assert p.variety == 'diff'
 
     # Invalid usages.
-    invalids = ('exists-diff-blort', 'missing')
+    invalids = ('exists-fubb', 'blort-foo')
     for sid in invalids:
         with pytest.raises(MvsError) as einfo:
-            p = Problem.from_skip_id(sid)
-        assert einfo.value.msg == MF.invalid_skip.format(sid)
+            p = Problem.from_str_id(sid)
+        assert einfo.value.msg == MF.invalid_problem.format(*sid.split('-'))
 
 def test_strict_mode(tr):
     # One problem.

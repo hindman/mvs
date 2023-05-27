@@ -13,72 +13,16 @@ toc: Table of contents
 todos: TODOs
 --------
 
-LISTINGS: new chunk of notes/thoughts:
+Listings: enhance the summary tallies:
 
-    Some of these ideas might work. But remember that there are
-    two things needed in conftest:
-
-        - Ability to build summary table.
-
-        - Ability to group renamings under the right headings in the listing
-          itself. For this, order matters, and dict-ordering did not arrive
-          until Python 3.7.
-
-    Define summary table as fmt using keyword params, with every possible row.
-
-    CliRenamer:
-
-        renaming_listing():
-            - Use plan to build params.
-            - Return build_summary_table(params).
-
-    messages.py:
-
-        build_summary_table(params):
-            - Build table, using a marker for detail rows with None.
-            - Remove lines with the marker.
-            - Return text.
-
-        Test this function separately.
-
-    Outputs:
-
-        - The inventory must be params data as tuple-of-tuple or None:
-
-            If None:
-
-                inventory = (('active', None, ORIG, ...),)
-
-            Otherwise:
-
-                inventory = (
-                    ('filtered', None, ORIG, ...),
-                    ('skipped', SID, ORIG, ...),
-                    ...
-                    ('excluded', SID, ORIG, ...),
-                    ...
-                    ('active', SID, ORIG, ...),
-                    ...
-                )
-
-        - Convert to params dict.
-
-        - Assemble summary table: build_summary_table(params).
-
-        - Assemble the expected listing based on the tuple.
-
-
-
-Listings:
-
-    - The long list of "problems" for noop-equal is annoying.
-
-    - Maybe leave listing alone but enhance the counts.
+    The long list of "problems" for noop-equal is annoying. Rather than
+    changing how the listings work, address that problem by improving the
+    summary table:
 
         - Add problem sub-tallies under Skipped and Excluded.
-        - Lowercase Active sub-tally names.
 
-        # Renaming plan summary:
+        - Lowercase Active sub-tally names (except for OK), so that all of the
+          sub-tallies are literal Problem str IDs.
 
           Total: 48
             Filtered: 5
@@ -96,59 +40,88 @@ Listings:
               parent: 2
               exists: 4
               collides: 6
-              ok: 8
+              OK: 8
 
-    - Affected tests: only two tests use inventory:
+    Affected tests: only two tests use inventory:
 
         # test_cli.py
         test_filter_all()
         test_listings()
 
-        - I can define any format I want for inventory. Another format is
-          needed. And a more explicit one could simplify code in conftest.
+    Remember that there are two things needed in conftest to check cli outputs:
 
-    - Thoughts:
+        - Ability to build summary table.
 
-        - Problem: reframe SID concept: not a skip ID, but a string ID.
+        - Ability to group renamings under the right headings in the listing
+          itself. For this, order matters, and dict-ordering did not arrive
+          until Python 3.7.
 
-        - To generate SID values in CliRenamer:
+    Define summary table as fmt using keyword params, with every possible row.
 
-            p = Problem(name, '', '', '', '', variety = variety).sid
+    CliRenamer:
 
-            hyphen_join(*tup)
+        renaming_listing():
+            - Use plan to build params.
+            - Return build_summary_table(params).
 
-        - Not sure I need plan.prepare_probs() and its attributes. The only
-          prepare-step that follows it is the strict check, which does not need
-          the attributes.
+        To generate SID values in CliRenamer:
 
-        - More useful would be a plan method to return a RenamingInventory. The
-          inventory could drive CliRenamer's creation of the summary table.
+            empties = ('', '', '', '')
+            sid = Problem(name, *empties, variety = variety).sid
 
-            tally = {
+        Maybe drop RenamingPlan.prepare_probs() and its attributes:
 
-                total??
-                n_filtered??
-                ...
+            - The only prepare-step that follows it is the strict check, which
+              does not need the attributes.
 
-                filtered: [],
-                skipped: {SID: [], ...},
-                excluded: {SID: [], ...},
-                active: {SID: [], ...},
+    messages.py:
 
-            }
+        build_summary_table(params):
+            - Build table, using a marker for detail rows with None.
+            - Remove lines with the marker.
+            - Return text.
 
-        Resolvable | Name      | Varieties
-        ----------------------------------------------
-        no         | noop      | equal, same, recase
-        no         | duplicate | .
-        no         | missing   | .
-        no         | type      | .
-        no         | code      | filter, rename
-        no         | exists    | other
-        ----------------------------------------------
-        yes        | exists    | diff, full
-        yes        | collides  | diff, full
-        yes        | parent    | .
+        Test this function separately.
+
+    Outputs:
+
+        - The inventory must be params data as tuple-of-tuple or None:
+
+            If None:
+
+                inventory = (
+                    ('active', None, ORIG, ...),
+                )
+
+            Otherwise:
+
+                inventory = (
+                    ('filtered', None, ORIG, ...),
+                    ('skipped', SID, ORIG, ...),
+                    ...
+                    ('excluded', SID, ORIG, ...),
+                    ...
+                    ('active', SID, ORIG, ...),
+                    ...
+                )
+
+            Possible simplification:
+
+                inventory = (
+                    (X, ORIG, ...),
+                    ...
+                )
+
+                Where conftest has a dict mapping the X values to their SID and
+                their parent category (filtered, skipped, excluded, active),
+                and where two non-SID values are also recognized for X:
+                filtered and ok.
+
+        - Convert to params dict.
+
+        - Assemble summary table: build_summary_table(params).
+
+        - Assemble the expected listing based on the tuple.
 
 Tests:
 

@@ -128,10 +128,14 @@ class Issue:
         # Custom initializer, because we need to build the ultimate msg from
         # the name, variety, and arguments. To keep instances frozen,
         # we update __dict__ directly.
+        try:
+            msg = self.FORMATS[name, variety].format(*xs)
+        except KeyError:
+            raise MvsError(MF.invalid_problem.format(name, variety))
         self.__dict__.update(
             name = name,
             variety = variety,
-            msg = self.FORMATS[name, variety].format(*xs),
+            msg = msg,
         )
 
 ####
@@ -162,8 +166,8 @@ class Problem(Issue):
         (PN.parent, None),
     )
 
-    SKIP_IDS = tuple(hyphen_join(*tup) for tup in RESOLVABLE)
-    SKIP_CHOICES = (CON.all, *SKIP_IDS)
+    STR_IDS = tuple(hyphen_join(*tup) for tup in RESOLVABLE)
+    SKIP_CHOICES = (CON.all, *STR_IDS)
 
     @classmethod
     def is_resolvable(cls, prob):
@@ -171,30 +175,27 @@ class Problem(Issue):
 
     @property
     def sid(self):
-        # Problems have a skip ID, which is just the NAME-VARIETY string that a
+        # Problems have a str ID, which is just the NAME-VARIETY string that a
         # user provides when declaring which kinds of resolvable problems
         # should cause a Renaming to be skipped. These IDs are also used in the
         # CliRenamer's summary tally.
         return hyphen_join(self.name, self.variety)
 
     @classmethod
-    def from_skip_id(cls, sid):
-        # Takes a skip ID.
+    def from_str_id(cls, sid):
+        # Takes a Problem str ID.
         # Returns the corresponding Problem or raises.
         xs = underscores_to_hyphens(sid).split(CON.hyphen)
         if len(xs) > 2:
             raise MvsError(MF.invalid_skip.format(sid))
         name, variety = (xs + [None])[0:2]
-        if (name, variety) in cls.RESOLVABLE:
-            return cls(name, variety = variety)
-        else:
-            raise MvsError(MF.invalid_skip.format(sid))
+        return cls(name, variety = variety)
 
     @classmethod
     def probs_matching_sid(cls, sid):
-        # Takes a skip ID.
+        # Takes a str ID.
         # Returns all resolvable problems matching that ID.
-        query = cls.from_skip_id(sid)
+        query = cls.from_str_id(sid)
         return tuple(
             cls(name, variety = variety)
             for name, variety in cls.RESOLVABLE
