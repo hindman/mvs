@@ -13,118 +13,28 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Listings: enhance the summary tallies:
+Listings: enhance the summary tallies to show problem-detail rows:
 
-    The long list of "problems" for noop-equal is annoying. Rather than
-    changing how the listings work, address that problem by improving the
-    summary table:
+    STATUS:
 
-        - Add problem sub-tallies under Skipped and Excluded.
+        I implemented the new behavior and it generally appears to be working.
 
-        - Lowercase Active sub-tally names (except for OK), so that all of the
-          sub-tallies are literal Problem str IDs.
+        test_listings() is passing, but the test and conftest need
+        a close editing pass.
 
-          Total: 48
-            Filtered: 5
-            Skipped: 7
-              exists: 1
-              exists-full: 2
-              collides: 3
-              parent: 1
-            Excluded: 16
-              noop-equal: 10
-              duplicate: 2
-              missing: 1
-              type: 3
-            Active: 20
-              parent: 2
-              exists: 4
-              collides: 6
-              OK: 8
+        Lots of other test_cli.py tests are failing unexpectedly.
 
-    Affected tests: only two tests use inventory:
+        Need to drop INV_MAP in conftest.
 
-        # test_cli.py
+        Need to drop SUMMARY_TABLE from messages.py.
+
+    Only two tests use non-None inventory:
+
         test_filter_all()
         test_listings()
 
-    Remember that there are two things needed in conftest to check cli outputs:
-
-        - Ability to build summary table.
-
-        - Ability to group renamings under the right headings in the listing
-          itself. For this, order matters, and dict-ordering did not arrive
-          until Python 3.7.
-
-    Define summary table as fmt using keyword params, with every possible row.
-
-    CliRenamer:
-
-        renaming_listing():
-            - Use plan to build params.
-            - Return build_summary_table(params).
-
-        To generate SID values in CliRenamer:
-
-            empties = ('', '', '', '')
-            sid = Problem(name, *empties, variety = variety).sid
-
-        Maybe drop RenamingPlan.prepare_probs() and its attributes:
-
-            - The only prepare-step that follows it is the strict check, which
-              does not need the attributes.
-
-    messages.py:
-
-        build_summary_table(params):
-            - Build table, using a marker for detail rows with None.
-            - Remove lines with the marker.
-            - Return text.
-
-        Test this function separately.
-
-    Outputs:
-
-        - The inventory must be params data as tuple-of-tuple or None:
-
-            If None:
-
-                inventory = (
-                    ('active', None, ORIG, ...),
-                )
-
-            Otherwise:
-
-                inventory = (
-                    ('filtered', None, ORIG, ...),
-                    ('skipped', SID, ORIG, ...),
-                    ...
-                    ('excluded', SID, ORIG, ...),
-                    ...
-                    ('active', SID, ORIG, ...),
-                    ...
-                )
-
-            Possible simplification:
-
-                inventory = (
-                    (X, ORIG, ...),
-                    ...
-                )
-
-                Where conftest has a dict mapping the X values to their SID and
-                their parent category (filtered, skipped, excluded, active),
-                and where two non-SID values are also recognized for X:
-                filtered and ok.
-
-        - Convert to params dict.
-
-        - Assemble summary table: build_summary_table(params).
-
-        - Assemble the expected listing based on the tuple.
-
 Tests:
-
+    - Test build_summary_table(params) separately, because conftest uses it.
     - Scenario involving --stdin and a user confirmation step.
 
 New documentation and editing pass:

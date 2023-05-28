@@ -92,13 +92,13 @@ class RenamingPlan:
         # Based on the inputs we begin with the full universe of Renaming
         # instances. During processing, those rns get put into four buckes:
         # - renamings filtered out by user code;
-        # - renamings the user wants to skip, due to problems;
         # - renamings that must be excluded, due to unresolvable problems;
+        # - renamings the user wants to skip, due to problems;
         # - active renamings.
         self.n_initial = None
         self.filtered = []
-        self.skipped = []
         self.excluded = []
+        self.skipped = []
         self.active = []
 
         # Attributes holding a breakdown of the active Renaming instances, by
@@ -627,7 +627,7 @@ class RenamingPlan:
 
     def should_exclude(self, rn):
         prob = rn.problem
-        return prob and not Problem.is_resolvable(prob)
+        return prob and not prob.is_resolvable
 
     ####
     # Sequence number and common prefix.

@@ -5,6 +5,7 @@ import subprocess
 import sys
 import traceback
 
+from collections import defaultdict
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -14,12 +15,13 @@ from short_con import constants
 from .constants import CON, STRUCTURES
 from .optconfig import OptConfig, positive_int
 from .plan import RenamingPlan
-from .problems import Problem, StrictMode
+from .problems import Problem, StrictMode, build_summary_table
 from .version import __version__
 
 from .messages import (
     LISTING_CHOICES,
     LISTING_FORMATS,
+    LISTING_ORDER,
     MSG_FORMATS as MF,
 )
 
@@ -523,8 +525,8 @@ class CliRenamer:
         # A renaming listing shown to the user before asking for
         # confirmation to proceed with renaming.
         sections = tuple(
-            (fmt, getattr(self.plan, k))
-            for k, fmt in LISTING_FORMATS
+            (LISTING_FORMATS[k], getattr(self.plan, k))
+            for k in LISTING_ORDER
         )
         return para_join(
             self.failure_listing(),
@@ -548,18 +550,38 @@ class CliRenamer:
         N = len(p.active)
         if p.n_initial == N and N == len(p.ok):
             return ''
-        else:
-            return MF.summary_table.format(
-                p.n_initial,
-                len(p.filtered),
-                len(p.skipped),
-                len(p.excluded),
-                len(p.active),
-                len(p.parent),
-                len(p.exists),
-                len(p.collides),
-                len(p.ok),
-            )
+
+        # Intialize a dict of tallies with the top-level counts.
+        tally = defaultdict(int)
+        tally.update(
+            total = p.n_initial,
+            filtered = len(p.filtered),
+            excluded = len(p.excluded),
+            skipped = len(p.skipped),
+            active = len(p.active),
+            ok = len(p.ok),
+        )
+
+        # Add Problem details to the tally for excluded/skipped renamings.
+        # Here the tally keys are based directly on the Problem SID.
+        for rn in p.excluded + p.skipped:
+            prob = rn.problem
+            if prob:
+                k = hyphens_to_underscores(prob.sid)
+                tally[k] += 1
+
+        # Do the same for active renamings.
+        # Here the tally keys use Problem.name plus a prefix to
+        # distinguish their keys from those in excluded/skipped.
+        for rn in p.active:
+            prob = rn.problem
+            if prob:
+                k = 'active_' + hyphens_to_underscores(prob.name)
+                tally[k] += 1
+
+        # Return the table text. This function will exclude detail
+        # rows having a count of zero.
+        return build_summary_table(tally)
 
     def section_listing(self, sections):
         # Takes data defining the sections of a renaming or failure listing.

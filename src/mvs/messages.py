@@ -9,15 +9,25 @@ from .version import __version__
 
 LISTING_FORMATS = constants('ListingFormats', dict(
     filtered = '# Renamings: filtered out by user code{}:\n',
-    skipped  = '# Renamings: skipped by user due to problems{}:\n',
     excluded = '# Renamings: excluded due to unresolvable problems{}:\n',
+    skipped  = '# Renamings: skipped by user due to problems{}:\n',
     parent   = '# Active renamings: will create new parent{}:\n',
     exists   = '# Active renamings: will clobber existing path{}:\n',
     collides = '# Active renamings: will collide with another new path{}:\n',
     ok       = '# Active renamings: with no problems{}:\n',
 ))
 
-LISTING_CHOICES = (CON.all, *LISTING_FORMATS.keys())
+LISTING_ORDER = (
+    'filtered',
+    'excluded',
+    'skipped',
+    'parent',
+    'exists',
+    'collides',
+    'ok',
+)
+
+LISTING_CHOICES = (CON.all, *LISTING_ORDER)
 
 ####
 # Summary of counts shown before the renaming listing.

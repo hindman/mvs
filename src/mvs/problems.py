@@ -1,3 +1,5 @@
+import re
+
 from dataclasses import dataclass
 from short_con import constants
 
@@ -169,9 +171,9 @@ class Problem(Issue):
     STR_IDS = tuple(hyphen_join(*tup) for tup in RESOLVABLE)
     SKIP_CHOICES = (CON.all, *STR_IDS)
 
-    @classmethod
-    def is_resolvable(cls, prob):
-        return (prob.name, prob.variety) in cls.RESOLVABLE
+    @property
+    def is_resolvable(self):
+        return (self.name, self.variety) in self.RESOLVABLE
 
     @property
     def sid(self):
@@ -182,7 +184,7 @@ class Problem(Issue):
         return hyphen_join(self.name, self.variety)
 
     @classmethod
-    def from_str_id(cls, sid):
+    def from_sid(cls, sid):
         # Takes a Problem str ID.
         # Returns the corresponding Problem or raises.
         xs = underscores_to_hyphens(sid).split(CON.hyphen)
@@ -195,7 +197,7 @@ class Problem(Issue):
     def probs_matching_sid(cls, sid):
         # Takes a str ID.
         # Returns all resolvable problems matching that ID.
-        query = cls.from_str_id(sid)
+        query = cls.from_sid(sid)
         return tuple(
             cls(name, variety = variety)
             for name, variety in cls.RESOLVABLE
@@ -236,4 +238,66 @@ class StrictMode:
             *self.probs,
         )
         return CON.space.join(filter(None, xs))
+
+####
+# Summary of counts shown before the renaming listing.
+####
+
+SUMMARY_TABLE = '''
+# Renaming plan summary:
+
+  Total: {total}
+    Filtered: {filtered}
+    Excluded: {excluded}
+      noop-equal: {noop_equal}
+      noop-same: {noop_same}
+      noop-recase: {noop_recase}
+      missing: {missing}
+      duplicate: {duplicate}
+      type: {type}
+      code-filter: {code_filter}
+      code-rename: {code_rename}
+      exists-other: {exists_other}
+    Skipped: {skipped}
+      parent: {parent}
+      exists: {exists}
+      exists-diff: {exists_diff}
+      exists-full: {exists_full}
+      collides: {collides}
+      collides-diff: {collides_diff}
+      collides-full: {collides_full}
+    Active: {active}
+      parent: {active_parent}
+      exists: {active_exists}
+      collides: {active_collides}
+      ok: {ok}
+'''
+
+def build_summary_table(params):
+    # Takes a dict of the format string params for SUMMARY_TABLE.
+    # Returns the formatted table, excluding any of the detail
+    # lines having zero values.
+
+    # Get all keys in the SUMMARY_TABLE.
+    key_rgx = re.compile(r'\{(\w+)\}')
+    all_keys = key_rgx.findall(SUMMARY_TABLE)
+
+    # Build a dict mapping those keys to the values from params.
+    # When params lack a key or has a zero value, we use either
+    # zero or a blank-marker, the latter for detail rows.
+    PARENT_KEYS = {'total', 'filtered', 'excluded', 'skipped', 'active'}
+    BLANK = 'BLANK!'
+    full_params = {}
+    for k in all_keys:
+        v = params.get(k, None)
+        full_params[k] = v or (0 if k in PARENT_KEYS else BLANK)
+
+    # Format the table text, exclude lines containing the blank-marker,
+    # rejoin the surviving lines, and return the assembled text.
+    txt = SUMMARY_TABLE.format(**full_params)
+    return CON.newline.join(
+        line
+        for line in txt.split(CON.newline)
+        if BLANK not in line
+    )
 

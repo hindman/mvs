@@ -4,17 +4,18 @@ from mvs.utils import MvsError
 from mvs.messages import MSG_FORMATS as MF
 
 from mvs.problems import (
-    Problem,
     PROBLEM_NAMES as PN,
+    Problem,
     StrictMode,
+    build_summary_table,
 )
 
 def test_from_str_id(tr):
     # Basic usages.
-    p = Problem.from_str_id('exists')
+    p = Problem.from_sid('exists')
     assert p.name == 'exists'
     assert p.variety is None
-    p = Problem.from_str_id('exists-diff')
+    p = Problem.from_sid('exists-diff')
     assert p.name == 'exists'
     assert p.variety == 'diff'
 
@@ -22,7 +23,7 @@ def test_from_str_id(tr):
     invalids = ('exists-fubb', 'blort-foo')
     for sid in invalids:
         with pytest.raises(MvsError) as einfo:
-            p = Problem.from_str_id(sid)
+            p = Problem.from_sid(sid)
         assert einfo.value.msg == MF.invalid_problem.format(*sid.split('-'))
 
 def test_strict_mode(tr):
@@ -47,4 +48,11 @@ def test_strict_mode(tr):
         sm = StrictMode.from_user(invalid)
     exp = MF.invalid_strict.format(invalid)
     assert einfo.value.msg == exp
+
+def test_summary_table(tr):
+    # TODO.
+    return
+    params = dict(ok = 10, filtered = 32, code_filter = 3, exists_other = 3, collides_diff = 4)
+    xs = build_summary_table(params)
+    tr.dump(xs)
 

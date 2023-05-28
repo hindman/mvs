@@ -5,17 +5,24 @@ import shutil
 import stat
 import os
 
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from mvs.constants import CON
-from mvs.problems import FAILURE_FORMATS as FF
 from mvs.utils import indented, para_join
+
+from mvs.problems import (
+    FAILURE_FORMATS as FF,
+    Problem,
+    build_summary_table,
+)
 
 from mvs.messages import (
     MSG_FORMATS as MF,
     LISTING_FORMATS as LF,
+    LISTING_ORDER,
 )
 
 ####
@@ -403,13 +410,72 @@ class Outputs:
         OK: 'ok',
     }
 
+    '''
+    # Renaming plan summary:
+
+      Total: {total}
+        Filtered: {filtered}
+        Excluded: {excluded}
+          noop-equal: {noop_equal}
+          noop-same: {noop_same}
+          noop-recase: {noop_recase}
+          missing: {missing}
+          duplicate: {duplicate}
+          type: {type}
+          code-filter: {code_filter}
+          code-rename: {code_rename}
+          exists-other: {exists_other}
+        Skipped: {skipped}
+          parent: {parent}
+          exists: {exists}
+          exists-diff: {exists_diff}
+          exists-full: {exists_full}
+          collides: {collides}
+          collides-diff: {collides_diff}
+          collides-full: {collides_full}
+        Active: {active}
+          parent: {active_parent}
+          exists: {active_exists}
+          collides: {active_collides}
+          ok: {ok}
+
+        Filtered: {filtered}
+
+    'filtered'
+
+    'noop-equal'
+    'noop-same'
+    'noop-recase'
+    'missing'
+    'duplicate'
+    'type'
+    'code-filter'
+    'code-rename'
+    'exists-other'
+
+    'parent'
+    'exists'
+    'exists-diff'
+    'exists-full'
+    'collides'
+    'collides-diff'
+    'collides-full'
+
+    'active-parent'
+    'active-exists'
+    'active-collides'
+    'ok'
+
+
+
+
+
+    '''
+
     def __init__(self, origs, news, inventory = None, fail_params = None):
         self.origs = origs
         self.news = news
-        self.inventory = (
-            self.OK if inventory is None
-            else inventory
-        )
+        self.inventory = inventory
         if fail_params is None:
             self.fail_msg = ''
             self.no_change = False
@@ -432,37 +498,67 @@ class Outputs:
         # Or it can be a str using the abbreviations in INV_MAP, and
         # optionally using the shortcut where a single character means
         # that all renamings end up in the same bucket.
-        inv = self.inventory
-        if isinstance(inv, dict):
-            exp_origs = {
-                attr : inv.get(attr, [])
-                for attr in self.INV_MAP.values()
-            }
-        else:
-            if len(inv) == 1:
-                inv = inv * len(self.origs)
-            pairs = tuple(zip(inv, self.origs))
-            exp_origs = {
-                attr : [o for abbrev, o in pairs if abbrev == k]
-                for k, attr in self.INV_MAP.items()
-            }
 
-        # Use those expected orig paths to assemble the expected summary table.
-        counts = [len(origs) for origs in exp_origs.values()]
-        inactive = counts[0:3]
-        active = counts[3:]
-        n_tot = sum(counts)
-        n_active = sum(active)
-        n_ok = counts[-1]
-        if n_ok == n_tot:
-            summary = ''
-        else:
-            summary = MF.summary_table.format(
-                n_tot,
-                *inactive,
-                n_active,
-                *active,
+        '''
+
+        - Change the data for inventory:
+
+            inventory = (X, ...)
+
+            Where inventory parallels origs.
+
+            Where X is either a SID or one of the following:
+
+                SID
+                    - Determine whether the Problem is resolvable.
+                    - That tells us whether renaming ends up in excluded or skipped.
+
+                filtered:
+                    - Renaming is filtered.
+
+                ok or starts with the active-prefix:
+                    - Renaming is active.
+
+        - Convert to params dict.
+
+        - Assemble summary table: build_summary_table(params).
+
+        - Assemble the expected listing based on the tuple.
+
+        '''
+
+
+        # Set up the inventory. If None, everything ends up the the OK bucket.
+        inv = self.inventory or ('ok',) * len(self.origs)
+        assert len(inv) == len(self.origs)
+
+        # Build the tally data needed for the summary table.
+        tally = defaultdict(int)
+        exp_origs = defaultdict(list)
+        for k, orig in zip(inv, self.origs):
+
+            parent_k = (
+                k if k == 'filtered' else
+                'active' if (k == 'ok' or k.startswith('active-')) else
+                'skipped' if Problem.from_sid(k).is_resolvable else
+                'excluded'
             )
+
+            eo_key = (
+                k if k == 'ok' else
+                k.split('-')[1] if k.startswith('active-') else
+                parent_k
+            )
+
+            k = k.replace(CON.hyphen, CON.underscore)
+            tally[k] += 1
+            tally['total'] += 1
+            if k != 'filtered':
+                tally[parent_k] += 1
+
+            exp_origs[eo_key].append(orig)
+
+        summary = build_summary_table(tally)
 
         # Use the RenamingPlan to build a dict mapping each orig path to the
         # Renaming instances with that path. This dict will allow us to connect
@@ -477,7 +573,8 @@ class Outputs:
         # - Summary table, if needed.
         # - Section for each non-empty category of Renaming instances.
         paras = [self.fail_msg, summary]
-        for attr, origs in exp_origs.items():
+        for attr in LISTING_ORDER:
+            origs = exp_origs.get(attr, [])
             if origs:
                 # The heading.
                 tot = self.total_msg(len(origs))

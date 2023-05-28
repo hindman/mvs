@@ -1089,33 +1089,33 @@ def test_listings(tr, creators):
     Pd = namedtuple('PathsData', 'inv orig new')
     pds = (
         # Filtered.
-        Pd('f', 'F1', 'F1.new'),
-        Pd('f', 'F2', 'F2.new'),
+        Pd('filtered', 'F1', 'F1.new'),
+        Pd('filtered', 'F2', 'F2.new'),
         # Skipped.
-        Pd('s', 's1', 's1.new'),
-        Pd('s', 's2', 's2.new'),
+        Pd('exists-full', 's1', 's1.new'),
+        Pd('exists-full', 's2', 's2.new'),
         # Excluded.
-        Pd('X', 'SAME_A', 'same1.new'),
-        Pd('X', 'SAME_A', 'same2.new'),
-        Pd('X', 'SAME_B', 'same3.new'),
-        Pd('X', 'SAME_B', 'same4.new'),
+        Pd('duplicate', 'SAME_A', 'same1.new'),
+        Pd('duplicate', 'SAME_A', 'same2.new'),
+        Pd('duplicate', 'SAME_B', 'same3.new'),
+        Pd('duplicate', 'SAME_B', 'same4.new'),
         # Parent.
-        Pd('p', 'p1', 'parent/p1.new'),
-        Pd('p', 'p2', 'parent/p2.new'),
-        Pd('p', 'p3', 'parent/p3.new'),
-        Pd('p', 'p4', 'parent/p4.new'),
+        Pd('active-parent', 'p1', 'parent_dir/p1.new'),
+        Pd('active-parent', 'p2', 'parent_dir/p2.new'),
+        Pd('active-parent', 'p3', 'parent_dir/p3.new'),
+        Pd('active-parent', 'p4', 'parent_dir/p4.new'),
         # Exists.
-        Pd('e', 'e1', 'e1.new'),
-        Pd('e', 'e2', 'e2.new'),
-        Pd('e', 'e3', 'e3.new'),
+        Pd('active-exists', 'e1', 'e1.new'),
+        Pd('active-exists', 'e2', 'e2.new'),
+        Pd('active-exists', 'e3', 'e3.new'),
         # Collides.
-        Pd('c', 'c1', 'c12.new'),
-        Pd('c', 'c2', 'c12.new'),
-        Pd('c', 'c3', 'c34.new'),
-        Pd('c', 'c4', 'c34.new'),
+        Pd('active-collides', 'c1', 'c12.new'),
+        Pd('active-collides', 'c2', 'c12.new'),
+        Pd('active-collides', 'c3', 'c34.new'),
+        Pd('active-collides', 'c4', 'c34.new'),
         # OK.
-        Pd('.', 'a', 'a.new'),
-        Pd('.', 'b', 'b.new'),
+        Pd('ok', 'a', 'a.new'),
+        Pd('ok', 'b', 'b.new'),
     )
 
     # Use that data to set up the paths and args.
@@ -1123,17 +1123,20 @@ def test_listings(tr, creators):
     news = tuple(t.new for t in pds)
     inventory = tuple(t.inv for t in pds)
     extras = (
-        # The paths that exists and the paths that will
+        # The paths that exist and the paths that will
         # be skipped due to exists-full.
-        tuple(t.new for t in pds if t.inv == 'e') +
+        tuple(t.new for t in pds if t.inv == 'active-exists') +
         ('s1.new/', 's1.new/bar', 's2.new/', 's2.new/bar')
     )
     expecteds = (
         # The extras, plus the needed parent directory, plus
         # either the orig path or new path from pds.
         extras +
-        ('parent',) +
-        tuple(t.orig if t.inv in 'fsX' else t.new for t in pds)
+        ('parent_dir',) +
+        tuple(
+            t.new if t.inv == 'ok' or t.inv.startswith('active-') else t.orig
+            for t in pds
+        )
     )
     run_args = (tr, creators, origs, news)
 
@@ -1146,8 +1149,16 @@ def test_listings(tr, creators):
         '--skip', 'exists-full',
         extras = extras,
         expecteds = expecteds,
+        # TODO.
         inventory = inventory,
+
+        # TODO: drop and fix commented line(s) above.
+        # inventory = None,
+        # check_outs = False,
     )
+
+    # tr.dump(cli.summary_listing())
+    # tr.dump(outs.renaming_listing(cli.plan))
 
 ####
 # Miscellaneous.
