@@ -284,20 +284,20 @@ def build_summary_table(params):
 
     # Build a dict mapping those keys to the values from params.
     # When params lack a key or has a zero value, we use either
-    # zero or a blank-marker, the latter for detail rows.
+    # zero or an empty-row marker, the latter for detail rows.
     PARENT_KEYS = {'total', 'filtered', 'excluded', 'skipped', 'active'}
-    BLANK = 'BLANK!'
     full_params = {}
     for k in all_keys:
         v = params.get(k, None)
-        full_params[k] = v or (0 if k in PARENT_KEYS else BLANK)
+        empty = 0 if k in PARENT_KEYS else CON.empty_row_marker
+        full_params[k] = v or empty
 
-    # Format the table text, exclude lines containing the blank-marker,
-    # rejoin the surviving lines, and return the assembled text.
+    # Format the table text; exclude lines with empty-row marker;
+    # rejoin the surviving lines; and return the assembled text.
     txt = SUMMARY_TABLE.format(**full_params)
     return CON.newline.join(
         line
         for line in txt.split(CON.newline)
-        if BLANK not in line
+        if CON.empty_row_marker not in line
     )
 

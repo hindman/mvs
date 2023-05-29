@@ -734,6 +734,10 @@ class RenamingPlan:
     ####
 
     @property
+    def all_renamings(self):
+        return self.filtered + self.excluded + self.skipped + self.active
+
+    @property
     def tracking_rn(self):
         # The Renaming that was being renamed when rename_paths()
         # raised an exception.

@@ -17,7 +17,7 @@ LISTING_FORMATS = constants('ListingFormats', dict(
     ok       = '# Active renamings: with no problems{}:\n',
 ))
 
-LISTING_ORDER = (
+LISTING_CATEGORIES = constants('ListingCategories', (
     'filtered',
     'excluded',
     'skipped',
@@ -25,27 +25,16 @@ LISTING_ORDER = (
     'exists',
     'collides',
     'ok',
-)
+))
 
-LISTING_CHOICES = (CON.all, *LISTING_ORDER)
+PARENT_LISTING_CATEGORIES = constants('ParentListingCategories', (
+    'filtered',
+    'excluded',
+    'skipped',
+    'active',
+))
 
-####
-# Summary of counts shown before the renaming listing.
-####
-
-SUMMARY_TABLE = '''
-# Renaming plan summary:
-
-  Total: {}
-    Filtered: {}
-    Skipped: {}
-    Excluded: {}
-    Active: {}
-      Parent: {}
-      Exists: {}
-      Collides: {}
-      OK: {}
-'''
+LISTING_CHOICES = (CON.all, *LISTING_CATEGORIES.keys())
 
 ####
 # Messages.
@@ -78,7 +67,6 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     edit_failed_unexpected = 'Editing failed unexpectedly. Traceback follows:\n\n{}',
     plan_failed            = 'Plan failed: {}',
     # Other messages in CliRenamer.
-    summary_table          = SUMMARY_TABLE.lstrip(),
     confirm_prompt         = '\nRename paths',
     no_action              = '\nNo action taken.',
     paths_renamed          = '\nPaths renamed.',

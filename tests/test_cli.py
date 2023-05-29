@@ -13,10 +13,15 @@ from types import SimpleNamespace
 
 from mvs.cli import main, CliRenamer, CLI
 from mvs.constants import CON
-from mvs.messages import MSG_FORMATS as MF
 from mvs.plan import RenamingPlan
 from mvs.utils import write_to_clipboard
 from mvs.version import __version__
+
+from mvs.messages import (
+    MSG_FORMATS as MF,
+    LISTING_CATEGORIES as LC,
+    PARENT_LISTING_CATEGORIES as PLC,
+)
 
 from mvs.problems import (
     FAILURE_FORMATS as FF,
@@ -936,6 +941,7 @@ def test_filter_all(tr, creators):
     # Paths and args.
     origs = ('a', 'b', 'c')
     news = ('aa', 'bb', 'cc')
+    inventory = (LC.filtered,) * len(origs)
     run_args = (tr, creators, origs, news)
 
     # Initial scenario: it works.
@@ -950,7 +956,7 @@ def test_filter_all(tr, creators):
         no_change = True,
         err_in = MF.no_action,
         log = PLAN_LOG_OK,
-        inventory = 'f',
+        inventory = inventory,
         fail_params = (FN.all_filtered, None),
     )
 
@@ -1091,14 +1097,14 @@ def test_listings(tr, creators):
         # Filtered.
         Pd('filtered', 'F1', 'F1.new'),
         Pd('filtered', 'F2', 'F2.new'),
-        # Skipped.
-        Pd('exists-full', 's1', 's1.new'),
-        Pd('exists-full', 's2', 's2.new'),
         # Excluded.
         Pd('duplicate', 'SAME_A', 'same1.new'),
         Pd('duplicate', 'SAME_A', 'same2.new'),
         Pd('duplicate', 'SAME_B', 'same3.new'),
         Pd('duplicate', 'SAME_B', 'same4.new'),
+        # Skipped.
+        Pd('exists-full', 's1', 's1.new'),
+        Pd('exists-full', 's2', 's2.new'),
         # Parent.
         Pd('active-parent', 'p1', 'parent_dir/p1.new'),
         Pd('active-parent', 'p2', 'parent_dir/p2.new'),
@@ -1123,8 +1129,7 @@ def test_listings(tr, creators):
     news = tuple(t.new for t in pds)
     inventory = tuple(t.inv for t in pds)
     extras = (
-        # The paths that exist and the paths that will
-        # be skipped due to exists-full.
+        # The paths needed for the exists situations implied above.
         tuple(t.new for t in pds if t.inv == 'active-exists') +
         ('s1.new/', 's1.new/bar', 's2.new/', 's2.new/bar')
     )
@@ -1134,7 +1139,7 @@ def test_listings(tr, creators):
         extras +
         ('parent_dir',) +
         tuple(
-            t.new if t.inv == 'ok' or t.inv.startswith('active-') else t.orig
+            t.new if t.inv == LC.ok or t.inv.startswith(PLC.active) else t.orig
             for t in pds
         )
     )
@@ -1149,16 +1154,8 @@ def test_listings(tr, creators):
         '--skip', 'exists-full',
         extras = extras,
         expecteds = expecteds,
-        # TODO.
         inventory = inventory,
-
-        # TODO: drop and fix commented line(s) above.
-        # inventory = None,
-        # check_outs = False,
     )
-
-    # tr.dump(cli.summary_listing())
-    # tr.dump(outs.renaming_listing(cli.plan))
 
 ####
 # Miscellaneous.

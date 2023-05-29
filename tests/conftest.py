@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mvs.constants import CON
-from mvs.utils import indented, para_join
+from mvs.utils import indented, para_join, hyphens_to_underscores
 
 from mvs.problems import (
     FAILURE_FORMATS as FF,
@@ -22,7 +22,8 @@ from mvs.problems import (
 from mvs.messages import (
     MSG_FORMATS as MF,
     LISTING_FORMATS as LF,
-    LISTING_ORDER,
+    LISTING_CATEGORIES as LC,
+    PARENT_LISTING_CATEGORIES as PLC,
 )
 
 ####
@@ -397,80 +398,7 @@ class WorkArea:
 
 class Outputs:
 
-    # Maps SHORTCUT => ATTRIBUTE for the purpose of checking
-    # the inventory of renamings in an Renaming Plan.
-    OK = '.'
-    INV_MAP = {
-        'f': 'filtered',
-        's': 'skipped',
-        'X': 'excluded',
-        'p': 'parent',
-        'e': 'exists',
-        'c': 'collides',
-        OK: 'ok',
-    }
-
-    '''
-    # Renaming plan summary:
-
-      Total: {total}
-        Filtered: {filtered}
-        Excluded: {excluded}
-          noop-equal: {noop_equal}
-          noop-same: {noop_same}
-          noop-recase: {noop_recase}
-          missing: {missing}
-          duplicate: {duplicate}
-          type: {type}
-          code-filter: {code_filter}
-          code-rename: {code_rename}
-          exists-other: {exists_other}
-        Skipped: {skipped}
-          parent: {parent}
-          exists: {exists}
-          exists-diff: {exists_diff}
-          exists-full: {exists_full}
-          collides: {collides}
-          collides-diff: {collides_diff}
-          collides-full: {collides_full}
-        Active: {active}
-          parent: {active_parent}
-          exists: {active_exists}
-          collides: {active_collides}
-          ok: {ok}
-
-        Filtered: {filtered}
-
-    'filtered'
-
-    'noop-equal'
-    'noop-same'
-    'noop-recase'
-    'missing'
-    'duplicate'
-    'type'
-    'code-filter'
-    'code-rename'
-    'exists-other'
-
-    'parent'
-    'exists'
-    'exists-diff'
-    'exists-full'
-    'collides'
-    'collides-diff'
-    'collides-full'
-
-    'active-parent'
-    'active-exists'
-    'active-collides'
-    'ok'
-
-
-
-
-
-    '''
+    TOTAL = 'total'
 
     def __init__(self, origs, news, inventory = None, fail_params = None):
         self.origs = origs
@@ -486,103 +414,85 @@ class Outputs:
             self.no_change = True
 
     def total_msg(self, n):
-        return f' (total {n})'
+        return f' ({self.TOTAL} {n})'
 
     def renaming_listing(self, plan, final_msg = None):
-        # Convert the inventory supplied to Outputs to a dict mapping each
-        # INV_MAP attribute to the orig paths we expect.
+        # Assembles the expected renaming listing output.
+
+        # Set up the inventory, which should parallel self.origs and declare
+        # which detailed-listing-category each renaming should end up in. If
+        # the user supplied None, everything ends up the the OK bucket.
+        n_origs = len(self.origs)
+        inv = self.inventory or (LC.ok,) * n_origs
+        assert len(inv) == n_origs
+
+        # Set up a map from each orig path in the plan to the Renaming
+        # instances having that orig path.
+        rns_by_orig = defaultdict(list)
+        for rn in plan.all_renamings:
+            rns_by_orig[rn.orig].append(rn)
+
+        # Iterate over self.origs and the inventory, building two things:
         #
-        # The inventory can be a dict already in that form. If so, we
-        # just add any missing keys.
+        # - A dict holding the tally needed for the summary table, mapping
+        #   each detailed-listing-category to its N of renamings.
         #
-        # Or it can be a str using the abbreviations in INV_MAP, and
-        # optionally using the shortcut where a single character means
-        # that all renamings end up in the same bucket.
-
-        '''
-
-        - Change the data for inventory:
-
-            inventory = (X, ...)
-
-            Where inventory parallels origs.
-
-            Where X is either a SID or one of the following:
-
-                SID
-                    - Determine whether the Problem is resolvable.
-                    - That tells us whether renaming ends up in excluded or skipped.
-
-                filtered:
-                    - Renaming is filtered.
-
-                ok or starts with the active-prefix:
-                    - Renaming is active.
-
-        - Convert to params dict.
-
-        - Assemble summary table: build_summary_table(params).
-
-        - Assemble the expected listing based on the tuple.
-
-        '''
-
-
-        # Set up the inventory. If None, everything ends up the the OK bucket.
-        inv = self.inventory or ('ok',) * len(self.origs)
-        assert len(inv) == len(self.origs)
-
-        # Build the tally data needed for the summary table.
+        # - A dict mapping each listing-category (filtered, excluded,
+        #   skipped, and the details under active) to a list of orig paths
+        #   in that category.
+        #
         tally = defaultdict(int)
-        exp_origs = defaultdict(list)
-        for k, orig in zip(inv, self.origs):
+        origs_by_lc = defaultdict(list)
+        for dlc, orig in zip(inv, self.origs):
+            # Set up some flags.
+            is_active = dlc.startswith(PLC.active)
+            is_ok = dlc == LC.ok
 
-            parent_k = (
-                k if k == 'filtered' else
-                'active' if (k == 'ok' or k.startswith('active-')) else
-                'skipped' if Problem.from_sid(k).is_resolvable else
-                'excluded'
+            # Determine the parent listing-category.
+            plc = (
+                PLC.filtered if dlc == LC.filtered else
+                PLC.active if (is_active or is_ok) else
+                PLC.skipped if Problem.from_sid(dlc).is_resolvable else
+                PLC.excluded
             )
 
-            eo_key = (
-                k if k == 'ok' else
-                k.split('-')[1] if k.startswith('active-') else
-                parent_k
+            # Increment total, parent-category, detail-category.
+            tally[self.TOTAL] += 1
+            tally[plc] += 1
+            if dlc != LC.filtered:
+                tally[hyphens_to_underscores(dlc)] += 1
+
+            # Put the orig path from the inventory into the correct
+            # listing-category.
+            lc = (
+                dlc.split(CON.hyphen)[1] if is_active else
+                LC.ok if is_ok else
+                plc
             )
-
-            k = k.replace(CON.hyphen, CON.underscore)
-            tally[k] += 1
-            tally['total'] += 1
-            if k != 'filtered':
-                tally[parent_k] += 1
-
-            exp_origs[eo_key].append(orig)
-
-        summary = build_summary_table(tally)
-
-        # Use the RenamingPlan to build a dict mapping each orig path to the
-        # Renaming instances with that path. This dict will allow us to connect
-        # the orig paths in exp_origs to the Renaming instances in the plan.
-        orig_lookup = {}
-        for attr in self.INV_MAP.values():
-            for rn in getattr(plan, attr):
-                orig_lookup.setdefault(rn.orig, []).append(rn)
+            origs_by_lc[lc].append(orig)
 
         # Assemble the paragraphs we expect to see in the renaming listing.
         # - Failure msg, if any.
         # - Summary table, if needed.
-        # - Section for each non-empty category of Renaming instances.
-        paras = [self.fail_msg, summary]
-        for attr in LISTING_ORDER:
-            origs = exp_origs.get(attr, [])
+        # - Section for each non-empty listing-category.
+        summary = (
+            '' if tally.get(LC.ok) == n_origs
+            else build_summary_table(tally)
+        )
+        paras = [
+            self.fail_msg,
+            summary,
+        ]
+        for lc in LC.keys():
+            origs = origs_by_lc.get(lc, [])
             if origs:
                 # The heading.
                 tot = self.total_msg(len(origs))
-                heading = LF[attr].format(tot)
+                heading = LF[lc].format(tot)
                 paras.append(heading)
                 # The indented/formatted Renaming instances.
                 paras.extend(
-                    indented(orig_lookup[o].pop(0).formatted)
+                    indented(rns_by_orig[o].pop(0).formatted)
                     for o in origs
                 )
 

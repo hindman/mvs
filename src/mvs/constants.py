@@ -27,6 +27,7 @@ class CON:
     all = 'all'
     all_tup = (all,)
     yes = 'yes'
+    empty_row_marker = '__EMPTY__'
 
     # User-supplied code.
     code_actions = constants('CodeActions', ('rename', 'filter'))

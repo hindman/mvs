@@ -13,27 +13,8 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Listings: enhance the summary tallies to show problem-detail rows:
-
-    STATUS:
-
-        I implemented the new behavior and it generally appears to be working.
-
-        test_listings() is passing, but the test and conftest need
-        a close editing pass.
-
-        Lots of other test_cli.py tests are failing unexpectedly.
-
-        Need to drop INV_MAP in conftest.
-
-        Need to drop SUMMARY_TABLE from messages.py.
-
-    Only two tests use non-None inventory:
-
-        test_filter_all()
-        test_listings()
-
 Tests:
+    - Expand coverage of test_listings()
     - Test build_summary_table(params) separately, because conftest uses it.
     - Scenario involving --stdin and a user confirmation step.
 

@@ -21,7 +21,7 @@ from .version import __version__
 from .messages import (
     LISTING_CHOICES,
     LISTING_FORMATS,
-    LISTING_ORDER,
+    LISTING_CATEGORIES,
     MSG_FORMATS as MF,
 )
 
@@ -526,7 +526,7 @@ class CliRenamer:
         # confirmation to proceed with renaming.
         sections = tuple(
             (LISTING_FORMATS[k], getattr(self.plan, k))
-            for k in LISTING_ORDER
+            for k in LISTING_CATEGORIES.keys()
         )
         return para_join(
             self.failure_listing(),
