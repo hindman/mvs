@@ -15,7 +15,6 @@ todos: TODOs
 
 Tests:
     - Expand coverage of test_listings()
-    - Test build_summary_table(params) separately, because conftest uses it.
     - Scenario involving --stdin and a user confirmation step.
 
 New documentation and editing pass:
