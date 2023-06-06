@@ -451,10 +451,14 @@ class CliRenamer:
 
     def read_from_stdin(self):
         # Reads from self.stdin and returns its content.
+        #
         # If the file handle is sys.stdin we close and reopen it,
         # because user confirmation will need to read self.stdin.
+        #
+        # The latter behavior is not easy to test. For now,
+        # we rely on the tests/stdin-check script.
         blob = self.stdin.read()
-        if self.stdin is sys.stdin:
+        if self.stdin is sys.stdin: # pragma: no cover
             terminal = os.ctermid()
             self.stdin.close()
             self.stdin = open(terminal)

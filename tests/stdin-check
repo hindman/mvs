@@ -1,0 +1,29 @@
+#! /bin/bash
+
+# Paths.
+wa='tests/work'
+pre='stdin-check'
+
+# Helpers.
+
+heading() {
+    printf "\n# $1 =========================\n\n"
+}
+
+check_wa() {
+    heading "$1"
+    tree "$wa"
+}
+
+# Set up the work area.
+rm -f $wa/*
+touch $wa/$pre-{1,2,3}
+check_wa 'BEFORE'
+
+# Use mvs to rename some paths.
+heading 'RENAMING'
+find $wa -name $pre-* | mvs --stdin --rename 'return o + ".new"'
+
+# Check work area.
+check_wa 'AFTER'
+

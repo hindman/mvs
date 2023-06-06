@@ -23,11 +23,16 @@ def test_from_str_id(tr):
     assert p.variety == 'diff'
 
     # Invalid usages.
-    invalids = ('exists-fubb', 'blort-foo')
+    xyz = 'x-y-z'
+    invalids = ('exists-fubb', 'blort-foo', xyz)
     for sid in invalids:
         with pytest.raises(MvsError) as einfo:
             p = Problem.from_sid(sid)
-        assert einfo.value.msg == MF.invalid_problem.format(*sid.split('-'))
+        exp = (
+            MF.invalid_skip.format(sid) if sid == xyz else
+            MF.invalid_problem.format(*sid.split('-'))
+        )
+        assert einfo.value.msg == exp
 
 def test_strict_mode(tr):
     # One problem.

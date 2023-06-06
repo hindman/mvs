@@ -1090,8 +1090,8 @@ def test_main(tr, create_wa, create_outs):
 ####
 
 def test_listings(tr, creators):
-    # Define some paths data to set up a situation where
-    # the renaming listing will contain every category.
+    # Define some paths data to set up a situation where the
+    # renaming listing will contain every top-level category.
     Pd = namedtuple('PathsData', 'inv orig new')
     pds = (
         # Filtered.

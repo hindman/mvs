@@ -13,10 +13,6 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Tests:
-    - Expand coverage of test_listings()
-    - Scenario involving --stdin and a user confirmation step.
-
 New documentation and editing pass:
 
     - First draft:
@@ -190,6 +186,9 @@ Activate and run tests:
 
         workon mvs-3.9.4
         pytest -s -v tests/
+
+        # Also confirm that mvs --stdin work when needing user confirmation.
+        tests/stdin-check
 
     - With invoke:
 
