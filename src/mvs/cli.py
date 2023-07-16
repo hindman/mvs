@@ -758,9 +758,6 @@ class CLI:
     # the user preferences into opts.
     unset_opt_vals = (False, None, [])
 
-    # Text used in various OptConfig help texts.
-    just_origs_msg = 'implies inputs are just original paths'
-
     # Argument configuration for argparse.
     opt_configs = (
 
@@ -822,6 +819,12 @@ class CLI:
             action = 'store_true',
             help = 'Input paths in tab-delimited rows: original, tab, new',
         ),
+        OptConfig(
+            names = '--originals',
+            validator = bool,
+            action = 'store_true',
+            help = 'Original paths only [requires --rename]',
+        ),
 
         #
         # User code for renaming and filtering.
@@ -831,7 +834,7 @@ class CLI:
             names = '--rename -r',
             validator = str,
             metavar = 'CODE',
-            help = f'Code to convert original path to new path [{just_origs_msg}]',
+            help = f'Code to create or modify new paths',
         ),
         OptConfig(
             names = '--filter',
@@ -875,7 +878,7 @@ class CLI:
             names = '--edit',
             validator = bool,
             action = 'store_true',
-            help = f'Create new paths via a text editor [{just_origs_msg}]',
+            help = f'Create or modify new paths via a text editor',
         ),
         OptConfig(
             names = '--editor',

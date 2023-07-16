@@ -52,9 +52,10 @@ class CON:
 ####
 
 STRUCTURES = constants('Structures', (
-    'paragraphs',
     'flat',
+    'paragraphs',
     'pairs',
     'rows',
+    'originals',
 ))
 

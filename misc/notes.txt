@@ -13,6 +13,35 @@ toc: Table of contents
 todos: TODOs
 --------
 
+Allow --rename with any input structure:
+
+    # Done: did not break tests.
+    x Need a new structure: --original (original paths only).
+    x Add corresponding command-line option; modify option help text
+    x The default structure will still be --flat.
+    x Drop constant: just_origs_msg.
+
+    - Adjust RenamingPlan.parse_inputs() [this breaks tests]
+    - Adjust tests.
+
+    - Adjust variables supplied to user-code:
+        - Current:
+            o     Original path.
+            p     Original path, as a pathlib.Path instance.
+            seq   Current sequence value.
+            plan  RenamingPlan instance.
+        - Adjusted:
+            o, n    Original path and new path.
+            po, pn  The same, as a pathlib.Path instances.
+            seq     Current sequence value.
+            r       Current Renaming instance.
+            plan    RenamingPlan instance.
+
+    - Example:
+
+        # Use format strings in the new input paths.
+        mvs --rename 'return n.format(str(seq).zfill(2))'
+
 New documentation and editing pass:
 
     - First draft:

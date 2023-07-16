@@ -288,6 +288,10 @@ class RenamingPlan:
 
         # If we have rename_code, inputs are just original paths.
         if self.rename_code:
+        # TODO:
+        # if self.structure == STRUCTURES.originals:
+        #     origs = [orig for orig in self.inputs if orig]
+        #     news = [None for _ in origs]
             rns = [
                 Renaming(orig, None)
                 for orig in self.inputs
