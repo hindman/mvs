@@ -261,6 +261,9 @@ class CliRenamer:
             return None
 
         # Validate the options related to input sources and structures.
+        if opts.origs and not opts.rename:
+            self.wrapup(CON.exit_fail, MF.opts_originals_rename)
+            return None
         self.validate_sources_structures(opts)
         if self.done:
             return None
@@ -365,7 +368,7 @@ class CliRenamer:
         # - Zero or one option specifying an input structure.
         checks = (
             (CLI.sources.keys(), False),
-            (CLI.structures.keys(), True),
+            (STRUCTURES.keys(), True),
         )
 
         # Run the checks.
@@ -655,7 +658,6 @@ class CLI:
 
     paths = 'paths'
     sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
-    structures = constants('Structures', ('rename',) + STRUCTURES.keys())
 
     # Program help text: description and explanatory text.
 
@@ -769,7 +771,7 @@ class CLI:
             names = 'paths',
             validator = OptConfig.list_of_str,
             nargs = '*',
-            metavar = 'PATH',
+            metavar = 'PATHS',
             help = 'Input paths via arguments',
         ),
         OptConfig(
@@ -820,7 +822,7 @@ class CLI:
             help = 'Input paths in tab-delimited rows: original, tab, new',
         ),
         OptConfig(
-            names = '--originals',
+            names = '--origs',
             validator = bool,
             action = 'store_true',
             help = 'Original paths only [requires --rename]',

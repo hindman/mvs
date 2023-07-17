@@ -408,6 +408,7 @@ def test_indent_and_posint(tr, creators):
             *run_args,
             '--rename', 'return o + o',
             '--indent', ind,
+            '--origs',
             include_news = False,
             rootless = True,
         )
@@ -418,6 +419,7 @@ def test_indent_and_posint(tr, creators):
             *run_args,
             '--rename', 'return o + o',
             '--indent', ind,
+            '--origs',
             include_news = False,
             rootless = True,
             failure = True,
@@ -440,13 +442,14 @@ def test_basic_use_cases(tr, creators):
     # Basic use cases:
     # - Flat structure as the default.
     # - Flat passed explicitly.
-    # - Renaming via code.
+    # - Renaming via code and just original paths.
     wa, outs, cli = run_checks(*run_args)
     wa, outs, cli = run_checks(*run_args, '--flat')
     wa, outs, cli = run_checks(
         *run_args,
         '--rename',
-        'return p.with_name(p.name + p.name)',
+        'return po.with_name(po.name + po.name)',
+        '--origs',
         include_news = False,
     )
 
@@ -811,6 +814,7 @@ def test_dryrun(tr, creators):
         '--rename',
         'return o + o',
         '--dryrun',
+        '--origs',
         include_news = False,
         rootless = True,
         no_change = True,
@@ -833,6 +837,7 @@ def test_no_confirmation(tr, creators):
         *run_args,
         '--rename',
         'return o + o',
+        '--origs',
         include_news = False,
         rootless = True,
         no_change = True,

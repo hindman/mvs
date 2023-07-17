@@ -60,6 +60,7 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     renaming_raised        = '\nRenaming raised an error at tracking_index={}. Traceback follows:\n\n{{}}',
     opts_require_one       = 'One of these options is required',
     opts_mutex             = 'No more than one of these options should be used',
+    opts_originals_rename  = 'The --origs option requires --rename',
     invalid_pref_val       = 'User preferences: invalid value for {}: expected {}: got {!r}',
     invalid_pref_keys      = 'User preferences: invalid key(s): {}',
     no_editor              = 'The --edit option requires an --editor',

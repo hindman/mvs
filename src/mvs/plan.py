@@ -286,24 +286,13 @@ class RenamingPlan:
             self.handle_failure(name, *xs, variety = variety)
             return []
 
-        # If we have rename_code, inputs are just original paths.
-        if self.rename_code:
-        # TODO:
-        # if self.structure == STRUCTURES.originals:
-        #     origs = [orig for orig in self.inputs if orig]
-        #     news = [None for _ in origs]
-            rns = [
-                Renaming(orig, None)
-                for orig in self.inputs
-                if orig
-            ]
-            if rns:
-                return rns
-            else:
-                return do_fail(FN.parsing, FV.no_paths)
-
         # Otherwise, organize inputs into original paths and new paths.
-        if self.structure == STRUCTURES.paragraphs:
+        if self.structure == STRUCTURES.origs:
+            # Just original file paths.
+            origs = [orig for orig in self.inputs if orig]
+            news = [None for _ in origs]
+
+        elif self.structure == STRUCTURES.paragraphs:
             # Paragraphs: first original paths, then new paths.
             # - Group into non-empty vs empty lines.
             # - Ensure exactly two groups of non-empty.
@@ -446,7 +435,8 @@ class RenamingPlan:
     def execute_user_filter(self, rn, seq_val):
         if self.filter_code:
             try:
-                keep = self.filter_func(rn.orig, Path(rn.orig), seq_val, self)
+                kws = self.user_func_kwargs(rn, seq_val)
+                keep = self.filter_func(**kws)
                 if not keep:
                     rn.filtered = True
             except Exception as e:
@@ -457,7 +447,8 @@ class RenamingPlan:
         if self.rename_code:
             # Compute the new path.
             try:
-                new = self.rename_func(rn.orig, Path(rn.orig), seq_val, self)
+                kws = self.user_func_kwargs(rn, seq_val)
+                new = self.rename_func(**kws)
             except Exception as e:
                 return Problem(PN.code, e, rn.orig, variety = PV.rename)
             # Validate its type and either set rn.new or return Problem.
@@ -467,6 +458,17 @@ class RenamingPlan:
                 typ = type(new).__name__
                 return Problem(PN.code, typ, rn.orig, variety = PV.rename)
         return None
+
+    def user_func_kwargs(self, rn, seq_val):
+        return dict(
+            o = rn.orig, 
+            n = rn.new, 
+            po = Path(rn.orig),
+            pn = Path(rn.new) if rn.new else None,
+            seq = seq_val,
+            r = rn,
+            plan = self,
+        )
 
     def check_equal(self, rn, seq_val):
         if rn.orig == rn.new:

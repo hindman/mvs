@@ -385,8 +385,8 @@ def test_renaming_code(tr, create_wa):
 
     # Renaming code in three forms.
     code_str = 'return o + o'
-    code_lambda = lambda o, p, seq, plan: o + o
-    def code_func(o, p, seq, plan): return o + o
+    code_lambda = lambda o, **kws: o + o
+    def code_func(o, **kws): return o + o
 
     # Scenarios: generate new-paths via user-supplied code.
     for code in (code_str, code_lambda, code_func):
@@ -394,6 +394,7 @@ def test_renaming_code(tr, create_wa):
             *run_args,
             inputs = origs,
             rename_code = code,
+            structure = STRUCTURES.origs,
             rootless = True,
         )
 
@@ -416,7 +417,8 @@ def test_filtering_code(tr, create_wa):
         include_news = False,
         include_extras = True,
         rename_code = 'return o + o',
-        filter_code = 'return not ("d" in o or p.is_dir())',
+        filter_code = 'return not ("d" in o or po.is_dir())',
+        structure = STRUCTURES.origs,
         rootless = True,
         inventory = exp_inv,
     )
@@ -441,6 +443,7 @@ def test_code_compilation_fails(tr, create_wa):
     # Scenario: invalid renaming code.
     wa, plan = run_checks(
         *run_args,
+        structure = STRUCTURES.origs,
         include_news = False,
         rename_code = BAD_CODE,
         failure = True,
@@ -480,8 +483,16 @@ def test_code_execution_fails(tr, create_wa):
     # - Renaming code returns bad data type.
     # - Filtering code raises an exception.
     scenarios = (
-        dict(rename_code = rename_code1, include_news = False),
-        dict(rename_code = rename_code2, include_news = False),
+        dict(
+            rename_code = rename_code1,
+            structure = STRUCTURES.origs,
+            include_news = False,
+        ),
+        dict(
+            rename_code = rename_code2,
+            structure = STRUCTURES.origs,
+            include_news = False,
+         ),
         dict(filter_code = filter_code),
     )
 
@@ -518,6 +529,7 @@ def test_seq(tr, create_wa):
     # its values in user-supplied code.
     wa, plan = run_checks(
         *run_args,
+        structure = STRUCTURES.origs,
         rootless = True,
         include_news = False,
         rename_code = 'return f"{o}.{seq * 2}"',
@@ -534,6 +546,7 @@ def test_common_prefix(tr, create_wa):
     # User-supplied code exercises strip_prefix() helper.
     wa, plan = run_checks(
         *run_args,
+        structure = STRUCTURES.origs,
         rootless = True,
         include_news = False,
         rename_code = 'return plan.strip_prefix(o)',
@@ -548,7 +561,7 @@ def test_plan_as_dict(tr, create_wa):
     origs = ('a', 'b', 'c')
     news = ('a.10', 'b.15', 'c.20')
     run_args = (tr, create_wa, origs, news)
-    filter_code = lambda o, p, seq, plan: 'd' not in o
+    filter_code = lambda o, **kws: 'd' not in o
 
     # Helper to check keys in plan.as_dict.
     def check_plan_dict(wa, plan):
@@ -577,6 +590,7 @@ def test_plan_as_dict(tr, create_wa):
         *run_args,
         rootless = True,
         include_news = False,
+        structure = STRUCTURES.origs,
         rename_code = 'return f"{o}.{seq}"',
         filter_code = filter_code,
         seq_start = 10,
@@ -599,6 +613,7 @@ def test_prepare_rename_multiple_times(tr, create_wa):
     # without causing any trouble: renaming succeeds.
     wa, plan = run_checks(
         *run_args,
+        structure = STRUCTURES.origs,
         rootless = True,
         include_news = False,
         rename_code = 'return o + o',

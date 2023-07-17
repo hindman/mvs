@@ -1,3 +1,5 @@
+from textwrap import dedent
+
 from short_con import constants
 
 ####
@@ -31,8 +33,11 @@ class CON:
 
     # User-supplied code.
     code_actions = constants('CodeActions', ('rename', 'filter'))
-    user_code_fmt = 'def {func_name}(o, p, seq, plan):\n{indent}{user_code}\n'
     func_name_fmt = '_do_{}'
+    user_code_fmt = dedent('''
+        def {func_name}(o, n, po, pn, seq, r, plan):
+        {indent}{user_code}
+    ''').lstrip()
 
     # Command-line exit codes.
     exit_ok = 0
@@ -56,6 +61,6 @@ STRUCTURES = constants('Structures', (
     'paragraphs',
     'pairs',
     'rows',
-    'originals',
+    'origs',
 ))
 

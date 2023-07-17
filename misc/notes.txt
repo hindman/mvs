@@ -21,28 +21,51 @@ Allow --rename with any input structure:
     x The default structure will still be --flat.
     x Drop constant: just_origs_msg.
 
-    - Adjust RenamingPlan.parse_inputs() [this breaks tests]
-    - Adjust tests.
+    x Adjust RenamingPlan.parse_inputs() [this breaks tests]
+    x Adjust tests.
 
-    - Adjust variables supplied to user-code:
-        - Current:
-            o     Original path.
-            p     Original path, as a pathlib.Path instance.
-            seq   Current sequence value.
-            plan  RenamingPlan instance.
-        - Adjusted:
-            o, n    Original path and new path.
-            po, pn  The same, as a pathlib.Path instances.
-            seq     Current sequence value.
-            r       Current Renaming instance.
-            plan    RenamingPlan instance.
+    x Adjust variables supplied to user-code:
 
-    - Example:
-
-        # Use format strings in the new input paths.
-        mvs --rename 'return n.format(str(seq).zfill(2))'
+    - Test new behaviors:
+        - Should raise if given --origs without --rename.
+        - Can rename paths with origs, news, and --rename (include a usage of format strings in news).
 
 New documentation and editing pass:
+
+    - Assess usage:
+
+        - The mutex opts for sources/structures are non-standard.
+
+        - Structures could be handled with one option:
+
+            --structure S    Structure of the input file paths: flat, paragraphs,
+                             pairs, rows, origs [default: flat; see --details]
+
+            - This approach is more scalable if new structures are ever needed.
+
+            - Argparse won't accept shortened opt-args the way it does with
+              opts (but a helper function could do it).
+
+            - I'm leaning in direction of keeping current approach.
+
+        - Sources could be distilled in a few ways, but not down to a single
+          option. All of these approaches will still require some extra
+          arg-parsing validation.
+
+            # Condensed via special syntax.
+            PATHS
+            --source .stdin | .clip | PATH
+
+            # Standard approach.
+            PATHS
+            --file PATH
+            --source stdin | clip
+
+            # Current approach: this seems best.
+            PATHS
+            --stdin
+            --clipboard
+            --file PATH
 
     - First draft:
 
@@ -102,6 +125,7 @@ New documentation and editing pass:
                 --strict PROB...
         - Enhanced listing behavior (and added --list).
         - Bug fix: Windows when replacing/clobbering a path.
+        - New kwargs passed to user's rename and filter functions.
 
     - Policy changes.
         - Orig paths must be regular file or directory.
