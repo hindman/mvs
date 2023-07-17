@@ -579,6 +579,31 @@ def test_sources(tr, creators):
         out = '',
     )
 
+def test_origs_rename(tr, creators):
+    # Paths and args.
+    origs = ('z1', 'z2', 'z3')
+    news = tuple(o + '.new' for o in origs)
+    run_args = (tr, creators, origs, news)
+
+    # Working scenario with --origs and --rename.
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--rename', 'return o + ".new"',
+        '--origs',
+        include_news = False,
+    )
+
+    # Should fail without --rename.
+    wa, outs, cli = run_checks(
+        *run_args,
+        '--origs',
+        include_news = False,
+        failure = True,
+        no_change = True,
+        err_starts = MF.opts_origs_rename,
+        out = '',
+    )
+
 ####
 # The --edit and --editor options.
 ####

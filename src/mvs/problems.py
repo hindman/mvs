@@ -58,17 +58,19 @@ FAILURE_VARIETIES = FV = constants('FailureVarieties', (
     'no_paths',
     'paragraphs',
     'row',
+    'origs_rename',
     'imbalance',
 ))
 
 FAILURE_FORMATS = FF = {
-    (FN.all_filtered, None):     'all paths were filtered, excluded, or skipped during processing.',
-    (FN.parsing, FV.no_paths):   'no input paths.',
-    (FN.parsing, FV.paragraphs): 'the --paragraphs option expects exactly two paragraphs.',
-    (FN.parsing, FV.row):        'the --rows option expects rows with exactly two cells: {!r}.',
-    (FN.parsing, FV.imbalance):  'got an unequal number of original paths and new paths.',
-    (FN.code, None):             'invalid user-supplied {} code:\n{}',
-    (FN.strict, None):           'renaming plan failed to satisfy strict: {!r}.',
+    (FN.all_filtered, None):       'all paths were filtered, excluded, or skipped during processing.',
+    (FN.parsing, FV.no_paths):     'no input paths.',
+    (FN.parsing, FV.paragraphs):   'the --paragraphs option expects exactly two paragraphs.',
+    (FN.parsing, FV.row):          'the --rows option expects rows with exactly two cells: {!r}.',
+    (FN.parsing, FV.origs_rename): 'the --origs option requires --rename.',
+    (FN.parsing, FV.imbalance):    'got an unequal number of original paths and new paths.',
+    (FN.code, None):               'invalid user-supplied {} code:\n{}',
+    (FN.strict, None):             'renaming plan failed to satisfy strict: {!r}.',
 }
 
 PROBLEM_NAMES = PN = constants('ProblemNames', (

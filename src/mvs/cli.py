@@ -262,7 +262,7 @@ class CliRenamer:
 
         # Validate the options related to input sources and structures.
         if opts.origs and not opts.rename:
-            self.wrapup(CON.exit_fail, MF.opts_originals_rename)
+            self.wrapup(CON.exit_fail, MF.opts_origs_rename)
             return None
         self.validate_sources_structures(opts)
         if self.done:

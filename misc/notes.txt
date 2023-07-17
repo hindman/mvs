@@ -13,59 +13,7 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Allow --rename with any input structure:
-
-    # Done: did not break tests.
-    x Need a new structure: --original (original paths only).
-    x Add corresponding command-line option; modify option help text
-    x The default structure will still be --flat.
-    x Drop constant: just_origs_msg.
-
-    x Adjust RenamingPlan.parse_inputs() [this breaks tests]
-    x Adjust tests.
-
-    x Adjust variables supplied to user-code:
-
-    - Test new behaviors:
-        - Should raise if given --origs without --rename.
-        - Can rename paths with origs, news, and --rename (include a usage of format strings in news).
-
 New documentation and editing pass:
-
-    - Assess usage:
-
-        - The mutex opts for sources/structures are non-standard.
-
-        - Structures could be handled with one option:
-
-            --structure S    Structure of the input file paths: flat, paragraphs,
-                             pairs, rows, origs [default: flat; see --details]
-
-            - This approach is more scalable if new structures are ever needed.
-
-            - Argparse won't accept shortened opt-args the way it does with
-              opts (but a helper function could do it).
-
-            - I'm leaning in direction of keeping current approach.
-
-        - Sources could be distilled in a few ways, but not down to a single
-          option. All of these approaches will still require some extra
-          arg-parsing validation.
-
-            # Condensed via special syntax.
-            PATHS
-            --source .stdin | .clip | PATH
-
-            # Standard approach.
-            PATHS
-            --file PATH
-            --source stdin | clip
-
-            # Current approach: this seems best.
-            PATHS
-            --stdin
-            --clipboard
-            --file PATH
 
     - First draft:
 

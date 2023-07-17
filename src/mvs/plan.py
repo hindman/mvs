@@ -291,6 +291,8 @@ class RenamingPlan:
             # Just original file paths.
             origs = [orig for orig in self.inputs if orig]
             news = [None for _ in origs]
+            if not self.rename_code:
+                return do_fail(FN.parsing, FV.origs_rename)
 
         elif self.structure == STRUCTURES.paragraphs:
             # Paragraphs: first original paths, then new paths.

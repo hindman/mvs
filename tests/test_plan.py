@@ -172,6 +172,7 @@ def run_diagnostics(tr, wa, plan):
     tr.dumpj(plan.as_dict, 'RenamingPlan')
 
 # Convenience scheme for the inventory parameter in run_checks().
+# When inventory=EMPTY, the assembled inventory will be empty.
 EMPTY = '_'
 INV_MAP = {
     '.': 'active',
@@ -221,6 +222,39 @@ def test_structure_default(tr, create_wa):
             structure = s,
         )
         assert plan.structure == STRUCTURES.flat
+
+def test_structure_origs(tr, create_wa):
+    # Paths and args.
+    origs = ('a', 'b', 'c')
+    news = ('a.new', 'b.new', 'c.new')
+    expecteds = ('a.001', 'b.002', 'c.003')
+    run_args = (tr, create_wa, origs, news)
+
+    # Scenario: original paths only, plus --rename.
+    wa, plan = run_checks(
+        *run_args,
+        rename_code = 'return o + ".new"',
+        structure = STRUCTURES.origs,
+        include_news = False,
+    )
+
+    # Scenario: original and new paths, plus --rename.
+    wa, plan = run_checks(
+        *run_args,
+        rename_code = 'return n.replace("new", str(seq).zfill(3))',
+        expecteds = expecteds,
+    )
+
+    # Scenario: original paths only, without --rename.
+    wa, plan = run_checks(
+        *run_args,
+        structure = STRUCTURES.origs,
+        include_news = False,
+        failure = True,
+        reason = Failure(FN.parsing, variety = FV.origs_rename),
+        no_change = True,
+        inventory = EMPTY,
+    )
 
 def test_structure_paragraphs(tr, create_wa):
     # Paths and args.
@@ -397,6 +431,14 @@ def test_renaming_code(tr, create_wa):
             structure = STRUCTURES.origs,
             rootless = True,
         )
+
+    # Make sure we can access all variables passed to user code.
+    wa, plan = run_checks(
+        *run_args,
+        inputs = origs + news,
+        rename_code = 'xs = (o, n, po, pn, seq, r, plan)\n    if all(xs): return n',
+        rootless = True,
+    )
 
 def test_filtering_code(tr, create_wa):
     # Paths and args.
