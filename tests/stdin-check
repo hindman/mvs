@@ -22,7 +22,7 @@ check_wa 'BEFORE'
 
 # Use mvs to rename some paths.
 heading 'RENAMING'
-find $wa -name $pre-* | mvs --stdin --rename 'return o + ".new"'
+find $wa -name $pre-* | mvs --stdin --origs --rename 'return o + ".new"'
 
 # Check work area.
 check_wa 'AFTER'

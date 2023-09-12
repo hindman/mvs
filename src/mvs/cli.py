@@ -253,7 +253,7 @@ class CliRenamer:
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.details:
-            msg = self.wrapped_post_eplilog(ap)
+            msg = self.wrapped_details(ap)
             self.wrapup(CON.exit_ok, msg)
             return None
         elif opts.version:
@@ -397,7 +397,7 @@ class CliRenamer:
             self.wrapup(CON.exit_fail, msg)
             return
 
-    def wrapped_post_eplilog(self, ap):
+    def wrapped_details(self, ap):
         # Use the argparse help text to compute the desired width.
         lines = ap.format_help().split(CON.newline)
         width = max(len(line) for line in lines)
@@ -405,7 +405,7 @@ class CliRenamer:
         # Split the post-epilog into paragraphs.
         # Wrap the paragraph unless it is a heading or indented.
         paras = []
-        for p in CLI.post_epilog.split(CON.para_break):
+        for p in CLI.details.split(CON.para_break):
             if not p.startswith('  ') and not p.endswith('----'):
                 p = wrap_text(p, width)
             paras.append(p)
@@ -668,19 +668,26 @@ class CLI:
         been checked for common types of problems.
     ''')
 
-    post_epilog = dedent('''
+    details = dedent('''
         User-supplied code
         ------------------
 
-        The user-supplied renaming and filtering code receives the following
-        variables as function arguments:
+        User code should explictly return a value, as follows:
+
+          Renaming   New path, as a str or Path.
+          Filtering  True to retain original path, False to reject
+
+        User code receives the following variables as function arguments:
 
           o     Original path.
-          p     Original path, as a pathlib.Path instance.
+          n     New path (might be None).
+          po    Original path as a pathlib.Path instance.
+          pn    New path as a pathlib.Path instance (might be None).
           seq   Current sequence value.
+          r     Current Renaming instance.
           plan  RenamingPlan instance.
 
-        The code also has access to these Python libraries or classes:
+        User code has access to these libraries or classes:
 
           re    Python re library.
           Path  Python pathlib.Path class.
@@ -689,13 +696,8 @@ class CLI:
         (presumably the original path) and returns a new str with the common
         prefix (across all original paths) removed.
 
-        User-supplied code should explictly return a value, as follows:
-
-          Renaming   New path, as a str or Path.
-          Filtering  True to retain original path, False to reject
-
-        The code text does not require indentation for its first line,
-        but does require it for any subsequent lines.
+        The code text does not require indentation for its first line, but does
+        require it for any subsequent lines.
 
         For reference, here are some useful Path attributes and methods in a
         renaming context:
@@ -719,40 +721,145 @@ class CLI:
         Problem control
         ---------------
 
-        Before any renamings occur, each is checked for common types of
-        problems. By default, if any occur, the renaming plan is halted and no
-        paths are renamed. The problems and their short names are as follows:
+        TODO...
 
-          equal      Original path and new path are the same.
-          missing    Original path does not exist.
-          existing   New path already exists.
-          colliding  Two or more new paths are the same.
-          parent     Parent directory of new path does not exist.
+        Process:
 
-        Users can configure various problem controls to address such issues.
-        That allows the renaming plan to proceed in spite of the problems,
-        either by skipping offending items, taking remedial action (creating a
-        missing parent for a new path), or simply forging ahead in spite of the
-        consequences (clobbering).
+            - Input prep: if these fail, the process halts immediately.
 
-        The controls and their applicable problems:
+                prepare_inputs   # Parses inputs
+                prepare_code     # Filtering
+                prepare_code     # Renaming
 
-          skip     All of them.
-          create   parent.
-          clobber  existing, colliding.
+            - Other prep:
 
-        Examples:
+                prepare_renamings
 
-          # Skipping items with specific problems.
-          --skip equal
-          --skip equal missing
+                    # Setup and user-code computation.
+                    set_exists_and_types
+                    execute_user_filter
+                    execute_user_rename
+                    set_exists_and_types
 
-          # Shortcut to control all applicable problems.
-          --skip all
-          --clobber all
+                    # Problem checks.
+                    check_equal             | .
+                    check_orig_uniq         | .
+                    check_orig_exists       | .
+                    check_orig_type         | .
+                    check_new_exists        | .
+                    check_new_parent_exists | .
+                    check_new_collisions    | .
 
-          # Creating missing parents before renaming.
-          --create parent
+                    # Failures and Problems: general notes.
+                    #
+                    # Failures are not specific to a single Renaming and/or have
+                    # no meaningful resolution. Most relate to bad inputs.
+                    #
+                    # Problems are specific to one Renaming. Some of them are resolvable, some not.
+                    # Renamings with unresolvable problems must be skipped/excluded; those with
+                    # resolvable problems can be skipped if the user requests it. Both classes
+                    # have a name, and an optional variety to further classify them.
+
+                    (PN.noop, PV.equal):    'Original path and new path are the exactly equal',
+                    (PN.noop, PV.same):     'Original path and new path are the functionally the same',
+                    (PN.noop, PV.recase):   'User requested path-name case-change, but file system already agrees with new',
+                    (PN.missing, None):     'Original path does not exist',
+                    (PN.duplicate, None):   'Original path is the same as another original path',
+                    (PN.type, None):        'Original path is neither a regular file nor directory',
+                    (PN.code, PV.filter):   'Error from user-supplied filtering code: {} [original path: {}]',
+                    (PN.code, PV.rename):   'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
+                    (PN.exists, PV.other):  'New path exists and is neither regular file nor directory',
+                    # Resolvable.
+                    (PN.exists, None):      'New path exists',
+                    (PN.exists, PV.diff):   'New path exists and differs with original in type',
+                    (PN.exists, PV.full):   'New path exists and is a non-empty directory',
+                    (PN.collides, None):    'New path collides with another new path',
+                    (PN.collides, PV.diff): 'New path collides with another new path, and they differ in type',
+                    (PN.collides, PV.full): 'New path collides with another new path, and it is a non-empty directory',
+                    (PN.parent, None):      'Parent directory of new path does not exist',
+
+                prepare_probs   # Internal bookkeeping
+                prepare_strict  # Halt plan if --strict settings are not met
+
+            --skip PROB...
+
+                PROB can be a Problem name or a Problem name-variety
+
+        -----
+
+        Philsophy:
+
+            Eager renaming: execute as many renamings as possible.
+
+            Informed consent:
+                - informative listings documenting original and new
+                  paths, plus any problems that are observed.
+
+                - user confirmation before any renamings are executed
+
+            Rigor via configuration:
+                - Automatically skip renamings having problems.
+                - Halt if certain types of problems occur.
+
+        General approach to problem handling:
+
+            - Eager renaming with informed consent.
+
+                Phase 1: collect input.
+
+                    mvs first collects user input: arguments and options;
+                    paths; user-supplied code. If failures occur related to
+                    invalid inputs, the renaming plan is halted immediatly and
+                    no renamings are attempted.
+
+                Phase 2: prepare and check renamings.
+
+                    Assuming generally valid input and no plan-halting
+                    failures, mvs prepares the renamings and checks
+                    them for a variety of problems.
+
+                    Some are unresolvable: eg, if an original path does not
+                    exist, the renaming is impossible.
+
+                    Others are resolvable: eg, if a new path implies a parent
+                    directory that does not exist yet, mvs could create the
+                    directory before attempting the renaming.
+
+                    At least by default, mvs takes the approach that it should
+                    try to implement as many of the requested renamings as
+                    possible.
+
+                        - Renamings with unresolvable problems are excluded.
+                          There is no alternative here.
+
+                        - Renamings with resolvable problems are executed (via
+                          mkdir or clobber)
+
+            - Less eagerness via configuration:
+
+                - Skipping renamings with resolvable problems.
+
+                    - Instead of taking remedial action to resolve problems,
+                      mvs can be configure to skip renamings having such problems.
+
+                    - User can skip all such renamings are only those with
+                      specific kinds of problems.
+
+                    --skip all
+                    --skip PROB PROB ...
+                    --skip PROB-VARIETY ...
+
+                - Halting the renaming plan if exexpected problems are found:
+
+                    # Halt if any renamings had unresolvable problems.
+                    --strict excluded
+
+                    # Halt if any renamings had resolvable problems of various types.
+                    --strict parent exists collides
+
+                    # Both.
+                    --strict all
+
     ''').lstrip()
 
     # Values in the parsed opts indicating that the user did not
@@ -781,16 +888,16 @@ class CLI:
             help = 'Input paths via STDIN',
         ),
         OptConfig(
-            names = '--file',
-            validator = str,
-            metavar = 'PATH',
-            help = 'Input paths via a text file',
-        ),
-        OptConfig(
             names = '--clipboard',
             validator = bool,
             action = 'store_true',
             help = 'Input paths via the clipboard',
+        ),
+        OptConfig(
+            names = '--file',
+            validator = str,
+            metavar = 'PATH',
+            help = 'Input paths via a text file',
         ),
 
         #
@@ -801,25 +908,25 @@ class CLI:
             names = '--flat',
             validator = bool,
             action = 'store_true',
-            help = 'Input paths: original paths, then equal number of new paths [the default]',
+            help = 'Original paths, then an equal number of new paths [the default]',
         ),
         OptConfig(
             names = '--paragraphs',
             validator = bool,
             action = 'store_true',
-            help = 'Input paths in paragraphs: original paths, blank line(s), new paths',
+            help = 'Original paths, blank line(s), then new paths',
         ),
         OptConfig(
             names = '--pairs',
             validator = bool,
             action = 'store_true',
-            help = 'Input paths in alternating lines: original, new, original, new, etc.',
+            help = 'Alternating lines: original, new, original, new, etc.',
         ),
         OptConfig(
             names = '--rows',
             validator = bool,
             action = 'store_true',
-            help = 'Input paths in tab-delimited rows: original, tab, new',
+            help = 'Tab-delimited rows: original, tab, new',
         ),
         OptConfig(
             names = '--origs',
@@ -833,16 +940,16 @@ class CLI:
         #
         OptConfig(
             group = 'User code',
-            names = '--rename -r',
-            validator = str,
-            metavar = 'CODE',
-            help = f'Code to create or modify new paths',
-        ),
-        OptConfig(
             names = '--filter',
             validator = str,
             metavar = 'CODE',
             help = 'Code to filter input paths',
+        ),
+        OptConfig(
+            names = '--rename -r',
+            validator = str,
+            metavar = 'CODE',
+            help = f'Code to create or modify new paths',
         ),
         OptConfig(
             names = '--indent',
@@ -880,17 +987,14 @@ class CLI:
             names = '--edit',
             validator = bool,
             action = 'store_true',
-            help = f'Create or modify new paths via a text editor',
+            help = f'Modify input paths via a text editor',
         ),
         OptConfig(
             names = '--editor',
             validator = str,
             real_default = CON.default_editor_cmd,
             metavar = 'CMD',
-            help = (
-                'Command string for editor used by --edit [default: '
-                f'`{CON.default_editor_cmd}`; empty string to disable]'
-            ),
+            help = f'Command string for editor [default: `{CON.default_editor_cmd}`]',
         ),
 
         #
@@ -927,7 +1031,7 @@ class CLI:
             metavar = 'CMD',
             help = (
                 'Command string for paginating listings [default: '
-                f'`{CON.default_pager_cmd}`; empty string to disable]'
+                f'`{CON.default_pager_cmd}`; empty to disable]'
             ),
         ),
         OptConfig(
@@ -936,14 +1040,14 @@ class CLI:
             validator = OptConfig.list_of_str,
             nargs = '+',
             choices = LISTING_CHOICES,
-            help = 'Specify the sections to include in listings',
+            help = 'Specify the sections to include in listings [see --details]',
         ),
         OptConfig(
             names = '--limit',
             validator = OptConfig.posint,
             metavar = 'N',
             type = positive_int,
-            help = 'Upper limit on the number of items to display in listings [default: none]',
+            help = 'Upper limit on number of items to display in listings [default: none]',
         ),
 
         #

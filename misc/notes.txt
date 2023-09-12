@@ -17,43 +17,43 @@ New documentation and editing pass:
 
     - First draft:
 
-        README.md
-        mvs --help
-        mvs --details
-        CHANGES.md
+        x mvs --help
+        . mvs --details
+        - README.md
+        - CHANGES.md
 
     - Editing pass:
 
-        misc/notes.txt
-        src/__init__.py
-        src/cli.py
-        src/constants.py
-        src/filesys.py
-        src/messages.py
-        src/optconfig.py
-        src/plan.py
-        src/problems.py
-        src/renaming.py
-        src/utils.py
-        src/version.py
-        tests/__init__.py
-        tests/conftest.py
-        tests/editor.py
-        tests/empty_pager.py
-        tests/failer.py
-        tests/test_cli.py
-        tests/test_plan.py
-        tests/test_problems.py
-        tests/test_renaming.py
-        tests/test_utils.py
-        CHANGES.md
-        LICENSE
-        README.md
-        requirements.txt
-        setup.py
-        tags
-        tasks.py
-        tox.ini
+        - misc/notes.txt
+        - src/__init__.py
+        - src/cli.py
+        - src/constants.py
+        - src/filesys.py
+        - src/messages.py
+        - src/optconfig.py
+        - src/plan.py
+        - src/problems.py
+        - src/renaming.py
+        - src/utils.py
+        - src/version.py
+        - tests/__init__.py
+        - tests/conftest.py
+        - tests/editor.py
+        - tests/empty_pager.py
+        - tests/failer.py
+        - tests/test_cli.py
+        - tests/test_plan.py
+        - tests/test_problems.py
+        - tests/test_renaming.py
+        - tests/test_utils.py
+        - CHANGES.md
+        - LICENSE
+        - README.md
+        - requirements.txt
+        - setup.py
+        - tags
+        - tasks.py
+        - tox.ini
 
     - Don't delete this until just before publish.
 
@@ -225,9 +225,9 @@ misc-notes: Misc notes
 
 Why problem control was overhauled, yet again:
 
-    - Current approach:
+    - Previous approach:
 
-        - The most recent problem-control system started with an opinionated
+        - The previous problem-control system started with an opinionated
           set of defaults regarding how to handle each type of problem: some
           were fatal (eventually getting the explicit halt control) and others
           simply excluded the affected renamings (skip).
@@ -241,7 +241,10 @@ Why problem control was overhauled, yet again:
           the different variants of clobber and collide), that system has grown
           too complex.
 
-        - The rest of these notes describe a better alternative.
+        - The rest of these notes describe a better alternative. [NOTE: The new
+          approach was implemented and is now the current approach, but most of
+          the language here is still framed as though the changes are in the
+          future.]
 
     - Use --skip rather than --controls:
 

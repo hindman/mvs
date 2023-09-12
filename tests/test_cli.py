@@ -376,7 +376,7 @@ def test_version_and_help(tr, creators):
         out = BYPASS,
         **kws,
     )
-    assert cli.out.split() == CLI.post_epilog.split()
+    assert cli.out.split() == CLI.details.split()
 
     # Help.
     wa, outs, cli = run_checks(
