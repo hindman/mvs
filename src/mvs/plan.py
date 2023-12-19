@@ -8,7 +8,7 @@ from dataclasses import asdict
 from itertools import groupby
 from os.path import commonprefix, samefile
 from pathlib import Path
-from short_con import constants
+from short_con import cons
 
 from .constants import CON, STRUCTURES
 from .messages import MSG_FORMATS as MF
@@ -64,10 +64,10 @@ class RenamingPlan:
     # which paths were renamed and which were not. Similarly, CliRenamer logs
     # the necessary information to figure that out.
     #
-    TRACKING = constants('Tracking', dict(
+    TRACKING = cons(
         not_started = -1,
         done = None,
-    ))
+    )
 
     def __init__(self,
                  # Path inputs and their structure.

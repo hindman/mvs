@@ -1,4 +1,4 @@
-from short_con import constants
+from short_con import cons
 
 from .constants import CON
 from .version import __version__
@@ -7,7 +7,7 @@ from .version import __version__
 # Renaming categories using in listings.
 ####
 
-LISTING_FORMATS = constants('ListingFormats', dict(
+LISTING_FORMATS = cons(
     filtered = '# Renamings: filtered out by user code{}:\n',
     excluded = '# Renamings: excluded due to unresolvable problems{}:\n',
     skipped  = '# Renamings: skipped by user due to problems{}:\n',
@@ -15,9 +15,9 @@ LISTING_FORMATS = constants('ListingFormats', dict(
     exists   = '# Active renamings: will clobber existing path{}:\n',
     collides = '# Active renamings: will collide with another new path{}:\n',
     ok       = '# Active renamings: with no problems{}:\n',
-))
+)
 
-LISTING_CATEGORIES = constants('ListingCategories', (
+LISTING_CATEGORIES = cons(
     'filtered',
     'excluded',
     'skipped',
@@ -25,14 +25,14 @@ LISTING_CATEGORIES = constants('ListingCategories', (
     'exists',
     'collides',
     'ok',
-))
+)
 
-PARENT_LISTING_CATEGORIES = constants('ParentListingCategories', (
+PARENT_LISTING_CATEGORIES = cons(
     'filtered',
     'excluded',
     'skipped',
     'active',
-))
+)
 
 LISTING_CHOICES = (CON.all, *LISTING_CATEGORIES.keys())
 
@@ -40,7 +40,7 @@ LISTING_CHOICES = (CON.all, *LISTING_CATEGORIES.keys())
 # Messages.
 ####
 
-MSG_FORMATS = MF = constants('MsgFormats', dict(
+MSG_FORMATS = MF = cons(
     # MvsError instances in RenamingPlan.
     rename_done_already    = 'RenamingPlan cannot rename paths because renaming has already been executed',
     prepare_failed         = 'RenamingPlan cannot rename paths because failures occurred during preparation',
@@ -72,5 +72,5 @@ MSG_FORMATS = MF = constants('MsgFormats', dict(
     no_action              = '\nNo action taken.',
     paths_renamed          = '\nPaths renamed.',
     cli_version            = f'{CON.app_name} v{__version__}',
-))
+)
 

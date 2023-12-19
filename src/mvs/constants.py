@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-from short_con import constants
+from short_con import cons
 
 ####
 # General constants.
@@ -32,7 +32,7 @@ class CON:
     empty_row_marker = '__EMPTY__'
 
     # User-supplied code.
-    code_actions = constants('CodeActions', ('rename', 'filter'))
+    code_actions = cons('rename', 'filter')
     func_name_fmt = '_do_{}'
     user_code_fmt = dedent('''
         def {func_name}(o, n, po, pn, seq, r, plan):
@@ -56,11 +56,11 @@ class CON:
 # Structures for input paths data.
 ####
 
-STRUCTURES = constants('Structures', (
+STRUCTURES = cons(
     'flat',
     'paragraphs',
     'pairs',
     'rows',
     'origs',
-))
+)
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from short_con import constants
+from short_con import cons
 
 from .problems import Problem
 
@@ -10,11 +10,11 @@ from .problems import Problem
 # proposed renaming would affect the name-portion of the path.
 ####
 
-NAME_CHANGE_TYPES = constants('NameChangeTypes', (
+NAME_CHANGE_TYPES = cons(
     'noop',
     'name_change',
     'case_change',
-))
+)
 
 ####
 # A data object to hold information about a single renaming.

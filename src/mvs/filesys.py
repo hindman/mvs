@@ -2,24 +2,24 @@ import os
 import stat
 
 from pathlib import Path
-from short_con import constants
+from short_con import cons
 from tempfile import TemporaryDirectory
 
 ####
 # Path type and existence-status.
 ####
 
-PATH_TYPES = constants('PathTypes', (
+PATH_TYPES = cons(
     'file',
     'directory',
     'other',
-))
+)
 
-EXISTENCES = constants('Existences', dict(
+EXISTENCES = cons(
     missing = 0,
     exists = 1,
     exists_case = 2,
-))
+)
 
 ANY_EXISTENCE = (EXISTENCES.exists, EXISTENCES.exists_case)
 
@@ -62,11 +62,11 @@ def is_non_empty_dir(path):
 # File system case sensitivity.
 ####
 
-FS_TYPES = constants('FileSystemTypes', (
+FS_TYPES = cons(
     'case_insensitive',
     'case_preserving',
     'case_sensitive',
-))
+)
 
 def case_sensitivity():
     # Determines the file system's case sensitivity.

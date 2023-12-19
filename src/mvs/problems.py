@@ -1,7 +1,7 @@
 import re
 
 from dataclasses import dataclass
-from short_con import constants
+from short_con import cons
 
 from .constants import CON
 from .messages import MSG_FORMATS as MF
@@ -47,20 +47,20 @@ from .utils import(
 # Names, varieties, and formats.
 ####
 
-FAILURE_NAMES = FN = constants('FailureNames', (
+FAILURE_NAMES = FN = cons(
     'all_filtered',
     'parsing',
     'code',
     'strict',
-))
+)
 
-FAILURE_VARIETIES = FV = constants('FailureVarieties', (
+FAILURE_VARIETIES = FV = cons(
     'no_paths',
     'paragraphs',
     'row',
     'origs_rename',
     'imbalance',
-))
+)
 
 FAILURE_FORMATS = FF = {
     (FN.all_filtered, None):       'all paths were filtered, excluded, or skipped during processing.',
@@ -73,7 +73,7 @@ FAILURE_FORMATS = FF = {
     (FN.strict, None):             'renaming plan failed to satisfy strict: {!r}.',
 }
 
-PROBLEM_NAMES = PN = constants('ProblemNames', (
+PROBLEM_NAMES = PN = cons(
     'noop',
     'duplicate',
     'missing',
@@ -82,9 +82,9 @@ PROBLEM_NAMES = PN = constants('ProblemNames', (
     'exists',
     'collides',
     'parent',
-))
+)
 
-PROBLEM_VARIETIES = PV = constants('ProblemVarieties', (
+PROBLEM_VARIETIES = PV = cons(
     'equal',
     'same',
     'recase',
@@ -93,7 +93,7 @@ PROBLEM_VARIETIES = PV = constants('ProblemVarieties', (
     'other',
     'diff',
     'full',
-))
+)
 
 PROBLEM_FORMATS = PF = {
     # Unresolvable.

@@ -10,7 +10,7 @@ from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from textwrap import dedent
-from short_con import constants
+from short_con import cons
 
 from .constants import CON, STRUCTURES
 from .optconfig import OptConfig, positive_int
@@ -53,10 +53,7 @@ def main(args = None, **kws):
 
 class CliRenamer:
 
-    LOG_TYPE = constants('LogType', (
-        'plan',
-        'tracking',
-    ))
+    LOG_TYPE = cons('plan', 'tracking')
 
     ####
     # Initializer.
@@ -657,7 +654,7 @@ class CLI:
     # Important option names or groups of options.
 
     paths = 'paths'
-    sources = constants('Sources', ('paths', 'stdin', 'file', 'clipboard'))
+    sources = cons('paths', 'stdin', 'file', 'clipboard')
 
     # Program help text: description and explanatory text.
 
