@@ -722,6 +722,13 @@ class CLI:
 
         Process:
 
+            ** Need to document environment variable
+
+            ** Need to document the full process. For example, the draft notes
+            below do not state where --edit occurs [it happens early, immediately
+            after collecting input paths from the source, but before --rename
+            code is executed]
+
             - Input prep: if these fail, the process halts immediately.
 
                 prepare_inputs   # Parses inputs

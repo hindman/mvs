@@ -15,6 +15,20 @@ todos: TODOs
 
 New documentation and editing pass:
 
+    - Scan code to re-orient:
+
+        - src/mvs/utils.py
+        - src/mvs/renaming.py
+        - src/mvs/optconfig.py
+        - src/mvs/cli.py
+        - src/mvs/filesys.py
+        - src/mvs/plan.py
+        x src/mvs/__init__.py
+        x src/mvs/constants.py
+        x src/mvs/messages.py
+        x src/mvs/problems.py
+        x src/mvs/version.py
+
     - First draft:
 
         x mvs --help
@@ -24,18 +38,18 @@ New documentation and editing pass:
 
     - Editing pass:
 
-        - misc/notes.txt
-        - src/__init__.py
-        - src/cli.py
-        - src/constants.py
-        - src/filesys.py
-        - src/messages.py
-        - src/optconfig.py
-        - src/plan.py
-        - src/problems.py
-        - src/renaming.py
-        - src/utils.py
-        - src/version.py
+        x misc/notes.txt
+        - src/mvs/__init__.py
+        - src/mvs/cli.py
+        - src/mvs/constants.py
+        - src/mvs/filesys.py
+        - src/mvs/messages.py
+        - src/mvs/optconfig.py
+        - src/mvs/plan.py
+        - src/mvs/problems.py
+        - src/mvs/renaming.py
+        - src/mvs/utils.py
+        - src/mvs/version.py
         - tests/__init__.py
         - tests/conftest.py
         - tests/editor.py
@@ -113,12 +127,11 @@ New documentation and editing pass:
 
                 - Multiple new-collisions on the same new-path.
 
-        - The package is not tested on case-sensitive and case-preserving
-          operating systems, but not on case-insensitive systems. In that
-          context, regular renamings will probably work fine. Some
-          case-change-only renamings won't be treated as problems by the checks
-          (if rn.new fails to exists-strict), so the renaming would be tried,
-          and it will fail.
+        - The package is tested on case-sensitive and case-preserving operating
+          systems, but not on case-insensitive systems. In that context,
+          regular renamings will probably work fine. Some case-change-only
+          renamings won't be treated as problems by the checks (if rn.new fails
+          to exists-strict), so the renaming would be tried, and it will fail.
 
         - Renaming renames the leaf, not the leaf plus its parent. When
           renaming something, mvs asks whether the parent of its new path
@@ -365,7 +378,7 @@ Scenario to exercise CLI listing behavior:
 
 Why runtime user-code problems are treated as unresolvable:
 
-    - In theory, one could forge ahead with a renaming even in the face of an
+    - In theory, one could forge ahead with a renaming even in the face of a
       runtime failure of the user's filtering and renaming code.
 
         - Verdict: doable, but not worth the trouble right now. Easy enough to
@@ -380,25 +393,6 @@ Why runtime user-code problems are treated as unresolvable:
 
         - Picking the right default is not clear cut. I would lean in the
           direction retaining renamings with a runtime filter problem.
-
-    - Renaming problem:
-
-        - Currently, the presence of renaming code causes the plan to treat all
-          inputs and original paths. That could be changed.
-
-        - If that were done, the user could supply both new paths and renaming
-          code. The user's code could either return the current new path or a
-          different new path.
-
-        - Although not crazy, that usage scenario is a bit counter-intuitive.
-
-        - It would require an additional usage parameter.
-
-            --rename CODE          # Inputs just original paths.
-            --rename CODE --news   # Inputs both original and new paths.
-
-        - It would also require an additional problem sub-category, such as
-          Problem(noop, undef).
 
 Other operations: copy, link, chmod, times, touch [OTHER_OPS]:
     - copy: given old-paths, copy them to new-paths.
@@ -460,22 +454,6 @@ Convenience renaming operations [CONVENIENCE_OPS]:
         --nometa             # Replace each shell meta-character with underscore.
         --trim               # Remove whitespace and underscores from ends of orig path.
 
-Current file system interactions:
-
-    - This is outdated.
-
-    - cli.py
-        - Path.home().
-        - Read user-prefs.
-        - Write log.
-        - Read input paths from file.
-        - Editing input paths in editor.
-
-    - plan.py
-        - Check path existence.
-        - Create directory during renaming.
-        - Renaming.
-
 The purpose of the --paragraphs structure:
 
     - It does not provide any user flexibility.
@@ -486,37 +464,16 @@ The purpose of the --paragraphs structure:
       requirement that at least one blank existings between the original and
       new paths.
 
-How --edit relates to SOURCES and STRUCTURES:
+How --edit and --rename interact:
 
-    - The --edit option is like a "source" and has structural implications, but
-      it not literally a source or a structure.
+    - The steps go like this:
 
-    - Source:
-
-        - The option is not a primary source. Instead, the user provides
-          original paths from a primary source.
-
-        - Like --rename, --edit augments those paths. But unlike --rename, the
-          augmentation occur before path parsing. So the steps go like this:
-
-            - Read input from source (orig paths)
-            - Write paths to temp file.
-            - Edit temp file.
-            - Read input paths from temp file (orig paths and new paths).
-            - Parse.
-
-    - Structure:
-
-        - Both --edit and --rename have structural implications.
-
-        - But --rename functions as a STRUCTURE in command-line grammar becaue
-          it means the user need not (and cannot meaningfully) specify a
-          structure other than the default of --flat.
-
-        - By contrast, a user can use --edit and any of the structures. The
-          --edit option assumes that the input input paths are flat and solely
-          original; but the final edited temp file can have any structure the
-          user wants.
+        - Read input paths from source.
+        - Write paths to temp file.
+        - Edit temp file.
+        - Read input paths from temp file (orig paths and new paths).
+        - Parse.
+        - Then proceed with rest of renaming plan, including --rename.
 
 Policy regarding new parents:
 

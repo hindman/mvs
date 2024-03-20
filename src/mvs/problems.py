@@ -18,8 +18,16 @@ from .utils import(
 #
 # Failures and Problems: general notes.
 #
-# Failures are not specific to a single Renaming and/or have
-# no meaningful resolution. Most relate to bad inputs.
+# Failures are not specific to a single Renaming and/or have no meaningful
+# resolution. Most relate to bad inputs. Failures have a name and an optional
+# variety to further classify them.
+#
+#   Resolvable | Name         | Varieties
+#   ----------------------------------------------
+#   no         | all_filtered | .
+#   no         | parsing      | no_paths, paragraphs, row, origs_rename, imbalance
+#   no         | code         | .
+#   no         | strict       | .
 #
 # Problems are specific to one Renaming. Some of them are resolvable, some not.
 # Renamings with unresolvable problems must be skipped/excluded; those with
@@ -39,7 +47,8 @@ from .utils import(
 #   yes        | collides  | diff, full
 #   yes        | parent    | .
 #
-# See command-line help text for more details.
+# See command-line help text for more details, along with FAILURE_FORMATS
+# and PROBLEM_FORMATS (below).
 #
 ####
 
@@ -117,7 +126,7 @@ PROBLEM_FORMATS = PF = {
 }
 
 ####
-# Issue: a base class.
+# Issue: a base class for Failure and Problem.
 ####
 
 @dataclass(init = False, frozen = True)
