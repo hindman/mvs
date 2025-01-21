@@ -17,7 +17,7 @@ New documentation and editing pass:
 
     - Scan code to re-orient:
 
-        - src/mvs/utils.py
+        x src/mvs/utils.py
         - src/mvs/renaming.py
         - src/mvs/optconfig.py
         - src/mvs/cli.py
