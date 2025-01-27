@@ -89,12 +89,12 @@ class RenamingPlan:
         self.inputs = tuple(inputs)
         self.structure = structure or STRUCTURES.flat
 
-        # Based on the inputs we begin with the full universe of Renaming
-        # instances. During processing, those rns get put into four buckes:
-        # - renamings filtered out by user code;
-        # - renamings that must be excluded, due to unresolvable problems;
-        # - renamings the user wants to skip, due to problems;
-        # - active renamings.
+        # We begin with full universe of Renaming instances (rns).
+        # During processing, they get put into four buckets:
+        # - rns filtered out by user code;
+        # - rns that must be excluded, due to unresolvable problems;
+        # - rns the user wants to skip, due to problems;
+        # - rns that are still active.
         self.n_initial = None
         self.filtered = []
         self.excluded = []
@@ -286,7 +286,7 @@ class RenamingPlan:
             self.handle_failure(name, *xs, variety = variety)
             return []
 
-        # Otherwise, organize inputs into original paths and new paths.
+        # Organize inputs into original paths and new paths.
         if self.structure == STRUCTURES.origs:
             # Just original file paths.
             origs = [orig for orig in self.inputs if orig]
@@ -309,7 +309,7 @@ class RenamingPlan:
                 return do_fail(FN.parsing, FV.paragraphs)
 
         elif self.structure == STRUCTURES.pairs:
-            # Pairs: original path, new path, original path, etc.
+            # Pairs: original path, new path, original, new, etc.
             groups = [[], []]
             i = 0
             for line in self.inputs:
@@ -393,7 +393,7 @@ class RenamingPlan:
     ####
 
     def set_exists_and_types(self, rn, seq_val):
-        # This step is called twice, and the beginning and then after user-code
+        # This step is called twice, at the beginning and then after user-code
         # for filtering and renaming has been executed. The initial call sets
         # information for rn.orig and, if possible, rn.new. The second call
         # handles rn.new if we have not done so already. The attributes set
@@ -561,6 +561,7 @@ class RenamingPlan:
         else:
             return Problem(PN.parent)
 
+    ## __HERE__
     def check_new_collisions(self, rn, seq_val):
         # Checks for collisions among all of the new paths in the RenamingPlan.
         # If any, returns the most serious problem: (1) collisions with

@@ -17,12 +17,13 @@ New documentation and editing pass:
 
     - Scan code to re-orient:
 
-        x src/mvs/utils.py
-        - src/mvs/renaming.py
-        - src/mvs/optconfig.py
-        - src/mvs/cli.py
-        - src/mvs/filesys.py
         - src/mvs/plan.py
+            See __HERE__
+        - src/mvs/cli.py
+        x src/mvs/filesys.py
+        x src/mvs/utils.py
+        x src/mvs/renaming.py
+        x src/mvs/optconfig.py
         x src/mvs/__init__.py
         x src/mvs/constants.py
         x src/mvs/messages.py
@@ -35,6 +36,10 @@ New documentation and editing pass:
         . mvs --details
         - README.md
         - CHANGES.md
+
+    - Test questions:
+        - How does sequence numbering work if renamings are filtered out
+          in the middle of the process?
 
     - Editing pass:
 
