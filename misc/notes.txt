@@ -15,11 +15,16 @@ todos: TODOs
 
 New documentation and editing pass:
 
+    - Next:
+        - jump ahead to get a draft for --details
+        - then read cli.py and re-read plan.py to check for:
+            - correctness of write-up
+            - to fill in any gaps
+
     - Scan code to re-orient:
 
-        - src/mvs/plan.py
-            See __HERE__
         - src/mvs/cli.py
+        x src/mvs/plan.py
         x src/mvs/filesys.py
         x src/mvs/utils.py
         x src/mvs/renaming.py
@@ -37,9 +42,30 @@ New documentation and editing pass:
         - README.md
         - CHANGES.md
 
-    - Test questions:
-        - How does sequence numbering work if renamings are filtered out
-          in the middle of the process?
+    - Needed among warnings:
+        - Complexity regarding seq numbering.
+            - seq is relevant only if rn.new is computed via user code
+            - that step occurs *after* filtering.
+
+        - Spefically:
+            - it operates during preparation, not renaming
+
+                set_exists_and_types
+                execute_user_filter          # filtering
+                execute_user_rename          # compute rn.new, using seq (across non-filtered paths)
+                set_exists_and_types
+                check_equal                  # various checks than can shift rns out of active
+                check_orig_uniq              # and into skipped or excluded
+                check_orig_exists
+                check_orig_type
+                check_new_exists
+                check_new_parent_exists
+                check_new_collisions
+
+        -  The implication:
+            - Among actully renamed files (self.active), the seq might have
+              gaps if any rns were skipped or excluded due to checks.
+            - In complex scenarios don't rely on gapless seq.
 
     - Editing pass:
 

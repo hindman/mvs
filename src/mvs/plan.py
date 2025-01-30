@@ -561,19 +561,19 @@ class RenamingPlan:
         else:
             return Problem(PN.parent)
 
-    ## __HERE__
     def check_new_collisions(self, rn, seq_val):
         # Checks for collisions among all of the new paths in the RenamingPlan.
-        # If any, returns the most serious problem: (1) collisions with
-        # non-empty directories, (2) collisions with a path of a different
-        # type, or (3) regular collisions.
+        # If any, returns the most serious variety of a Problem(collides).
         #
-        # Collisions occur between (A) the path-type of rn.orig, (B) the
-        # path-types of all OTHER.orig, and (C) the path-types of any OTHER.new
-        # that happen to exist.
+        #   - full: collision with non-empty directory
+        #   - diff: collision with a path of a different type
+        #   - regular collision.
+        #
+        # To determine the variety, we need to consider the relevant 
+        # orig and new attributes of the other files.
 
-        # Get the other Renaming instances that have the same new-path as the
-        # current rn. If rn.new is unique, there is no problem.
+        # Get the other Renaming instances that have the same new-path as
+        # the current rn. If rn.new is unique, there is no problem.
         k = self.new_collision_key_func(rn.new)
         others = [o for o in self.path_groups[k] if o is not rn]
         if not others:
@@ -664,7 +664,7 @@ class RenamingPlan:
         else:
             self.has_renamed = True
 
-        # Ensure than we have prepare, and raise if it failed.
+        # Ensure than we have prepared, and raise if it failed.
         self.prepare()
         if self.failed:
             raise MvsError(MF.prepare_failed, failure = self.failure)
