@@ -139,7 +139,8 @@ class CliRenamer:
             self.wrapup_with_tb(MF.plan_creation_failed)
             return
 
-        # Prepare the RenamingPlan, log plan information, and halt if it failed.
+        # Prepare the RenamingPlan, log plan information.
+        # Halt if logging failed.
         plan.prepare()
         self.write_log_file(self.LOG_TYPE.plan)
         if self.done:
@@ -666,6 +667,10 @@ class CLI:
     ''')
 
     details = dedent('''
+
+        ### Some sections are drafted below. But their ordering
+        probably needs adjustment.
+
         User-supplied code
         ------------------
 
@@ -715,19 +720,161 @@ class CLI:
           p.with_stem(X)    "               stem X.
           p.with_suffix(X)  "               suffix X.
 
-        Problem control
-        ---------------
+        Philsophy and policy
+        --------------------
+
+            Reasonable caution:
+                - Halts in the face of invalid input.
+                - Checks for problems typical in renaming scenarios.
+                - But does not take pains to catch less common problems that
+                  can occur under more complex or exotic scenarios.
+
+            Informed consent:
+                - Renamings are grouped into general categories: filtered,
+                  excluded, skipped, or active.
+                - They are listed along with information charactizing
+                  any problems revealed by the checks.
+                - No renamings are executed without user confirmation.
+
+            Eager renaming, with guardrails:
+                - By default, mvs prefers to execute renamings.
+                - Even if some renamings have unresolvable problems, mvs will
+                  proceed with the others.
+                - Even if some new paths lack an existing parent, mvs will
+                  create the needed parent directories.
+                - Even is some new paths are already occupied, mvs will perform
+                  a clobber: delete current item at the path; then perform the
+                  original-to-new renaming.
+                - But mvs will not make heroic efforts to fulfill renaming
+                  prequisities.
+                - It does not support renamings or clobberings for path types
+                  other than directory or regular file.
+
+            Rigor via configuration:
+                - The user can suppress that renaming eagerness via either the
+                  command line or configuration file.
+                - Renamings having resolvable problems can be automatically
+                  skipped.
+                - Or the renaming plan can be configured to halt before
+                  starting renaming if problems occur, either any or of
+                  specific kinds.
 
         TODO...
+
+        Process
+        -------
+
+                Phase 1: collect input.
+
+                    mvs first collects user input: arguments and options;
+                    paths; user-supplied code. If failures occur related to
+                    invalid inputs, the renaming plan is halted immediatly and
+                    no renamings are attempted.
+
+                    ** Need to document the full process. For example, the draft notes
+                    below do not state where --edit occurs [it happens early, immediately
+                    after collecting input paths from the source, but before creating
+                    a RenamingPlan]
+
+                    CLI process:
+
+                        # Parse args.
+                        # Collect the input paths.
+                        # Initialize the RenamingPlan.
+                        # Prepare the RenamingPlan, log plan information.
+                        # Print the renaming listing.
+                        # Return if plan failed.
+                        # Return if dryrun mode.
+                        # User confirmation.
+                        # Rename paths.
+
+                Phase 2: prepare and check renamings.
+
+                    Assuming generally valid input and no plan-halting
+                    failures, mvs prepares the renamings, runs user-supplied
+                    code and and checks all renamings them for a variety of
+                    problems.
+
+                    Some are unresolvable: for example, if an original path does not
+                    exist, the renaming is impossible.
+
+                    Others are resolvable: for example, if a new path implies a
+                    parent directory that does not exist yet, mvs could create
+                    the directory before attempting the renaming; or if a new
+                    path already exists, mvs could delete the curent item at
+                    that path before renaming.
+
+                Phase 3: user confirmation.
+
+                    After running all checks, mvs organizes and lists the
+                    renamings into four broad groups:
+
+                        - Filtered out by user code.
+
+                        - Excluded due to unresolvable problems.
+
+                        - Skipped due to resolvable problems that the user, via
+                          configuration, declared ineligible for renaming.
+
+                        - Renamings still active and awaiting user
+                          confirmation. Some might have no problems; others
+                          might have resolvable problems not configured as
+                          ineligible.
+
+                    Each renaming listed include its original and new paths,
+                    along with information about the type of problem, if any.
+
+                    After reviewing the lists, the user can confirm that
+                    the renamings should proceed as proposed.
+
+
+                - informative listings documenting original and new
+                  paths, plus any problems that are observed.
+
+                - user confirmation before any renamings are executed
+
+
+                    At least by default, mvs takes the approach that it should
+                    try to implement as many of the requested renamings as
+                    possible.
+
+                        - Renamings with unresolvable problems are excluded.
+                          There is no alternative here.
+
+                        - Renamings with resolvable problems are executed (via
+                          mkdir or clobber)
+
+            - Less eagerness via configuration:
+
+                - Skipping renamings with resolvable problems.
+
+                    - Instead of taking remedial action to resolve problems,
+                      mvs can be configure to skip renamings having such problems.
+
+                    - User can skip all such renamings are only those with
+                      specific kinds of problems.
+
+                    --skip all
+                    --skip PROB PROB ...
+                    --skip PROB-VARIETY ...
+
+                - Halting the renaming plan if exexpected problems are found:
+
+                    # Halt if any renamings had unresolvable problems.
+                    --strict excluded
+
+                    # Halt if any renamings had resolvable problems of various types.
+                    --strict parent exists collides
+
+                    # Both.
+                    --strict all
+
+        Problem control
+        ---------------
 
         Process:
 
             ** Need to document environment variable
-
-            ** Need to document the full process. For example, the draft notes
-            below do not state where --edit occurs [it happens early, immediately
-            after collecting input paths from the source, but before --rename
-            code is executed]
 
             - Input prep: if these fail, the process halts immediately.
 
@@ -790,79 +937,6 @@ class CLI:
                 PROB can be a Problem name or a Problem name-variety
 
         -----
-
-        Philsophy:
-
-            Eager renaming: execute as many renamings as possible.
-
-            Informed consent:
-                - informative listings documenting original and new
-                  paths, plus any problems that are observed.
-
-                - user confirmation before any renamings are executed
-
-            Rigor via configuration:
-                - Automatically skip renamings having problems.
-                - Halt if certain types of problems occur.
-
-        General approach to problem handling:
-
-            - Eager renaming with informed consent.
-
-                Phase 1: collect input.
-
-                    mvs first collects user input: arguments and options;
-                    paths; user-supplied code. If failures occur related to
-                    invalid inputs, the renaming plan is halted immediatly and
-                    no renamings are attempted.
-
-                Phase 2: prepare and check renamings.
-
-                    Assuming generally valid input and no plan-halting
-                    failures, mvs prepares the renamings and checks
-                    them for a variety of problems.
-
-                    Some are unresolvable: eg, if an original path does not
-                    exist, the renaming is impossible.
-
-                    Others are resolvable: eg, if a new path implies a parent
-                    directory that does not exist yet, mvs could create the
-                    directory before attempting the renaming.
-
-                    At least by default, mvs takes the approach that it should
-                    try to implement as many of the requested renamings as
-                    possible.
-
-                        - Renamings with unresolvable problems are excluded.
-                          There is no alternative here.
-
-                        - Renamings with resolvable problems are executed (via
-                          mkdir or clobber)
-
-            - Less eagerness via configuration:
-
-                - Skipping renamings with resolvable problems.
-
-                    - Instead of taking remedial action to resolve problems,
-                      mvs can be configure to skip renamings having such problems.
-
-                    - User can skip all such renamings are only those with
-                      specific kinds of problems.
-
-                    --skip all
-                    --skip PROB PROB ...
-                    --skip PROB-VARIETY ...
-
-                - Halting the renaming plan if exexpected problems are found:
-
-                    # Halt if any renamings had unresolvable problems.
-                    --strict excluded
-
-                    # Halt if any renamings had resolvable problems of various types.
-                    --strict parent exists collides
-
-                    # Both.
-                    --strict all
 
     ''').lstrip()
 
