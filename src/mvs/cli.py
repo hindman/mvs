@@ -314,7 +314,7 @@ class CliRenamer:
                 self.wrapup(CON.exit_fail, msg)
                 return None
 
-        # Attributes that either don't require merging.
+        # Attributes that don't require merging.
         special = {'disable'}
 
         # Merge preferences into opts. If the current opts attribute
@@ -660,283 +660,310 @@ class CLI:
     # Program help text: description and explanatory text.
 
     description = dedent('''
-        Renames file and directory paths in bulk, via user-supplied
-        Python code or a data source mapping old paths to new paths.
-        No renaming occurs until all of the proposed changes have
-        been checked for common types of problems.
+
+        Renames file and directory paths in bulk, via user-supplied Python code
+        or a data source mapping old paths to new paths. By default, no
+        renaming occurs until: (1) the renamings have been checked for common
+        types of problems; (2) the user reviews the renamings and other summary
+        information; and (3) the user provides confirmation to proceed.
+
     ''')
 
     details = dedent('''
-
-        ### Some sections are drafted below. But their ordering
-        probably needs adjustment.
 
         User-supplied code
         ------------------
 
         User code should explictly return a value, as follows:
 
-          Renaming   New path, as a str or Path.
-          Filtering  True to retain original path, False to reject
+            Renaming  | New path, as a str or Path.
+            Filtering | True to retain original path, False to reject
 
         User code receives the following variables as function arguments:
 
-          o     Original path.
-          n     New path (might be None).
-          po    Original path as a pathlib.Path instance.
-          pn    New path as a pathlib.Path instance (might be None).
-          seq   Current sequence value.
-          r     Current Renaming instance.
-          plan  RenamingPlan instance.
+            o    | Original path (str).
+            n    | New path (str or None).
+            po   | Original path (pathlib.Path)
+            pn   | New path (pathlib.Path or None)
+            seq  | Current sequence value.
+            r    | Current Renaming instance.
+            plan | RenamingPlan instance.
 
         User code has access to these libraries or classes:
 
-          re    Python re library.
-          Path  Python pathlib.Path class.
+            re   | Python re library.
+            Path | Python pathlib.Path class.
 
-        The RenamingPlan provides the strip_prefix() method, which takes a str
-        (presumably the original path) and returns a new str with the common
-        prefix (across all original paths) removed.
+        Helpers available via the RenamingPlan instance:
 
-        The code text does not require indentation for its first line, but does
-        require it for any subsequent lines.
+            plan.strip_prefix(ORIG_PATH): returns str with common prefix
+            (across all original paths) removed.
 
-        For reference, here are some useful Path attributes and methods in a
-        renaming context:
+        Indenation:
 
-          p         Path('/parent/dir/foo-bar.fubb')
-          p.parent  Path('/parent/dir')
+          First line  | no indent needed
+          Other lines | indent required
 
-          p.name    'foo-bar.fubb'
-          p.stem    'foo-bar'
-          p.suffix  '.fubb'
-          p.parts   ('/', 'parent', 'dir', 'foo-bar.fubb')
+        Path attributes and methods handy in a renaming context:
 
-          p.exists()   bool
-          p.is_file()  "
-          p.is_dir()   "
-
-          p.with_name(X)    New Path having name X.
-          p.with_stem(X)    "               stem X.
-          p.with_suffix(X)  "               suffix X.
+          p                | Path('/parent/dir/foo-bar.fubb')
+          p.parent         | Path('/parent/dir')
+          p.name           | 'foo-bar.fubb'
+          p.stem           | 'foo-bar'
+          p.suffix         | '.fubb'
+          p.parts          | ('/', 'parent', 'dir', 'foo-bar.fubb')
+          p.exists()       | bool
+          p.is_file()      | "
+          p.is_dir()       | "
+          p.with_name(X)   | Path having name X
+          p.with_stem(X)   | "           stem X
+          p.with_suffix(X) | "           suffix X
 
         Philsophy and policy
         --------------------
 
-            Reasonable caution:
-                - Halts in the face of invalid input.
-                - Checks for problems typical in renaming scenarios.
-                - But does not take pains to catch less common problems that
-                  can occur under more complex or exotic scenarios.
+        Reasonable caution:
+            - Halts in the face of invalid input.
+            - Checks for problems typical in renaming scenarios.
+            - But does not take pains to catch less common problems that can
+              occur under more complex or exotic scenarios.
 
-            Informed consent:
-                - Renamings are grouped into general categories: filtered,
-                  excluded, skipped, or active.
-                - They are listed along with information charactizing
-                  any problems revealed by the checks.
-                - No renamings are executed without user confirmation.
+        Informed consent:
+            - Renamings are grouped into general categories: filtered,
+              excluded, skipped, or active.
+            - They are listed along with information charactizing any problems
+              revealed by the checks.
+            - No renamings are executed without user confirmation.
 
-            Eager renaming, with guardrails:
-                - By default, mvs prefers to execute renamings.
-                - Even if some renamings have unresolvable problems, mvs will
-                  proceed with the others.
-                - Even if some new paths lack an existing parent, mvs will
-                  create the needed parent directories.
-                - Even is some new paths are already occupied, mvs will perform
-                  a clobber: delete current item at the path; then perform the
-                  original-to-new renaming.
-                - But mvs will not make heroic efforts to fulfill renaming
-                  prequisities.
-                - It does not support renamings or clobberings for path types
-                  other than directory or regular file.
+        Eager renaming, with guardrails:
+            - By default, mvs prefers to execute renamings.
+            - Even if some renamings have unresolvable problems, mvs will
+              proceed with the others.
+            - Even if some new paths lack an existing parent, mvs will create
+              the needed parent directories.
+            - Even is some new paths are already occupied, mvs will perform a
+              clobber: delete current item at the path; then perform the
+              original-to-new renaming.
+            - But mvs will not make heroic efforts to fulfill renaming
+              prequisities.
+            - It does not support renamings or clobberings for path types other
+              than directory or regular file.
 
-            Rigor via configuration:
-                - The user can suppress that renaming eagerness via either the
-                  command line or configuration file.
-                - Renamings having resolvable problems can be automatically
-                  skipped.
-                - Or the renaming plan can be configured to halt before
-                  starting renaming if problems occur, either any or of
-                  specific kinds.
+        Rigor via configuration:
+            - The user can suppress that renaming eagerness via either the
+              command line or configuration file.
+            - Renamings having resolvable problems can be automatically
+              skipped.
+            - Or the renaming plan can be configured to halt before starting
+              renaming if problems occur, either any or of specific kinds.
 
-        TODO...
+        Process: overview
+        -----------------
 
-        Process
-        -------
+        Collect inputs: command-line arguments and options; user preferences.
+        Halt if any failures occur (no renamings will be attempted).
 
-                Phase 1: collect input.
+        Prepare renamings: collect information about the paths to be renamed;
+        run user-code to filter orig paths and compute new paths; check
+        renamings for various problems. Halt if any problems are unresolvable.
 
-                    mvs first collects user input: arguments and options;
-                    paths; user-supplied code. If failures occur related to
-                    invalid inputs, the renaming plan is halted immediatly and
-                    no renamings are attempted.
+        Listing: log renaming plan information and print a listing of
+        renamings. The listing organizes proposed renamings into four broad
+        groups:
 
-                    ** Need to document the full process. For example, the draft notes
-                    below do not state where --edit occurs [it happens early, immediately
-                    after collecting input paths from the source, but before creating
-                    a RenamingPlan]
+            filtered | by user code
+            excluded | due to unresolvable problems
+            skipped  | due to resolvable problems configured by user as ineligible
+            active   | awaiting confirmation (some might have resolvable problems)
 
-                    CLI process:
+        Confirmation: halt unless the user supplies confirmation to proceed.
 
-                        # Parse args.
-                        # Collect the input paths.
-                        # Initialize the RenamingPlan.
-                        # Prepare the RenamingPlan, log plan information.
-                        # Print the renaming listing.
-                        # Return if plan failed.
-                        # Return if dryrun mode.
-                        # User confirmation.
-                        # Rename paths.
+        Renaming: attempt to perform the active renamings. If unexpected
+        failures occur in the middle of this process, the user can refer to the
+        plan and tracking log files to determine which renamings actually
+        occurred and which did not.
 
-                Phase 2: prepare and check renamings.
+        Process: details
+        ----------------
 
-                    Assuming generally valid input and no plan-halting
-                    failures, mvs prepares the renamings, runs user-supplied
-                    code and and checks all renamings them for a variety of
-                    problems.
+        Collect inputs:
+            - Parse args.
+            - Read user prefs
+            - Merge prefs and args.
+            - Collect the input paths.
+            - User edits the input paths (if --edit).
 
-                    Some are unresolvable: for example, if an original path does not
-                    exist, the renaming is impossible.
+        Prepare:
+            - Initialize the RenamingPlan.
+            - Prepare the RenamingPlan [details below]
 
-                    Others are resolvable: for example, if a new path implies a
-                    parent directory that does not exist yet, mvs could create
-                    the directory before attempting the renaming; or if a new
-                    path already exists, mvs could delete the curent item at
-                    that path before renaming.
+        Listing:
+            - Log plan information.
+            - Print the renaming listing.
+            - Halt if plan failed or if --dryrun.
 
-                Phase 3: user confirmation.
+        Confirmation:
+            - Prompt user (unless --yes).
+            - Halt if not given.
 
-                    After running all checks, mvs organizes and lists the
-                    renamings into four broad groups:
+        Renaming:
+            - Attempt to rename active renamings.
+            - Update the tracking log file.
 
-                        - Filtered out by user code.
+        Process: details: preparing the RenamingPlan
+        --------------------------------------------
 
-                        - Excluded due to unresolvable problems.
+        Initial steps (they halt on failure):
 
-                        - Skipped due to resolvable problems that the user, via
-                          configuration, declared ineligible for renaming.
+            prepare_inputs   | Parses input paths into orig and new paths
+            prepare_code     | Prepare filtering code
+            prepare_code     | Prepare renaming code
 
-                        - Renamings still active and awaiting user
-                          confirmation. Some might have no problems; others
-                          might have resolvable problems not configured as
-                          ineligible.
+        Other steps:
 
-                    Each renaming listed include its original and new paths,
-                    along with information about the type of problem, if any.
+            prepare_renamings  | Check for problems [details below]
+            prepare_probs      | Collect/assemble problems, if any
+            prepare_strict     | Check whether plan satisfied --strict criteria
 
-                    After reviewing the lists, the user can confirm that
-                    the renamings should proceed as proposed.
+        prepare_renamings(): details: setup:
 
+            set_exists_and_types | Set orig and new path attributes [as much as possible]
+            execute_user_filter  | Runs user code to filter out orig paths
+            execute_user_rename  | Runs user code to create/modify new paths
+            set_exists_and_types | Set orig and new path attributes [finishes]
 
-                - informative listings documenting original and new
-                  paths, plus any problems that are observed.
+        prepare_renamings(): details: problem checks:
 
-                - user confirmation before any renamings are executed
+            check_equal             | Are orig and new paths identical?
+            check_orig_uniq         | Is orig path uniq among all orig paths?
+            check_orig_exists       | Does orig path exist?
+            check_orig_type         | Is the orig path a supported file type
+            check_new_exists        | Does new path exist already and, if so, of what type?
+            check_new_parent_exists | Does the parent of a new path already exist?
+            check_new_collisions    | Does any new paths collide with each other and, if so, of what type?
 
+        Configuration and logging
+        -------------------------
 
-                    At least by default, mvs takes the approach that it should
-                    try to implement as many of the requested renamings as
-                    possible.
+        The mvs directory:
 
-                        - Renamings with unresolvable problems are excluded.
-                          There is no alternative here.
+            - Used for user-configuration file.
+            - Used for logging the renamings.
 
-                        - Renamings with resolvable problems are executed (via
-                          mkdir or clobber)
+            - Default location: $HOME/.mvs/
+            - Modify via environment variable: MVS_APP_DIR
 
-            - Less eagerness via configuration:
+        User preferences:
 
-                - Skipping renamings with resolvable problems.
+            - Default path: $HOME/.mvs/config.json
 
-                    - Instead of taking remedial action to resolve problems,
-                      mvs can be configure to skip renamings having such problems.
+            - Structure: keys are the same as the command-line options; values
+              are the desired settings.
 
-                    - User can skip all such renamings are only those with
-                      specific kinds of problems.
+            - Example for user who wants no logging for renamings, a 2-space
+              indent for user code, and Emacs for the --edit option.
 
-                    --skip all
-                    --skip PROB PROB ...
-                    --skip PROB-VARIETY ...
+                {
+                    "nolog": true,
+                    "indent": 2,
+                    "editor": "emacs"
+                }
 
-                - Halting the renaming plan if exexpected problems are found:
+        Logging:
 
-                    # Halt if any renamings had unresolvable problems.
-                    --strict excluded
+            Default location: $HOME/.mvs/
 
-                    # Halt if any renamings had resolvable problems of various types.
-                    --strict parent exists collides
+            By default, each renaming produces two log files:
 
-                    # Both.
-                    --strict all
+                DATETIME-plan.json     | All details of the RenamingPlan
+                DATETIME-tracking.json | Tracks which orig-new pair was active when renaming failed
 
-        Problem control
-        ---------------
+            Datetime format: YYYY-MM-DD_HH-MM-SS
 
-        Process:
+        Problems
+        --------
 
-            ** Need to document environment variable
+        Failures:
 
-            - Input prep: if these fail, the process halts immediately.
+            - Not specific to a single renaming and/or have no resolution.
 
-                prepare_inputs   # Parses inputs
-                prepare_code     # Filtering
-                prepare_code     # Renaming
+            - Most relate to bad inputs.
 
-            - Other prep:
+            - Halt the renaming plan early before any renamings occur.
 
-                prepare_renamings
+        Problems:
 
-                    # Setup and user-code computation.
-                    set_exists_and_types
-                    execute_user_filter
-                    execute_user_rename
-                    set_exists_and_types
+            - Specific to one Renaming.
 
-                    # Problem checks.
-                    check_equal             | .
-                    check_orig_uniq         | .
-                    check_orig_exists       | .
-                    check_orig_type         | .
-                    check_new_exists        | .
-                    check_new_parent_exists | .
-                    check_new_collisions    | .
+            - Some of them are unresolvable: for example, if the original path
+              does not exist the renaming is impossible.
 
-                    # Failures and Problems: general notes.
-                    #
-                    # Failures are not specific to a single Renaming and/or have
-                    # no meaningful resolution. Most relate to bad inputs.
-                    #
-                    # Problems are specific to one Renaming. Some of them are resolvable, some not.
-                    # Renamings with unresolvable problems must be skipped/excluded; those with
-                    # resolvable problems can be skipped if the user requests it. Both classes
-                    # have a name, and an optional variety to further classify them.
+            - Other problems are resolvable: for example, if a new path implies
+              a parent directory that does not exist yet, mvs could create the
+              directory before attempting the renaming; or if a new path
+              already exists, mvs could delete the curent item at that path
+              before renaming.
 
-                    (PN.noop, PV.equal):    'Original path and new path are the exactly equal',
-                    (PN.noop, PV.same):     'Original path and new path are the functionally the same',
-                    (PN.noop, PV.recase):   'User requested path-name case-change, but file system already agrees with new',
-                    (PN.missing, None):     'Original path does not exist',
-                    (PN.duplicate, None):   'Original path is the same as another original path',
-                    (PN.type, None):        'Original path is neither a regular file nor directory',
-                    (PN.code, PV.filter):   'Error from user-supplied filtering code: {} [original path: {}]',
-                    (PN.code, PV.rename):   'Error or invalid return from user-supplied renaming code: {} [original path: {}]',
-                    (PN.exists, PV.other):  'New path exists and is neither regular file nor directory',
-                    # Resolvable.
-                    (PN.exists, None):      'New path exists',
-                    (PN.exists, PV.diff):   'New path exists and differs with original in type',
-                    (PN.exists, PV.full):   'New path exists and is a non-empty directory',
-                    (PN.collides, None):    'New path collides with another new path',
-                    (PN.collides, PV.diff): 'New path collides with another new path, and they differ in type',
-                    (PN.collides, PV.full): 'New path collides with another new path, and it is a non-empty directory',
-                    (PN.parent, None):      'Parent directory of new path does not exist',
+            - Problems have a general name and an optional variety to further
+              classify them.
 
-                prepare_probs   # Internal bookkeeping
-                prepare_strict  # Halt plan if --strict settings are not met
+        Unresolvable problems:
 
-            --skip PROB...
+            Name      | Variety | Description
+            -----------------------------------------------------------------------------------
+            noop      | equal   | ORIG and NEW are the equal
+            noop      | same    | ORIG and NEW are the functionally the same
+            noop      | recase  | Renaming just a case-change, but file system agrees with NEW
+            missing   | .       | ORIG does not exist
+            duplicate | .       | ORIG is the same as another ORGI
+            type      | .       | ORIG is neither a regular file nor directory
+            code      | filter  | Error from user-supplied filtering code
+            code      | rename  | Error or invalid return from user-supplied renaming code
+            exists    | other   | NEW exists and is neither regular file nor directory
 
-                PROB can be a Problem name or a Problem name-variety
+        Resolvable problems:
 
-        -----
+            Name     | Variety | Description
+            -----------------------------------------------------------------------------------
+            exists   | .       | NEW exists
+            exists   | diff    | NEW exists and differs with ORIG in type
+            exists   | full    | NEW exists and is a non-empty directory
+            collides | .       | NEW collides with another NEW
+            collides | diff    | NEW collides with another NEW, and they differ in type
+            collides | full    | NEW collides with another NEW, and it is a non-empty directory
+            parent   | .       | Parent directory of NEW does not exist
+
+        Skipping resolvable problems:
+
+            - The user can configure mvs to skip renamings having specific
+              types of resolvable problems.
+
+            - This is done with the --skip option, which takes one or more
+              problem NAME or NAME-VARIETY values.
+
+            - Examples:
+
+                --skip all
+                --skip exists collides
+                --skip exists-full collides-full
+
+        Halting the renaming plan in the face of resolvable problems:
+
+            - The user can configure mvs to halting the renaming plan if
+              certain types of problems are found.
+
+            - This is done via the --strict option.
+
+            - Examples:
+
+                # Halt if any renamings were excluced due to unresolvable problems.
+                --strict excluded
+
+                # Halt if any renamings had resolvable problems of various types.
+                --strict parent exists collides
+
+                # Both.
+                --strict all
 
     ''').lstrip()
 

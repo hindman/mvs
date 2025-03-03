@@ -17,6 +17,9 @@ New documentation and editing pass:
 
     - Next:
         - jump ahead to get a draft for --details
+            - have a rough pre-first-draft
+            - edit it further
+
         - then read cli.py and re-read plan.py to check for:
             - correctness of write-up
             - to fill in any gaps

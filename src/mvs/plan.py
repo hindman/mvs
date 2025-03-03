@@ -651,7 +651,7 @@ class RenamingPlan:
 
     def strip_prefix(self, orig):
         i = self.prefix_len
-        return orig[i:] if i else orig
+        return str(orig)[i:] if i else orig
 
     ####
     # Files system operations.
