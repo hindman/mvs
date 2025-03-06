@@ -671,6 +671,135 @@ class CLI:
 
     details = dedent('''
 
+        Philsophy and policy
+        --------------------
+
+        Reasonable caution:
+
+            - Halts in the face of invalid input.
+
+            - Checks for problems typical in renaming scenarios.
+
+            - But does not take pains to catch less common problems that can
+              occur under more complex or exotic scenarios.
+
+        Informed consent:
+
+            - Renamings are grouped into general categories: filtered,
+              excluded, skipped, or active.
+
+            - They are listed along with information charactizing any problems
+              revealed by the checks.
+
+            - No renamings are executed without user confirmation.
+
+        Eager renaming, with guardrails:
+
+            - By default, mvs prefers to execute renamings.
+
+            - Even if some renamings have unresolvable problems, mvs will
+              proceed with the others.
+
+            - Even if some new paths lack an existing parent, mvs will create
+              the needed parent directories.
+
+            - Even is some new paths are already occupied, mvs will perform a
+              clobber: delete current item at the path; then perform the
+              original-to-new renaming.
+
+            - But mvs will not make heroic efforts to fulfill renaming
+              prequisities.
+
+            - It does not support renamings or clobberings for path types other
+              than directory or regular file.
+
+        Rigor via configuration:
+
+            - The user can suppress that renaming eagerness via either the
+              command line or configuration file.
+
+            - Renamings having resolvable problems can be automatically
+              skipped.
+
+            - Or the renaming plan can be configured to halt before starting
+              renaming if problems occur, either any or of specific kinds.
+
+        Process: details
+        ----------------
+
+        Collect inputs:
+
+            - Parse args.
+
+            - Read user prefs.
+
+            - Merge arg on top of user prefs.
+
+            - Collect the input paths.
+
+            - User edits the input paths (if --edit).
+
+            - Halt if failures along the way.
+
+        Prepare RenamingPlan:
+
+            - Initialize the plan.
+
+            - Parse input paths into orig and new paths.
+
+            - Prepare filtering and renaming code.
+
+            - Run user code to filter out orig paths.
+
+            - Run user code to create/modify new paths.
+
+            - Check for problems:
+
+                - Are orig and new paths identical?
+
+                - Is orig path uniq among all orig paths?
+
+                - Does orig path exist?
+
+                - Is the orig path a supported file type
+
+                - Does new path exist already and, if so, of what type?
+
+                - Does the parent of a new path already exist?
+
+                - Does any new paths collide with each other and, if so, of what type?
+
+        Listing:
+
+            - Log plan information.
+
+            - Print the renaming listing.
+
+            - Halt if plan failed or if --dryrun.
+
+        Confirmation:
+
+            - Prompt user (unless --yes).
+
+            - Halt if not given.
+
+        Renaming:
+
+            - Attempt to rename active renamings.
+
+            - Update the tracking log file.
+
+        Listing
+        -------
+
+        Before asking the user for confirmation to proceed, mvs prints a
+        listing that organizes the proposed renamings into four broad groups:
+
+            filtered | by user code
+            excluded | due to unresolvable problems
+            skipped  | due to resolvable problems configured by user as ineligible
+            active   | awaiting confirmation (some might have resolvable problems)
+
         User-supplied code
         ------------------
 
@@ -718,167 +847,6 @@ class CLI:
           p.with_name(X)   | Path having name X
           p.with_stem(X)   | "           stem X
           p.with_suffix(X) | "           suffix X
-
-        Philsophy and policy
-        --------------------
-
-        Reasonable caution:
-            - Halts in the face of invalid input.
-            - Checks for problems typical in renaming scenarios.
-            - But does not take pains to catch less common problems that can
-              occur under more complex or exotic scenarios.
-
-        Informed consent:
-            - Renamings are grouped into general categories: filtered,
-              excluded, skipped, or active.
-            - They are listed along with information charactizing any problems
-              revealed by the checks.
-            - No renamings are executed without user confirmation.
-
-        Eager renaming, with guardrails:
-            - By default, mvs prefers to execute renamings.
-            - Even if some renamings have unresolvable problems, mvs will
-              proceed with the others.
-            - Even if some new paths lack an existing parent, mvs will create
-              the needed parent directories.
-            - Even is some new paths are already occupied, mvs will perform a
-              clobber: delete current item at the path; then perform the
-              original-to-new renaming.
-            - But mvs will not make heroic efforts to fulfill renaming
-              prequisities.
-            - It does not support renamings or clobberings for path types other
-              than directory or regular file.
-
-        Rigor via configuration:
-            - The user can suppress that renaming eagerness via either the
-              command line or configuration file.
-            - Renamings having resolvable problems can be automatically
-              skipped.
-            - Or the renaming plan can be configured to halt before starting
-              renaming if problems occur, either any or of specific kinds.
-
-        Process: overview
-        -----------------
-
-        Collect inputs: command-line arguments and options; user preferences.
-        Halt if any failures occur (no renamings will be attempted).
-
-        Prepare renamings: collect information about the paths to be renamed;
-        run user-code to filter orig paths and compute new paths; check
-        renamings for various problems. Halt if any problems are unresolvable.
-
-        Listing: log renaming plan information and print a listing of
-        renamings. The listing organizes proposed renamings into four broad
-        groups:
-
-            filtered | by user code
-            excluded | due to unresolvable problems
-            skipped  | due to resolvable problems configured by user as ineligible
-            active   | awaiting confirmation (some might have resolvable problems)
-
-        Confirmation: halt unless the user supplies confirmation to proceed.
-
-        Renaming: attempt to perform the active renamings. If unexpected
-        failures occur in the middle of this process, the user can refer to the
-        plan and tracking log files to determine which renamings actually
-        occurred and which did not.
-
-        Process: details
-        ----------------
-
-        Collect inputs:
-            - Parse args.
-            - Read user prefs
-            - Merge prefs and args.
-            - Collect the input paths.
-            - User edits the input paths (if --edit).
-
-        Prepare:
-            - Initialize the RenamingPlan.
-            - Prepare the RenamingPlan [details below]
-
-        Listing:
-            - Log plan information.
-            - Print the renaming listing.
-            - Halt if plan failed or if --dryrun.
-
-        Confirmation:
-            - Prompt user (unless --yes).
-            - Halt if not given.
-
-        Renaming:
-            - Attempt to rename active renamings.
-            - Update the tracking log file.
-
-        Process: details: preparing the RenamingPlan
-        --------------------------------------------
-
-        Initial steps (they halt on failure):
-
-            prepare_inputs   | Parses input paths into orig and new paths
-            prepare_code     | Prepare filtering code
-            prepare_code     | Prepare renaming code
-
-        Other steps:
-
-            prepare_renamings  | Check for problems [details below]
-            prepare_probs      | Collect/assemble problems, if any
-            prepare_strict     | Check whether plan satisfied --strict criteria
-
-        prepare_renamings(): details: setup:
-
-            set_exists_and_types | Set orig and new path attributes [as much as possible]
-            execute_user_filter  | Runs user code to filter out orig paths
-            execute_user_rename  | Runs user code to create/modify new paths
-            set_exists_and_types | Set orig and new path attributes [finishes]
-
-        prepare_renamings(): details: problem checks:
-
-            check_equal             | Are orig and new paths identical?
-            check_orig_uniq         | Is orig path uniq among all orig paths?
-            check_orig_exists       | Does orig path exist?
-            check_orig_type         | Is the orig path a supported file type
-            check_new_exists        | Does new path exist already and, if so, of what type?
-            check_new_parent_exists | Does the parent of a new path already exist?
-            check_new_collisions    | Does any new paths collide with each other and, if so, of what type?
-
-        Configuration and logging
-        -------------------------
-
-        The mvs directory:
-
-            - Used for user-configuration file.
-            - Used for logging the renamings.
-
-            - Default location: $HOME/.mvs/
-            - Modify via environment variable: MVS_APP_DIR
-
-        User preferences:
-
-            - Default path: $HOME/.mvs/config.json
-
-            - Structure: keys are the same as the command-line options; values
-              are the desired settings.
-
-            - Example for user who wants no logging for renamings, a 2-space
-              indent for user code, and Emacs for the --edit option.
-
-                {
-                    "nolog": true,
-                    "indent": 2,
-                    "editor": "emacs"
-                }
-
-        Logging:
-
-            Default location: $HOME/.mvs/
-
-            By default, each renaming produces two log files:
-
-                DATETIME-plan.json     | All details of the RenamingPlan
-                DATETIME-tracking.json | Tracks which orig-new pair was active when renaming failed
-
-            Datetime format: YYYY-MM-DD_HH-MM-SS
 
         Problems
         --------
@@ -964,6 +932,46 @@ class CLI:
 
                 # Both.
                 --strict all
+
+        Configuration and logging
+        -------------------------
+
+        The mvs directory:
+
+            - Used for user-configuration file.
+
+            - Used for logging the renamings.
+
+            - Default location: $HOME/.mvs/
+
+            - Modify via environment variable: MVS_APP_DIR
+
+        User preferences:
+
+            - Default path: $HOME/.mvs/config.json
+
+            - Structure: keys are the same as the command-line options; values
+              are the desired settings.
+
+            - Example for user who wants no logging for renamings, a 2-space
+              indent for user code, and Emacs for the --edit option.
+
+                {
+                    "nolog": true,
+                    "indent": 2,
+                    "editor": "emacs"
+                }
+
+        Logging:
+
+            Default location: $HOME/.mvs/
+
+            By default, each renaming produces two log files:
+
+                DATETIME-plan.json     | All details of the RenamingPlan
+                DATETIME-tracking.json | Indicates orig-new pair active when renaming failed
+
+            Datetime format: YYYY-MM-DD_HH-MM-SS
 
     ''').lstrip()
 
