@@ -37,6 +37,20 @@ PARENT_LISTING_CATEGORIES = cons(
 LISTING_CHOICES = (CON.all, *LISTING_CATEGORIES.keys())
 
 ####
+# Sections in the detailed help text.
+####
+
+DETAILS_SECTIONS = cons(
+    'sections',
+    'policy',
+    'process',
+    'listing',
+    'code',
+    'problems',
+    'config',
+)
+
+####
 # Messages.
 ####
 

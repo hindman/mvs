@@ -13,117 +13,68 @@ toc: Table of contents
 todos: TODOs
 --------
 
-New documentation and editing pass:
+Basic read-through for agreement with --details:
+    - src/mvs/cli.py
+    - src/mvs/plan.py
 
-    - Next:
-        - jump ahead to get a draft for --details
-            - have a rough pre-first-draft
-            - edit it further
+Add CAVEATS section to --details: see notes below.
 
-        - then read cli.py and re-read plan.py to check for:
-            - correctness of write-up
-            - to fill in any gaps
+First draft of CHANGES.md: see notes below.
 
-    - Scan code to re-orient:
+First draft of README.md.
 
-        - src/mvs/cli.py
-        x src/mvs/plan.py
-        x src/mvs/filesys.py
-        x src/mvs/utils.py
-        x src/mvs/renaming.py
-        x src/mvs/optconfig.py
-        x src/mvs/__init__.py
-        x src/mvs/constants.py
-        x src/mvs/messages.py
-        x src/mvs/problems.py
-        x src/mvs/version.py
+Editing pass:
 
-    - First draft:
+    - misc/notes.txt
+    - src/mvs/__init__.py
+    - src/mvs/cli.py
+    - src/mvs/constants.py
+    - src/mvs/filesys.py
+    - src/mvs/messages.py
+    - src/mvs/optconfig.py
+    - src/mvs/plan.py
+    - src/mvs/problems.py
+    - src/mvs/renaming.py
+    - src/mvs/utils.py
+    - src/mvs/version.py
+    - tests/__init__.py
+    - tests/conftest.py
+    - tests/editor.py
+    - tests/empty_pager.py
+    - tests/failer.py
+    - tests/test_cli.py
+    - tests/test_plan.py
+    - tests/test_problems.py
+    - tests/test_renaming.py
+    - tests/test_utils.py
+    - CHANGES.md
+    - LICENSE
+    - README.md
+    - requirements.txt
+    - setup.py
+    - tags
+    - tasks.py
+    - tox.ini
 
-        x mvs --help
-        . mvs --details
-        - README.md
-        - CHANGES.md
+CHANGES:
 
-    - Needed among warnings:
-        - Complexity regarding seq numbering.
-            - seq is relevant only if rn.new is computed via user code
-            - that step occurs *after* filtering.
-
-        - Spefically:
-            - it operates during preparation, not renaming
-
-                set_exists_and_types
-                execute_user_filter          # filtering
-                execute_user_rename          # compute rn.new, using seq (across non-filtered paths)
-                set_exists_and_types
-                check_equal                  # various checks than can shift rns out of active
-                check_orig_uniq              # and into skipped or excluded
-                check_orig_exists
-                check_orig_type
-                check_new_exists
-                check_new_parent_exists
-                check_new_collisions
-
-        -  The implication:
-            - Among actully renamed files (self.active), the seq might have
-              gaps if any rns were skipped or excluded due to checks.
-            - In complex scenarios don't rely on gapless seq.
-
-    - Editing pass:
-
-        x misc/notes.txt
-        - src/mvs/__init__.py
-        - src/mvs/cli.py
-        - src/mvs/constants.py
-        - src/mvs/filesys.py
-        - src/mvs/messages.py
-        - src/mvs/optconfig.py
-        - src/mvs/plan.py
-        - src/mvs/problems.py
-        - src/mvs/renaming.py
-        - src/mvs/utils.py
-        - src/mvs/version.py
-        - tests/__init__.py
-        - tests/conftest.py
-        - tests/editor.py
-        - tests/empty_pager.py
-        - tests/failer.py
-        - tests/test_cli.py
-        - tests/test_plan.py
-        - tests/test_problems.py
-        - tests/test_renaming.py
-        - tests/test_utils.py
-        - CHANGES.md
-        - LICENSE
-        - README.md
-        - requirements.txt
-        - setup.py
-        - tags
-        - tasks.py
-        - tox.ini
-
-    - Don't delete this until just before publish.
-
-    - Changes:
-        - Support for case-change renamings
-        - Added user-prefs (and --disable)
-        - The --edit option (and --editor)
-        - Problem control:
-            - Informed-consent model rather than avoid-all-problems.
-            - Problems re-organized, simplified, and expanded to cover other situations.
-            - Dropped old mechanisms:
-                --skip PROB...
-                --clobber PROB...
-                --create PROB...
-            - Added new ones:
-                --skip PROB...
-                --strict PROB...
-        - Enhanced listing behavior (and added --list).
-        - Bug fix: Windows when replacing/clobbering a path.
-        - New kwargs passed to user's rename and filter functions.
-
-    - Policy changes.
+    - Support for case-change renamings
+    - Added user-prefs (and --disable)
+    - The --edit option (and --editor)
+    - Problem control:
+        - Informed-consent model rather than avoid-all-problems.
+        - Problems re-organized, simplified, and expanded to cover other situations.
+        - Dropped old mechanisms:
+            --skip PROB...
+            --clobber PROB...
+            --create PROB...
+        - Added new ones:
+            --skip PROB...
+            --strict PROB...
+    - Enhanced listing behavior (and added --list).
+    - Bug fix: Windows when replacing/clobbering a path.
+    - New kwargs passed to user's rename and filter functions.
+    - Policy:
         - Orig paths must be regular file or directory.
         - The --create control will create parents, not move-create.
         - New Problem('same')
@@ -134,55 +85,65 @@ New documentation and editing pass:
             - skipped by default
             - affects only case-preserving systems
 
+CAVEATS:
+
     - Document that --pager and --editor are executed with shell=True.
 
-    - Add caveats:
+    - Renaming is implemented with pathlib, which depends on os.rename()
+      os.replace().
 
-        - Renaming is implemented with pathlib, which depends on os.rename()
-          os.replace().
+    - Renames across file systems can fail according to those docs.
 
-        - Renames across file systems can fail according to those docs.
+    - Be sensible.
 
-        - Be sensible.
+        - If you have a lot of renaming to do involving complex scenarios (eg
+          files replacing nonempty dirs), break it down into more sane steps.
 
-            - If you have a lot of renaming to do involving complex scenarios (eg
-              files replacing nonempty dirs), break it down into more sane steps.
+        - Don't rename stuff that could affect the ability of subsequent
+          renames to succeed. The mvs library checks the renaming plan against
+          the current file system: it does not check each rename against the
+          future file system after some renamings have occurred.
 
-            - Don't rename stuff that could affect the ability of subsequent
-              renames to succeed. The mvs library checks the renaming plan against
-              the current file system: it does not check each rename against the
-              future file system after some renamings have occurred.
+        - Complex interactions among renamings are not guarded against with
+          any rigor. For example:
 
-            - Complex interactions among renamings are not guarded against with
-              any rigor. For example:
+            - For example, a prior renaming alters directory path needed by
+              subsequent renaming.
 
-                - For example, a prior renaming alters directory path needed by
-                  subsequent renaming.
+            - Multiple new-collisions on the same new-path.
 
-                - Multiple new-collisions on the same new-path.
+    - The package is tested on case-sensitive and case-preserving operating
+      systems, but not on case-insensitive systems. In that context,
+      regular renamings will probably work fine. Some case-change-only
+      renamings won't be treated as problems by the checks (if rn.new fails
+      to exists-strict), so the renaming would be tried, and it will fail.
 
-        - The package is tested on case-sensitive and case-preserving operating
-          systems, but not on case-insensitive systems. In that context,
-          regular renamings will probably work fine. Some case-change-only
-          renamings won't be treated as problems by the checks (if rn.new fails
-          to exists-strict), so the renaming would be tried, and it will fail.
+    - Renaming renames the leaf, not the leaf plus its parent. When
+      renaming something, mvs asks whether the parent of its new path
+      exists.
 
-        - Renaming renames the leaf, not the leaf plus its parent. When
-          renaming something, mvs asks whether the parent of its new path
-          exists.
+        - If yes, then the renaming does not need to concern itself with
+          the parent and the renaming affects only the leaf node.
 
-            - If yes, then the renaming does not need to concern itself with
-              the parent and the renaming affects only the leaf node.
+        - If no, then the renaming will be refused unless the user requests
+          create-parent and, if so, the new-parent is created. The
+          old-parent will be unchanged.
 
-            - If no, then the renaming will be refused unless the user requests
-              create-parent and, if so, the new-parent is created. The
-              old-parent will be unchanged.
+        - That behavior is reasonable: old-parent might contain other stuff
+          and mvs was not instructed modify it.
 
-            - That behavior is reasonable: old-parent might contain other stuff
-              and mvs was not instructed modify it.
+        - And it most renaming scenarios, the behavior is not surprising
+          or counter-intuitive.
 
-            - And it most renaming scenarios, the behavior is not surprising
-              or counter-intuitive.
+    - Sequence numbering can have gaps in some scenarios:
+        - seq is relevant only if rn.new is computed via user code
+        - that step occurs *after* filtering.
+        - immediately after new paths are calculated via user code the seq
+          numbering is gapless.
+        - but then we check for problems, which can move renamings out of
+          active and into skipped or excluded.
+        - if the user proceeds with renaming in the face of that, the
+          renamed paths won't have gapless sequence numbering.
 
 tasks.py: bump:
 

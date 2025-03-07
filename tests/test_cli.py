@@ -369,14 +369,17 @@ def test_version_and_help(tr, creators):
         **kws,
     )
 
-    # Details.
+    # Details: general check for same roster of words.
     wa, outs, cli = run_checks(
         *run_args,
-        '--details',
+        '--details', 'all',
         out = BYPASS,
         **kws,
     )
-    assert cli.out.split() == CLI.details.split()
+    assert cli.out.split() == ' '.join(
+        section
+        for _, section in CLI.details.items()
+    ).split()
 
     # Help.
     wa, outs, cli = run_checks(
