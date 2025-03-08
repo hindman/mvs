@@ -9,8 +9,8 @@ from collections import defaultdict
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from textwrap import dedent
 from short_con import cons
+from textwrap import dedent
 
 from .constants import CON, STRUCTURES
 from .optconfig import OptConfig, positive_int
@@ -85,7 +85,7 @@ class CliRenamer:
         # Status tracking:
         # - The exit_code attribute governs the self.done property
         # - Datetime when first log file was written.
-        # - Attributes ensure each run() sub-step executes only once.
+        # - Attributes to ensure each run() sub-step executes only once.
         self.exit_code = None
         self.logged_at = None
         self.has_prepared = False
@@ -675,6 +675,7 @@ DEETS[DETAILS_SECTIONS.sections] = f'''
         {DETAILS_SECTIONS.code}     | User-supplied code
         {DETAILS_SECTIONS.problems} | Problems
         {DETAILS_SECTIONS.config}   | Configuration and logging
+        {DETAILS_SECTIONS.caveats}  | Caveats
 
 '''
 
@@ -723,15 +724,15 @@ DEETS[DETAILS_SECTIONS.process] = '''
     general phases.
 
     Collect inputs. The script parses command-line arguments, reads the
-    user preferences configuration file, and merges the two (command lines
+    user preferences configuration file, and merges the two (command-line
     settings override configuration). Then in collects input paths and
     allows the user to edit them (if --edit). Failures or invalid input
     during this phase will cause mvs to halt.
 
-    Prepare the renaming plan. The script initializes a RenamingPlan
-    instance, which parses input paths into pairs of original and new
-    paths, runs user-supplied code to filter out paths and to create or
-    modify new paths.
+    Prepare the renaming plan. The script initializes a RenamingPlan instance,
+    which parses input paths into pairs of original and new paths, runs
+    user-supplied code to filter out paths, and then runs user-supplied code to
+    create or modify new paths.
 
     Check for problems. Each proposed renaming is checked for the
     following: are the original and new paths identical; is the original
@@ -936,6 +937,62 @@ DEETS[DETAILS_SECTIONS.config] = '''
     such errors, no other renamings are attempted. The user can use the two
     log files to determine all details of the attempted renaming and which
     specific renaming led to the unexpected error.
+
+'''
+
+DEETS[DETAILS_SECTIONS.caveats] = '''
+
+    Caveats
+    -------
+
+    Interactions among renamings. Complex interactions among renamings are not
+    guarded against with any rigor. The mvs library checks the renaming plan
+    against the current file system: it does not check each renaming against
+    the future file system after some renamings in the plan have occurred. The
+    general advice is to be sensible and incremental in your work. If you have
+    a lot of renamings to perform involving complex interactions, break the
+    work down into smaller steps that are easier for you (and the mvs code) to
+    reason about.
+
+    Case-insensitive file systems. The mvs code is tested on case-sensitive and
+    case-preserving operating systems, but not on case-insensitive systems. In
+    that context, regular renamings will probably work fine. However, to give
+    one example, case-change-only renamings will not be interpreted as problems
+    by the mvs checks even though, when attempted, such a renaming would fail
+    on a case-insensitive system.
+
+    Renaming operates only on the leaf node of a path. The mvs code renames
+    only the leaf of a file path, not the leaf and its parent. When checking a
+    proposed renaming, mvs asks whether the parent of its new path exists. If
+    yes, then the renaming does not need to concern itself with the parent
+    since the renaming affects only the leaf node. If no, mvs will create the
+    missing parent (at least by default). What mvs will not do is rename an
+    existing parent while also renaming the leaf portions of paths within that
+    parent. That restriction is reasonable: such a parent directory might
+    contain other material and mvs was not instructed modify it.
+
+    Sequences numbers can have gaps under some scenarios. Such numbers are
+    relevant only when new paths are created or modified by user-supplied code.
+    The sequence numbers supplied to that code are guaranteed to be gapless.
+    However, if the user's renaming code fails or returns an invalid value, the
+    renaming will be marked as having an unresolvable problem and thus skipped.
+    Similarly, after new paths are calculated, the renaming checks might find
+    other unresolvable problems, leading to more skipped renamings. If the user
+    provides confirmation to proceed with the renaming plan in that kind of
+    situation, the sequence numbers among the actually renamed paths would have
+    gaps. The advice given above to be sensible applies here: if you care about
+    gapless sequences, do not confirm a renaming plan containing unresolvable
+    problems.
+
+    The --pager and --editor commands use a shell. This is done so that the
+    values supplied for those options can themselves contain spaces, arguments,
+    and options. Do not supply values for --pager and --editor that would fail
+    under subprocess.run(COMMAND, shell = True).
+
+    Renamings across files systems. Renaming is implemented with pathlib, which
+    depends on os.rename() and os.replace(). According to the documenation for
+    those operations, renaming across file systems can fail. More generally,
+    the mvs libary is not tested under such scenarios.
 
 '''
 

@@ -26,7 +26,9 @@ class OptConfig:
                  validator = None,
                  real_default = None,
                  **params):
-        # Whether start a new argparse group before calling add_argument().
+
+        # Group name. If defined, a new argparse group will
+        # be started before calling add_argument().
         self.group = group
 
         # The names supplied to add_argument(): eg, ('--help', '-h').

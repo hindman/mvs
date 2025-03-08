@@ -13,19 +13,16 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Basic read-through for agreement with --details:
-    - src/mvs/cli.py
-    - src/mvs/plan.py
-
-Add CAVEATS section to --details: see notes below.
-
-First draft of CHANGES.md: see notes below.
-
-First draft of README.md.
+Add a new --details section: structures
 
 Editing pass:
 
+    - CHANGES.md
+    - LICENSE
+    - README.md
     - misc/notes.txt
+    - requirements.txt
+    - setup.py
     - src/mvs/__init__.py
     - src/mvs/cli.py
     - src/mvs/constants.py
@@ -37,6 +34,8 @@ Editing pass:
     - src/mvs/renaming.py
     - src/mvs/utils.py
     - src/mvs/version.py
+    - tags
+    - tasks.py
     - tests/__init__.py
     - tests/conftest.py
     - tests/editor.py
@@ -47,103 +46,7 @@ Editing pass:
     - tests/test_problems.py
     - tests/test_renaming.py
     - tests/test_utils.py
-    - CHANGES.md
-    - LICENSE
-    - README.md
-    - requirements.txt
-    - setup.py
-    - tags
-    - tasks.py
     - tox.ini
-
-CHANGES:
-
-    - Support for case-change renamings
-    - Added user-prefs (and --disable)
-    - The --edit option (and --editor)
-    - Problem control:
-        - Informed-consent model rather than avoid-all-problems.
-        - Problems re-organized, simplified, and expanded to cover other situations.
-        - Dropped old mechanisms:
-            --skip PROB...
-            --clobber PROB...
-            --create PROB...
-        - Added new ones:
-            --skip PROB...
-            --strict PROB...
-    - Enhanced listing behavior (and added --list).
-    - Bug fix: Windows when replacing/clobbering a path.
-    - New kwargs passed to user's rename and filter functions.
-    - Policy:
-        - Orig paths must be regular file or directory.
-        - The --create control will create parents, not move-create.
-        - New Problem('same')
-            - This less strong variant of Problem('equal').
-            - equal speaks to user input: did user ask for renaming of this rn?
-            - same speaks to whether renaming is supported by the policies of mvs.
-        - New Problem('recase')
-            - skipped by default
-            - affects only case-preserving systems
-
-CAVEATS:
-
-    - Document that --pager and --editor are executed with shell=True.
-
-    - Renaming is implemented with pathlib, which depends on os.rename()
-      os.replace().
-
-    - Renames across file systems can fail according to those docs.
-
-    - Be sensible.
-
-        - If you have a lot of renaming to do involving complex scenarios (eg
-          files replacing nonempty dirs), break it down into more sane steps.
-
-        - Don't rename stuff that could affect the ability of subsequent
-          renames to succeed. The mvs library checks the renaming plan against
-          the current file system: it does not check each rename against the
-          future file system after some renamings have occurred.
-
-        - Complex interactions among renamings are not guarded against with
-          any rigor. For example:
-
-            - For example, a prior renaming alters directory path needed by
-              subsequent renaming.
-
-            - Multiple new-collisions on the same new-path.
-
-    - The package is tested on case-sensitive and case-preserving operating
-      systems, but not on case-insensitive systems. In that context,
-      regular renamings will probably work fine. Some case-change-only
-      renamings won't be treated as problems by the checks (if rn.new fails
-      to exists-strict), so the renaming would be tried, and it will fail.
-
-    - Renaming renames the leaf, not the leaf plus its parent. When
-      renaming something, mvs asks whether the parent of its new path
-      exists.
-
-        - If yes, then the renaming does not need to concern itself with
-          the parent and the renaming affects only the leaf node.
-
-        - If no, then the renaming will be refused unless the user requests
-          create-parent and, if so, the new-parent is created. The
-          old-parent will be unchanged.
-
-        - That behavior is reasonable: old-parent might contain other stuff
-          and mvs was not instructed modify it.
-
-        - And it most renaming scenarios, the behavior is not surprising
-          or counter-intuitive.
-
-    - Sequence numbering can have gaps in some scenarios:
-        - seq is relevant only if rn.new is computed via user code
-        - that step occurs *after* filtering.
-        - immediately after new paths are calculated via user code the seq
-          numbering is gapless.
-        - but then we check for problems, which can move renamings out of
-          active and into skipped or excluded.
-        - if the user proceeds with renaming in the face of that, the
-          renamed paths won't have gapless sequence numbering.
 
 tasks.py: bump:
 

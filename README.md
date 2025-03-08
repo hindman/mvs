@@ -24,7 +24,7 @@ $ rename 's/foo/bar/' *
 Unfortunately, the script was a chainsaw – undeniably useful, but able to
 inflict devastation after a single false move. As a result, I rarely used
 `rename` directly for my bulk renaming needs, which were extensive on several
-projects I worked on. Instead, I wrote my own Perl script to the job. Its
+projects I worked on. Instead, I wrote my own Perl script to do the job. Its
 operation was roughly the same, but it included precautions to help me avoid
 disastrous mistakes. The most important were checking that the new paths did
 not collide with existing paths on the file system and including an inspection
@@ -42,35 +42,17 @@ the user provides original file paths and a snippet of Python code to perform
 the original-to-new computation, or (2) the user provides both original paths
 and new paths directly.
 
-Either way, before any renaming occurs, the following checks occur: are the
-original paths different than their corresponding new paths; do all of the
-original paths exist; do any new paths already exist; do any new paths collide
-with each other; and are the parent directories of any new paths missing? If
-those checks look alright, the proposed renamings are listed for inspection by
-the user, and renaming occurs only after confirmation.
+Either way, before any renaming occurs, mvs checks for common problems that
+might occur in bulk renaming scenarios, provides an informative listing of the
+proposed renamings grouping them into meaningful categories based on those
+checks, and waits for user confirmation before attempting any renamings. In
+addition, the script logs detailed information about the renamings to support
+the user in the event that they later regret what they have done.
 
-The script provides command-line options to customize its behavior:
-
-- Supply input paths in various ways: positional arguments, STDIN, a text data
-  file, or the clipboard.
-
-- Specify the structure of the input paths data: a flat sequence, two
-  blank-delimited paragraphs, alternating pairs of lines, or delimited rows.
-
-- Use a snippet of Python code to filter out original paths before renaming,
-  which can be handy if you want to supply paths via a command-line glob
-  pattern but do not want to rename all of them.
-
-- Specify in advance how the program should respond to the validation problems
-  listed above: skip the item with the problem, rename in spite of the problem
-  (even it that means overwriting other paths), or take remedial action (create
-  a missing parent).
-
-- Customize the start and skip values for a sequence number that can be used in
-  the renaming code snippet.
-
-- Request dryrun mode, which executes the filtering, checking, and listing
-  behavior but does not rename anything.
+The script provides various command-line options to customize its behavior,
+supports user preferences, and provides detailed documentation on policy,
+process, listings, user-supplied code, problem checking, configuration,
+logging, and caveats.
 
 #### Installation and examples
 
@@ -80,47 +62,14 @@ Install the library in the usual way.
 $ pip install mvs
 ```
 
-Get help and additional details regarding the options summarized above.
+Get usage help and detailed documentation.
 
 ```bash
 $ mvs --help
 $ mvs --details
 ```
 
-In general terms, the executable has the following usage. Note that the default
-structure is flat and that the `--rename` option is considered structural
-because it implies that the input path data consists solely of original paths.
-
-```text
-mvs SOURCE [STRUCTURE] [OTHER]
-
-PATHS     : positionals
-SOURCE    : PATHS | --stdin | --file PATH | --clipboard
-STRUCTURE : --flat | --paragraphs | --pairs | --rows | --rename CODE
-OTHER     : other options
-```
-
-The different input structures can be illustrated with a simple renaming
-scenario that adds a file extension to the original paths. Note that if the
-paths were supplied via a source other than positional arguments, each path
-should be on its own line.
-
-```bash
-# The default: a flat sequence of paths (first original paths, then new).
-$ mvs a b a.new b.new
-$ mvs a b a.new b.new --flat
-
-# Alternating pairs: original, new, etc.
-$ mvs a a.new b b.new --pairs
-
-# Paragraphs delimited by at least one blank.
-$ mvs a b '' a.new b.new --paragraphs
-```
-
-The same renaming scenario could also be performed via a code snippet. The
-snippet will be compiled into a function that receives the original path as the
-local variable `o`. See the program's help text for additional details about
-user-supplied code.
+A simple example:
 
 ```bash
 $ mvs a b --rename 'return f"{o}.new"'
@@ -128,9 +77,10 @@ $ mvs a b --rename 'return f"{o}.new"'
 
 #### Programmatic usage
 
-The mvs package also supports bulk renaming via a programmatic API. The first
-step is to configure a `RenamingPlan`. Initialization parameters and their
-defaults are as follows.
+The mvs package also supports bulk renaming via a programmatic API. This can be
+done by creating a `RenamingPlan` instance and then calling its
+`rename_paths()` method. Initialization parameters and their defaults are as
+follows.
 
 ```python
 from mvs import RenamingPlan
@@ -150,13 +100,10 @@ plan = RenamingPlan(
     seq_start = 1,
     seq_step = 1,
 
-    # Problem controls. For each control mechanism, supply the
-    # names of the problems to be controlled via the mechanism,
-    # either as a sequence or space-delimited str.
-    # See mvs --details for the problem names.
+    # Additional rigor in the face of problems.
+    # See mvs --details problems.
     skip = None,
-    clobber = None,
-    create = None,
+    strict = None,
 )
 
 plan.rename_paths()
@@ -182,9 +129,18 @@ plan.prepare()
 # All relevant information about the plan and its renamings.
 print(plan.as_dict)
 
-# Whether preparation failed due to problems and what they are.
+# Whether preparation failed.
 print(plan.failed)
-print(plan.uncontrolled_problems)
+
+# The renamings organized into four groups:
+# - filtered out by user code;
+# - excluded, due to unresolvable problems;
+# - skipped, due to resolvable problems configured by user an ineligible;
+# - active renamings.
+print(plan.filtered)
+print(plan.excluded)
+print(plan.skipped)
+print(plan.active)
 
 # Try to rename.
 try:

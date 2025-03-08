@@ -48,6 +48,7 @@ DETAILS_SECTIONS = cons(
     'code',
     'problems',
     'config',
+    'caveats',
 )
 
 ####
