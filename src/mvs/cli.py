@@ -668,14 +668,15 @@ DEETS[DETAILS_SECTIONS.sections] = f'''
     The detailed help is organized into sections. Supply one or more
     arguments with the --details option to see them.
 
-        {DETAILS_SECTIONS.sections} | Sections
-        {DETAILS_SECTIONS.policy}   | Policy
-        {DETAILS_SECTIONS.process}  | Process
-        {DETAILS_SECTIONS.listing}  | Listing
-        {DETAILS_SECTIONS.code}     | User-supplied code
-        {DETAILS_SECTIONS.problems} | Problems
-        {DETAILS_SECTIONS.config}   | Configuration and logging
-        {DETAILS_SECTIONS.caveats}  | Caveats
+        {DETAILS_SECTIONS.sections}   | Sections
+        {DETAILS_SECTIONS.policy}     | Policy
+        {DETAILS_SECTIONS.process}    | Process
+        {DETAILS_SECTIONS.listing}    | Listing
+        {DETAILS_SECTIONS.structures} | Input path structures
+        {DETAILS_SECTIONS.code}       | User-supplied code
+        {DETAILS_SECTIONS.problems}   | Problems
+        {DETAILS_SECTIONS.config}     | Configuration and logging
+        {DETAILS_SECTIONS.caveats}    | Caveats
 
 '''
 
@@ -778,6 +779,26 @@ DEETS[DETAILS_SECTIONS.listing] = '''
     By default, the listing includes all applicable groups. The user can
     restrict the listing to one or more specific groups: filtered,
     excluded, skipped, parent, exists, collides, or ok.
+
+'''
+
+DEETS[DETAILS_SECTIONS.structures] = '''
+
+    Input path structures
+    ---------------------
+
+    The supported structures for the input paths are described in the main
+    --help text. Here are examples to illustrate each structure via
+    command-line arguments in bash.
+
+        --flat        a b    A.NEW B.NEW
+        --paragraphs  a b '' A.NEW B.NEW
+        --pairs       a A.NEW  b B.NEW
+        --rows        $'a\\tA.NEW' $'b\\tB.NEW'
+        --origs       a b --rename 'return f"{o.upper()}.NEW"'
+
+    If the input source is STDIN, clipboard, or a text file, each argument
+    should be a line in the text.
 
 '''
 

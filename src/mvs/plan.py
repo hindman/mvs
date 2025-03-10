@@ -322,6 +322,7 @@ class RenamingPlan:
             # Rows: original-new path pairs, as tab-delimited rows.
             origs = []
             news = []
+
             for row in self.inputs:
                 if row:
                     cells = row.split(CON.tab)

@@ -45,6 +45,7 @@ DETAILS_SECTIONS = cons(
     'policy',
     'process',
     'listing',
+    'structures',
     'code',
     'problems',
     'config',

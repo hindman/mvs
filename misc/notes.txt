@@ -13,40 +13,40 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Add a new --details section: structures
-
 Editing pass:
 
-    - CHANGES.md
-    - LICENSE
-    - README.md
-    - misc/notes.txt
-    - requirements.txt
-    - setup.py
-    - src/mvs/__init__.py
     - src/mvs/cli.py
-    - src/mvs/constants.py
-    - src/mvs/filesys.py
-    - src/mvs/messages.py
-    - src/mvs/optconfig.py
     - src/mvs/plan.py
-    - src/mvs/problems.py
-    - src/mvs/renaming.py
-    - src/mvs/utils.py
-    - src/mvs/version.py
-    - tags
-    - tasks.py
-    - tests/__init__.py
+    x src/mvs/problems.py
+    x src/mvs/__init__.py
+    x src/mvs/constants.py
+    x src/mvs/filesys.py
+    x src/mvs/messages.py
+    x src/mvs/optconfig.py
+    x src/mvs/renaming.py
+    x src/mvs/utils.py
+    x src/mvs/version.py
+
     - tests/conftest.py
-    - tests/editor.py
-    - tests/empty_pager.py
-    - tests/failer.py
     - tests/test_cli.py
     - tests/test_plan.py
-    - tests/test_problems.py
-    - tests/test_renaming.py
-    - tests/test_utils.py
-    - tox.ini
+    x tests/__init__.py
+    x tests/editor.py
+    x tests/empty_pager.py
+    x tests/failer.py
+    x tests/test_problems.py
+    x tests/test_renaming.py
+    x tests/test_utils.py
+
+    - CHANGES.md
+    - README.md
+    - misc/notes.txt
+    x LICENSE
+    x requirements.txt
+    x setup.py
+    x tags
+    x tasks.py
+    x tox.ini
 
 tasks.py: bump:
 
