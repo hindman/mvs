@@ -149,7 +149,7 @@ def dist(c, publish = False, test = False):
     '''
     repo = 'testpypi' if test else 'pypi'
     c.run('rm -rf dist')
-    c.run('python setup.py sdist bdist_wheel')
+    c.run('python -m build')
     c.run('echo')
     c.run('twine check dist/*')
     if publish:
