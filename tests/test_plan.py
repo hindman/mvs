@@ -738,6 +738,7 @@ def test_same(tr, create_wa):
     parents_new = ('FOO', 'bar')
     expecteds_exclude = ('foo/xyz', 'BAR/xyz', 'a.new') + parents_orig
     expecteds_create = news + parents_orig + parents_new
+    expecteds_fail = origs + parents_orig
     exp_invX = 'XX.'
     exp_invS = 'ss.'
     run_args = (tr, create_wa, origs, news)
@@ -766,6 +767,7 @@ def test_same(tr, create_wa):
             strict = PN.parent,
             failure = True,
             no_change = True,
+            expecteds = expecteds_fail,
             reason = Failure(FN.strict, PN.parent),
         )
 
