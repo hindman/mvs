@@ -153,5 +153,5 @@ def dist(c, publish = False, test = False):
     c.run('echo')
     c.run('twine check dist/*')
     if publish:
-        c.run(f'twine upload -r {repo} dist/*')
+        c.run(f'twine upload -r {repo} dist/* {vflag}')
 
