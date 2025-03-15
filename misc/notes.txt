@@ -15,14 +15,14 @@ todos: TODOs
 
 Editing pass:
 
-    - src/mvs/cli.py
     - src/mvs/plan.py
-    x src/mvs/problems.py
     x src/mvs/__init__.py
+    x src/mvs/cli.py
     x src/mvs/constants.py
     x src/mvs/filesys.py
     x src/mvs/messages.py
     x src/mvs/optconfig.py
+    x src/mvs/problems.py
     x src/mvs/renaming.py
     x src/mvs/utils.py
     x src/mvs/version.py

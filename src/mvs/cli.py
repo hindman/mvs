@@ -68,6 +68,7 @@ class CliRenamer:
                  logfh = None):
 
         # Attributes received as arguments.
+        # The streams and file handle are purely for testing.
         self.args = args
         self.stdout = stdout
         self.stderr = stderr
@@ -623,7 +624,7 @@ class CliRenamer:
         return f'{msg}\n{rns_text}'
 
     def paginate(self, text):
-        # Takes some text and either send it to the
+        # Takes some text and either sends it to the
         # configured pager or writes it to self.stdout.
         if self.opts.pager:
             p = subprocess.Popen(
@@ -655,7 +656,7 @@ class CliRenamer:
         return None
 
 ####
-# Help text: details
+# Help text: details.
 ####
 
 DEETS = {}
@@ -685,34 +686,33 @@ DEETS[DETAILS_SECTIONS.policy] = '''
     Policy
     ------
 
-    The philosophy or policy of the mvs script has four key principles.
+    The mvs script has four key principles.
 
-    Reasonable caution. The script halts in the face of invalid input and
-    it checks for a variety of problems typical in renaming scenarios. But
-    it does not take pains to catch rare problems that can under complex or
-    exotic scenarios.
+    Reasonable caution. The script halts in the face of invalid input and it
+    checks for a variety of problems typical in renaming scenarios. But it does
+    not take pains to catch rare problems that can under complex or exotic
+    scenarios.
 
-    Informed consent. No renamings are executed without user confirmation.
-    As part of the confirmation process renamings are listed in general
-    categories (filtered, excluded, skipped, or active) along with
-    information charactizing any problems revealed by the checks.
+    Informed consent. Renamings are executed only after user confirmation. As
+    part of the confirmation process, renamings are listed in general
+    categories (filtered, excluded, skipped, or active) along with information
+    charactizing any problems revealed by the checks.
 
     Eager renaming, with guardrails. By default, mvs prefers to execute
     renamings. Specifically, that means the following: (1) even if some
-    renamings have unresolvable problems, mvs will proceed with the others
-    that do not; (2) even if some new paths lack an existing parent, mvs
-    will create the needed parent directories; and (3) even is some new
-    paths are already occupied, mvs will perform a clobber (delete current
-    item at the path, then perform the original-to-new renaming). But mvs
-    will not make heroic efforts to fulfill renaming prequisities, and it
-    does not support renamings or clobberings for path types other than
-    directory or regular file.
+    renamings have unresolvable problems, mvs will proceed with the others that
+    do not; (2) even if some new paths lack an existing parent, mvs will create
+    the needed parent directories; and (3) even if some new paths are already
+    occupied, mvs will perform a clobber (delete current item at the path, then
+    perform the original-to-new renaming). But mvs will not make heroic efforts
+    to fulfill renaming prequisities, and it does not support renamings or
+    clobberings for path types other than directory or regular file.
 
-    Rigor via configuration. The user can suppress that renaming eagerness
-    via command line arguments and a configuration file. Renamings having
-    resolvable problems can be automatically skipped. Or mvs can be
-    configured to halt before starting renaming if problems occur -- either
-    any problems or those of specific kinds.
+    Rigor via configuration. The user can suppress that renaming eagerness via
+    command line arguments and a configuration file. Renamings having
+    resolvable problems can be automatically skipped. Or mvs can be configured
+    to halt before starting renaming if problems occur -- either any problems
+    or those of specific kinds.
 
 '''
 
@@ -721,37 +721,36 @@ DEETS[DETAILS_SECTIONS.process] = '''
     Process
     -------
 
-    The process used by the mvs script can be described has have five
-    general phases.
+    The mvs script has have five general phases.
 
-    Collect inputs. The script parses command-line arguments, reads the
-    user preferences configuration file, and merges the two (command-line
-    settings override configuration). Then in collects input paths and
-    allows the user to edit them (if --edit). Failures or invalid input
-    during this phase will cause mvs to halt.
+    Collect inputs. The script parses command-line arguments, reads the user
+    preferences configuration file, and merges the two (command-line settings
+    override configuration). Then it collects input paths and allows the user
+    to edit them (if --edit). Failures or invalid input during this phase will
+    cause mvs to halt.
 
     Prepare the renaming plan. The script initializes a RenamingPlan instance,
     which parses input paths into pairs of original and new paths, runs
     user-supplied code to filter out paths, and then runs user-supplied code to
     create or modify new paths.
 
-    Check for problems. Each proposed renaming is checked for the
-    following: are the original and new paths identical; is the original
-    path unique across all original paths; does the original path exist; is
-    the original path a supported file type (directory or regular file);
-    does the new path exist already and, if so, what is its file type; does
-    the parent of the new path exist; and does the new path collide
-    another new path and, if so, what is its file type?
+    Check for problems. Each proposed original-to-new renaming is checked for
+    the following: are the original and new paths identical; is the original
+    path unique across all original paths; does the original path exist; is the
+    original path a supported file type (directory or regular file); does the
+    new path exist already and, if so, what is its file type; does the parent
+    of the new path exist; and does the new path collide another new path and,
+    if so, what is its file type?
 
-    Listing and logging. The script prints a listing of all proposed
-    renamings and logs all RenamingPlan details. The script halts
-    if the plan failed or if the user specified --dryrun.
+    Listing and logging. The script prints a listing of all proposed renamings
+    and logs all RenamingPlan details. The script halts if the plan failed or
+    if the user specified --dryrun.
 
-    Confirmation. The user is prompted to confirm than renaming
-    should proceed (unless --yes).
+    Confirmation. The user is prompted to confirm than renaming should proceed
+    (unless --yes).
 
-    Renaming. The script attempts to perform the active renamings. During
-    that process it updates the tracking log file.
+    Renaming. The script attempts to perform the active renamings. During that
+    process it updates the tracking log file.
 
 '''
 
@@ -760,25 +759,25 @@ DEETS[DETAILS_SECTIONS.listing] = '''
     Listing
     -------
 
-    Before asking the user for confirmation to proceed, mvs prints a
-    listing that organizes the proposed renamings into four broad groups:
+    Before asking the user for confirmation to proceed, mvs prints a listing
+    that organizes the proposed renamings into four groups:
 
         filtered | by user code
         excluded | due to unresolvable problems
         skipped  | due to resolvable problems configured by user as ineligible
         active   | awaiting confirmation
 
-    Active renamings are further classified according to the type of
-    problem they have, if any.
+    Active renamings are further classified according to the type of problem
+    they have, if any.
 
         parent   | parent of new path does not exist
         exists   | new path exists
         collides | new path collides with another new path
         ok       | no problems
 
-    By default, the listing includes all applicable groups. The user can
-    restrict the listing to one or more specific groups: filtered,
-    excluded, skipped, parent, exists, collides, or ok.
+    By default, the listing includes all applicable groups. Via the --list
+    option, the user can restrict the listing to one or more specific groups:
+    filtered, excluded, skipped, parent, exists, collides, or ok.
 
 '''
 
@@ -809,7 +808,7 @@ DEETS[DETAILS_SECTIONS.code] = '''
 
     User code should return a value, as follows:
 
-        renaming  | new path, as a str or Path
+        renaming  | new path, as a str or pathlib.Path
         filtering | True to retain original path, False to reject
 
     User code has access to the following variables:
@@ -865,22 +864,22 @@ DEETS[DETAILS_SECTIONS.problems] = '''
     resolution. Most relate to bad inputs. Failures halt the renaming plan
     early before any renamings occur.
 
-    Problems. These are specific to one renaming. Some of them are
-    unresolvable: for example, if the original path does not exist the
-    renaming is impossible. Other problems are resolvable and they come in
-    two general categories: (1) if a new path implies a parent directory
-    that does not exist yet, mvs can create the directory before attempting
-    the renaming; and (2) if a new path already exists, mvs can delete the
-    curent item at that path before renaming. Problems have a general name
-    and an optional variety to further classify them.
+    Problems. These are specific to one original-to-new renaming. Some of them
+    are unresolvable: for example, if the original path does not exist the
+    renaming is impossible. Other problems are resolvable and they come in two
+    general categories: (1) if a new path implies a parent directory that does
+    not exist yet, mvs can create the directory before attempting the renaming;
+    and (2) if a new path already exists, mvs can delete the current item at
+    that path before renaming. Problems have a general name and an optional
+    variety to further classify them.
 
     Unresolvable problems:
 
         Name      | Variety | Description
-        -----------------------------------------------------------------------------------
+        ------------------------------------------------------------------------------
         noop      | equal   | ORIG and NEW are equal
         noop      | same    | ORIG and NEW are functionally the same
-        noop      | recase  | Renaming just a case-change, but file system agrees with NEW
+        noop      | recase  | Renaming just a case-change; file system agrees with NEW
         missing   | .       | ORIG does not exist
         duplicate | .       | ORIG is the same as another ORIG
         type      | .       | ORIG is neither a regular file nor directory
@@ -891,19 +890,19 @@ DEETS[DETAILS_SECTIONS.problems] = '''
     Resolvable problems:
 
         Name     | Variety | Description
-        -----------------------------------------------------------------------------------
+        ------------------------------------------------------------------------------
         exists   | .       | NEW exists
         exists   | diff    | NEW exists and differs with ORIG in type
         exists   | full    | NEW exists and is a non-empty directory
         collides | .       | NEW collides with another NEW
-        collides | diff    | NEW collides with another NEW, and they differ in type
-        collides | full    | NEW collides with another NEW, and it is a non-empty directory
+        collides | diff    | NEW collides with another NEW; they differ in type
+        collides | full    | NEW collides with another NEW; latter non-empty directory
         parent   | .       | Parent directory of NEW does not exist
 
-    Skipping resolvable problems. The user can configure mvs to skip
-    renamings having specific types of resolvable problems. This is done
-    with the --skip option, which takes one or more problem NAME or
-    NAME-VARIETY values. A few examples:
+    Skipping resolvable problems. The user can configure mvs to skip renamings
+    having specific types of resolvable problems. This is done with the --skip
+    option, which takes one or more problem NAME or NAME-VARIETY values. A few
+    examples:
 
         --skip exists collides
         --skip exists-full collides-full
@@ -911,7 +910,8 @@ DEETS[DETAILS_SECTIONS.problems] = '''
 
     Halting the renaming plan in the face of resolvable problems. Via the
     --strict option, the user can configure mvs to halt the renaming plan
-    if certain types of problems are found. A few examples:
+    before attempting any renamings if certain types of problems are found. A
+    few examples:
 
         # Halt if any renamings were excluced due to unresolvable problems.
         --strict excluded
@@ -920,7 +920,7 @@ DEETS[DETAILS_SECTIONS.problems] = '''
         --strict parent
         --strict parent exists collides
 
-        # Maximum strictness.
+        # Two ways to specify maximum strictness.
         --strict all
         --strict excluded parent exists collides
 
@@ -937,9 +937,11 @@ DEETS[DETAILS_SECTIONS.config] = '''
     MVS_APP_DIR environment variable.
 
     User preferences file. By default the file is located at
-    $HOME/.mvs/config.json and its structure directly mimics the
-    command-line options: keys are the same as the command-line options,
-    and values are the desired settings. An example:
+    $HOME/.mvs/config.json and its structure directly mimics the command-line
+    options: keys are the same as the command-line options, and values are the
+    desired settings. When both preferences and command-line options are used,
+    settings in the options override analogous settings in preferences. An
+    example configuration file:
 
         {
             "nolog": true,
@@ -947,17 +949,18 @@ DEETS[DETAILS_SECTIONS.config] = '''
             "editor": "emacs"
         }
 
-    Logging. By default, each renaming scenario produces two log files, one
-    containing all details of the RenamingPlan (DATETIME-plan.json) and the
-    other indicating which original-to-new renaming was active in the event
-    that that attempt to rename the paths failed unexpectedly
-    (DATETIME-tracking.json). The intent of the log files is to support the
-    user by providing as much information as possible in cases where the
-    user messed up (renamings that they later regret) or where some
-    unexpected error occurred during an attempted renaming. In the face of
-    such errors, no other renamings are attempted. The user can use the two
-    log files to determine all details of the attempted renaming and which
-    specific renaming led to the unexpected error.
+    Logging. By default, each renaming scenario produces two log files. The
+    intent of the log files is to support the user by providing as much
+    information as possible in cases where the user messed up (renamings that
+    they later regret) or where some unexpected error occurred during an
+    attempted renaming. The primary log file contains all details about the
+    RenamingPlan (DATETIME-plan.json). The other log file is irrelevant for
+    successful renaming scenarios, but it can be used to determine which
+    original-to-new renaming was in play at the moment that an attempted
+    renaming failed unexpectedly (DATETIME-tracking.json). In the face of such
+    errors, no other renamings are attempted. The user can use the two log
+    files to determine all details of the attempted renaming and which specific
+    renaming led to the unexpected error.
 
 '''
 
@@ -967,7 +970,7 @@ DEETS[DETAILS_SECTIONS.caveats] = '''
     -------
 
     Interactions among renamings. Complex interactions among renamings are not
-    guarded against with any rigor. The mvs library checks the renaming plan
+    guarded against with any rigor. The mvs script checks the renaming plan
     against the current file system: it does not check each renaming against
     the future file system after some renamings in the plan have occurred. The
     general advice is to be sensible and incremental in your work. If you have
@@ -990,20 +993,20 @@ DEETS[DETAILS_SECTIONS.caveats] = '''
     missing parent (at least by default). What mvs will not do is rename an
     existing parent while also renaming the leaf portions of paths within that
     parent. That restriction is reasonable: such a parent directory might
-    contain other material and mvs was not instructed modify it.
+    contain other material and mvs was not instructed modify those paths.
 
-    Sequences numbers can have gaps under some scenarios. Such numbers are
-    relevant only when new paths are created or modified by user-supplied code.
-    The sequence numbers supplied to that code are guaranteed to be gapless.
-    However, if the user's renaming code fails or returns an invalid value, the
-    renaming will be marked as having an unresolvable problem and thus skipped.
-    Similarly, after new paths are calculated, the renaming checks might find
-    other unresolvable problems, leading to more skipped renamings. If the user
-    provides confirmation to proceed with the renaming plan in that kind of
-    situation, the sequence numbers among the actually renamed paths would have
-    gaps. The advice given above to be sensible applies here: if you care about
-    gapless sequences, do not confirm a renaming plan containing unresolvable
-    problems.
+    Sequences numbers can have gaps under some scenarios. Such numbers (see
+    --seq and --step) are relevant only when new paths are created or modified
+    by user-supplied code. The sequence numbers supplied to that code are
+    guaranteed to be gapless. However, if the user's renaming code fails or
+    returns an invalid value, the renaming will be marked as having an
+    unresolvable problem and thus skipped. Similarly, after new paths are
+    calculated, the renaming checks might find other unresolvable problems,
+    leading to more skipped renamings. If the user provides confirmation to
+    proceed with the renaming plan in that kind of situation, the sequence
+    numbers among the actually renamed paths would have gaps. The advice given
+    above to be sensible applies here: if you care about gapless sequences, do
+    not confirm a renaming plan containing unresolvable problems.
 
     The --pager and --editor commands use a shell. This is done so that the
     values supplied for those options can themselves contain spaces, arguments,
@@ -1036,7 +1039,8 @@ class CLI:
         or a data source mapping old paths to new paths. By default, no
         renaming occurs until: (1) the renamings have been checked for common
         types of problems; (2) the user reviews the renamings and other summary
-        information; and (3) the user provides confirmation to proceed.
+        information; and (3) the user provides confirmation to proceed. For
+        additional help text, see --details.
 
     ''')
 
