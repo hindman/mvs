@@ -153,5 +153,6 @@ def dist(c, publish = False, test = False):
     c.run('echo')
     c.run('twine check dist/*')
     if publish:
+        vflag = '--verbose' if verbose else ''
         c.run(f'twine upload -r {repo} dist/* {vflag}')
 
