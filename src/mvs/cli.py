@@ -696,7 +696,7 @@ DEETS[DETAILS_SECTIONS.policy] = '''
     Informed consent. Renamings are executed only after user confirmation. As
     part of the confirmation process, renamings are listed in general
     categories (filtered, excluded, skipped, or active) along with information
-    charactizing any problems revealed by the checks.
+    characterizing any problems revealed by the checks.
 
     Eager renaming, with guardrails. By default, mvs prefers to execute
     renamings. Specifically, that means the following: (1) even if some
@@ -705,7 +705,7 @@ DEETS[DETAILS_SECTIONS.policy] = '''
     the needed parent directories; and (3) even if some new paths are already
     occupied, mvs will perform a clobber (delete current item at the path, then
     perform the original-to-new renaming). But mvs will not make heroic efforts
-    to fulfill renaming prequisities, and it does not support renamings or
+    to fulfill renaming prerequisites, and it does not support renamings or
     clobberings for path types other than directory or regular file.
 
     Rigor via configuration. The user can suppress that renaming eagerness via
@@ -913,7 +913,7 @@ DEETS[DETAILS_SECTIONS.problems] = '''
     before attempting any renamings if certain types of problems are found. A
     few examples:
 
-        # Halt if any renamings were excluced due to unresolvable problems.
+        # Halt if any renamings were excluded due to unresolvable problems.
         --strict excluded
 
         # Halt if any renamings had resolvable problems of various types.
@@ -1014,9 +1014,9 @@ DEETS[DETAILS_SECTIONS.caveats] = '''
     under subprocess.run(COMMAND, shell = True).
 
     Renamings across files systems. Renaming is implemented with pathlib, which
-    depends on os.rename() and os.replace(). According to the documenation for
+    depends on os.rename() and os.replace(). According to the documentation for
     those operations, renaming across file systems can fail. More generally,
-    the mvs libary is not tested under such scenarios.
+    the mvs library is not tested under such scenarios.
 
 '''
 
@@ -1129,13 +1129,13 @@ class CLI:
             group = 'User code',
             names = '--filter',
             validator = str,
-            metavar = 'CODE',
-            help = 'Code to filter input paths',
+            metavar = 'C',
+            help = 'Code to filter input paths [return True to retain path]',
         ),
         OptConfig(
             names = '--rename -r',
             validator = str,
-            metavar = 'CODE',
+            metavar = 'C',
             help = f'Code to create or modify new paths',
         ),
         OptConfig(
@@ -1223,7 +1223,7 @@ class CLI:
         ),
         OptConfig(
             names = '--list',
-            metavar = 'NAME',
+            metavar = 'S',
             validator = OptConfig.list_of_str,
             nargs = '+',
             choices = LISTING_CHOICES,
@@ -1243,7 +1243,7 @@ class CLI:
         OptConfig(
             group = 'Problem handling and other configuration',
             names = '--skip',
-            metavar = 'PROB',
+            metavar = 'P',
             validator = OptConfig.list_of_str,
             nargs = '+',
             choices = Problem.SKIP_CHOICES,
@@ -1251,7 +1251,7 @@ class CLI:
         ),
         OptConfig(
             names = '--strict',
-            metavar = 'PROB',
+            metavar = 'P',
             validator = OptConfig.list_of_str,
             nargs = '+',
             choices = StrictMode.CHOICES,
@@ -1261,7 +1261,7 @@ class CLI:
             names = '--disable',
             validator = OptConfig.list_of_str,
             nargs = '+',
-            metavar = 'FLAG',
+            metavar = 'F',
             default = [],
             help = 'Disable flag options that were set true in user preferences',
         ),

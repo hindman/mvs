@@ -42,7 +42,7 @@ the user provides original file paths and a snippet of Python code to perform
 the original-to-new computation, or (2) the user provides both original paths
 and new paths directly.
 
-Either way, before any renaming occurs, mvs checks for common problems that
+Either way, before any renaming occurs, `mvs` checks for common problems that
 might occur in bulk renaming scenarios, provides an informative listing of the
 proposed renamings grouping them into meaningful categories based on those
 checks, and waits for user confirmation before attempting any renamings. In
@@ -51,8 +51,8 @@ the user in the event that they later regret what they have done.
 
 The script provides various command-line options to customize its behavior,
 supports user preferences, and provides detailed documentation on policy,
-process, listings, user-supplied code, problem checking, configuration,
-logging, and caveats.
+process, listings, input path structures, user-supplied code, problem checking,
+configuration, logging, and caveats.
 
 #### Installation and examples
 
@@ -101,7 +101,7 @@ plan = RenamingPlan(
     seq_step = 1,
 
     # Additional rigor in the face of problems.
-    # See mvs --details problems.
+    # See mvs --details.
     skip = None,
     strict = None,
 )

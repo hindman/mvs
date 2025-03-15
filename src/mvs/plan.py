@@ -57,17 +57,14 @@ class RenamingPlan:
     # Special values used by self.tracking_index.
     #
     # During rename_paths(), we track progress via self.tracking_index. It has
-    # two special values (shown below in TRACKING). Otherwise, a non-negative
-    # value indicates which Renaming we are currently trying to rename. If an
-    # exception occurs, that index tells us which Renaming was in progress.
-    # API users of RenamingPlan who care can catch the exception and infer
-    # which paths were renamed and which were not. Similarly, CliRenamer logs
-    # the necessary information to figure that out.
+    # two special values, as shown in TRACKING. Otherwise, a non-negative value
+    # indicates which Renaming we are currently trying to rename. If an
+    # exception occurs, that index tells us which Renaming was in progress. API
+    # users of RenamingPlan who care can catch the exception and infer which
+    # paths were renamed and which were not. Similarly, CliRenamer logs the
+    # necessary information to figure that out.
     #
-    TRACKING = cons(
-        not_started = -1,
-        done = None,
-    )
+    TRACKING = cons(not_started = -1, done = None)
 
     def __init__(self,
                  # Path inputs and their structure.
@@ -127,7 +124,7 @@ class RenamingPlan:
 
         # Information used when checking Renaming instance for problems.
         self.path_groups = None
-        self.new_collision_key_func = (
+        self.collision_key_func = (
             str if case_sensitivity() == FS_TYPES.case_sensitive else
             str.lower
         )
@@ -480,7 +477,7 @@ class RenamingPlan:
             return None
 
     def check_orig_uniq(self, rn, seq_val):
-        k = self.new_collision_key_func(rn.orig)
+        k = self.collision_key_func(rn.orig)
         others = [o for o in self.path_groups[k] if o is not rn]
         if others:
             return Problem(PN.duplicate)
@@ -575,7 +572,7 @@ class RenamingPlan:
 
         # Get the other Renaming instances that have the same new-path as
         # the current rn. If rn.new is unique, there is no problem.
-        k = self.new_collision_key_func(rn.new)
+        k = self.collision_key_func(rn.new)
         others = [o for o in self.path_groups[k] if o is not rn]
         if not others:
             return None
@@ -601,7 +598,7 @@ class RenamingPlan:
         self.path_groups = {}
         for rn in self.active:
             path = getattr(rn, attrib)
-            k = self.new_collision_key_func(path)
+            k = self.collision_key_func(path)
             self.path_groups.setdefault(k, []).append(rn)
 
     ####
@@ -685,7 +682,7 @@ class RenamingPlan:
         if self.call_at and self.tracking_index == self.call_at[0]:
             self.call_at[1](self)
 
-        # Set up Path instance.
+        # Set up Path instances.
         po = Path(rn.orig)
         pn = Path(rn.new)
 

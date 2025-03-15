@@ -6,7 +6,7 @@
 
 - Abandoned the v1 approach to problem control and instead adopted a policy of
   eager renaming with informed consent (see --details policy). Problem names
-  and classifications were reorganzied, simplified, and expanded to cover other
+  and classifications were reorganized, simplified, and expanded to cover other
   situations. The old problem-control mechanisms requiring users to specify in
   advance which types of problems were acceptable in renaming scenarios were
   dropped (--skip, --clobber, and --create). Under v2 users only need to use
@@ -18,10 +18,10 @@
 
 - Expanded detailed help (see --details).
 
-- Policy changes and clarifications. (1) Orignal paths must be directories or
-  regular files. (2) The mvs code will create missing parents but it will not
-  execute renamings that require modifying the parent portions of existing
-  paths (see --details caveats).
+- Implemented policy changes and clarifications. (1) Original paths must be
+  directories or regular files. (2) The mvs code will create missing parents
+  but it will not execute renamings that require modifying the parent portions
+  of existing paths (see --details caveats).
 
 - Added support for case-change-only renamings.
 
@@ -29,9 +29,9 @@
 
 - Added the --edit option (and --editor).
 
-- Different and additional variables are made available to user-supplied
+- Different and additional variables were made available to user-supplied
   renaming and filtering code.
 
-- Bug fix involving renamings on Windows when replacing/clobbering an existing
-  path.
+- Fixed bug involving renamings on Windows when replacing/clobbering an
+  existing path.
 

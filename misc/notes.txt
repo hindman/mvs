@@ -13,71 +13,31 @@ toc: Table of contents
 todos: TODOs
 --------
 
-Editing pass:
-
-    - src/mvs/plan.py
-    x src/mvs/__init__.py
-    x src/mvs/cli.py
-    x src/mvs/constants.py
-    x src/mvs/filesys.py
-    x src/mvs/messages.py
-    x src/mvs/optconfig.py
-    x src/mvs/problems.py
-    x src/mvs/renaming.py
-    x src/mvs/utils.py
-    x src/mvs/version.py
-
-    - tests/conftest.py
-    - tests/test_cli.py
-    - tests/test_plan.py
-    x tests/__init__.py
-    x tests/editor.py
-    x tests/empty_pager.py
-    x tests/failer.py
-    x tests/test_problems.py
-    x tests/test_renaming.py
-    x tests/test_utils.py
-
-    - CHANGES.md
-    - README.md
-    - misc/notes.txt
-    x LICENSE
-    x requirements.txt
-    x setup.py
-    x tags
-    x tasks.py
-    x tox.ini
-
-tasks.py: bump:
-
-    - Set version tag
-
-    - Retroactively set this tag:
-
-        v1.0.0
-        f5019972d33e6ea0ea4f418bfac0d03427e744fb
-
-Publish with major version bump.
+...
 
 --------
 road-map: Road map
 --------
 
-Clipboard source test disabled for Linux: revive if possible.
+Most compelling for me:
 
-Support sym-link renames.
+    - Convenience renaming operations [see CONVENIENCE_OPS].
 
-New inputs options: delimiters and stripping [see INPUT_OPTS].
+Other ideas:
 
-Logging operations: list, prune, undo prior rename.
+    - Clipboard source test disabled for Linux: revive if possible.
 
-Additional failure control: backup [see CONTROL_BACKUP].
+    - Support sym-link renames.
 
-Alternative dryrun output styles [see DRYRUN_OUTPUTS].
+    - New inputs options: delimiters and stripping [see INPUT_OPTS].
 
-Convenience renaming operations [see CONVENIENCE_OPS].
+    - Logging operations: list, prune, undo prior rename.
 
-Other operations: copy, link, chmod, times, touch [see OTHER_OPS].
+    - Additional failure control: backup [see CONTROL_BACKUP].
+
+    - Alternative dryrun output styles [see DRYRUN_OUTPUTS].
+
+    - Other operations: copy, link, chmod, times, touch [see OTHER_OPS].
 
 --------
 dev-notes: Dev notes
@@ -130,6 +90,12 @@ Tag file creation:
 
     inv tags
 
+Scenario to exercise CLI listing behavior:
+
+    # Scenario in empty directory.
+    ln -s foo bar && touch a d e f g h i ii j jj n
+    mvs --dryrun --pager '' --filter 'return "k" not in o' --skip collides --pairs a b  c c  d xx/d  e x  f m g m  h xx/h  i ii  j jj  k1 kk1 k2 kk2 n nn
+
 --------
 misc-notes: Misc notes
 --------
@@ -145,7 +111,7 @@ Why problem control was overhauled, yet again:
 
         - To achieve a renaming that might require more active measures (create
           a new parent, clobber an existing file, or collide with another new
-          path), the user must understand the problem control system and
+          path), the user had to understand the problem control system and
           vocabulary.
 
         - As more flavors of problems have been discovered (same, recase, and
@@ -268,12 +234,6 @@ Why problem control was overhauled, yet again:
             --list CATEGORY...  # filtered|skipped|excluded|parent|exists|collides|ok
             --list all          # The default.
 
-Scenario to exercise CLI listing behavior:
-
-    # Scenario in empty directory.
-    ln -s foo bar && touch a d e f g h i ii j jj n
-    mvs --dryrun --pager '' --filter 'return "k" not in o' --skip collides --pairs a b  c c  d xx/d  e x  f m g m  h xx/h  i ii  j jj  k1 kk1 k2 kk2 n nn
-
 Why runtime user-code problems are treated as unresolvable:
 
     - In theory, one could forge ahead with a renaming even in the face of a
@@ -282,7 +242,7 @@ Why runtime user-code problems are treated as unresolvable:
         - Verdict: doable, but not worth the trouble right now. Easy enough to
           add later.
 
-        - Seem notes below for some of the issues and possible solutions.
+        - See notes below for some of the issues and possible solutions.
 
     - Filter problem:
 
@@ -301,7 +261,7 @@ Other operations: copy, link, chmod, times, touch [OTHER_OPS]:
 
 Additional failure control: backup [CONTROL_BACKUP]:
     - Before clobber, backup the target (foo => foo.bak).
-    - Which really just adds a supplement renaming.
+    - Which really just adds a supplemental renaming.
 
 New inputs options: delimiters and stripping [INPUT_OPTS]:
     --row-delimiter [default: tab]
