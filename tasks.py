@@ -143,7 +143,7 @@ def tox(c):
     c.run('tox', env = d)
 
 @task
-def dist(c, publish = False, test = False):
+def dist(c, publish = False, test = False, verbose = False):
     '''
     Create distribution, optionally publishing to pypi or testpypi.
     '''
